@@ -52,7 +52,7 @@ export function AutoCompleteSearchBox({
       renderInput={(params) => (
         <TextField
           {...params}
-          sx={{ minWidth: `${width}px` }}
+          sx={{ width: `min(${width}px, 100%)` }}
           placeholder={placeholder}
           onChange={(event) => {
             const value = event.target.value;

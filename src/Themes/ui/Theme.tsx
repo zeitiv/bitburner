@@ -132,6 +132,10 @@ export function refreshTheme(): void {
               userSelect: "none",
               color: Settings.theme.primarydark,
             },
+            // Inputs below 16px trigger iOS Safari's zoom-on-focus, which jars mobile users on every tap.
+            "@media (max-width:600px)": {
+              fontSize: "16px",
+            },
           },
         },
       },

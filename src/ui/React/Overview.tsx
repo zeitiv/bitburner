@@ -22,6 +22,8 @@ const useStyles = makeStyles()({
     display: "flex",
     justifyContent: "flex-end",
     flexDirection: "column",
+    maxWidth: "100vw",
+    boxSizing: "border-box",
   },
 
   header: {

@@ -1,12 +1,15 @@
 import React, { useMemo, useCallback, useState, useEffect, useRef } from "react";
-import { styled, Theme, CSSObject } from "@mui/material/styles";
+import { styled, Theme, CSSObject, useTheme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import { makeStyles } from "tss-react/mui";
 import MuiDrawer from "@mui/material/Drawer";
 import List from "@mui/material/List";
 import Divider from "@mui/material/Divider";
 import Tooltip from "@mui/material/Tooltip";
+import IconButton from "@mui/material/IconButton";
 import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
+import MenuIcon from "@mui/icons-material/Menu";
 import ListItem from "@mui/material/ListItem";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
@@ -125,6 +128,8 @@ const useStyles = makeStyles()((theme: Theme) => ({
 export function SidebarRoot(props: { page: Page }): React.ReactElement {
   const isSettingUpKeyBindings = useRef(false);
   useCycleRerender();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   let flash: Page | null = null;
   switch (ITutorial.currStep) {
@@ -192,8 +197,13 @@ export function SidebarRoot(props: { page: Page }): React.ReactElement {
       if (flash === page) {
         iTutorialNextStep();
       }
+      // On mobile the drawer is a full overlay, so close it after navigating instead of
+      // leaving it covering the page content. Desktop's persisted open/closed rail is untouched.
+      if (isMobile) {
+        setOpen(false);
+      }
     },
-    [flash],
+    [flash, isMobile],
   );
 
   /**
@@ -305,10 +315,11 @@ export function SidebarRoot(props: { page: Page }): React.ReactElement {
   }, [canGoToPage, clickPage, props.page]);
 
   const { classes } = useStyles();
-  const [open, setOpen] = useState(Settings.IsSidebarOpened);
+  const [open, setOpen] = useState(() => (isMobile ? false : Settings.IsSidebarOpened));
   const toggleDrawer = (): void =>
     setOpen((old) => {
-      Settings.IsSidebarOpened = !old;
+      // The open/closed rail is a desktop preference; don't let mobile's overlay open/close persist it.
+      if (!isMobile) Settings.IsSidebarOpened = !old;
       return !old;
     });
   const li_classes = useMemo(() => ({ root: classes.listitem }), [classes.listitem]);
@@ -318,7 +329,30 @@ export function SidebarRoot(props: { page: Page }): React.ReactElement {
   // memo() can't be (easily) used on components like <List>, because the
   // props.children array will be a different object every time.
   return (
-    <Drawer open={open} anchor="left" variant="permanent">
+    <>
+      {isMobile && !open && (
+        <IconButton
+          aria-label="open sidebar"
+          onClick={toggleDrawer}
+          sx={{
+            position: "fixed",
+            top: 4,
+            left: 4,
+            zIndex: 1600,
+            backgroundColor: (t) => t.colors.backgroundprimary,
+            border: (t) => `1px solid ${t.palette.primary.main}`,
+          }}
+        >
+          <MenuIcon color="primary" />
+        </IconButton>
+      )}
+      <Drawer
+        open={open}
+        anchor="left"
+        variant={isMobile ? "temporary" : "permanent"}
+        onClose={toggleDrawer}
+        sx={isMobile ? { zIndex: 1600 } : undefined}
+      >
       {useMemo(
         () => (
           <ListItem classes={li_classes} button onClick={toggleDrawer}>
@@ -433,6 +467,7 @@ export function SidebarRoot(props: { page: Page }): React.ReactElement {
         />
         <Typography id="sidebar-extra-hook-3"></Typography>
       </List>
-    </Drawer>
+      </Drawer>
+    </>
   );
 }
