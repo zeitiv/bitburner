@@ -3,6 +3,8 @@ import Draggable, { DraggableEventHandler } from "react-draggable";
 import { makeStyles } from "tss-react/mui";
 import Collapse from "@mui/material/Collapse";
 import Paper from "@mui/material/Paper";
+import { useTheme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import EqualizerIcon from "@mui/icons-material/Equalizer";
@@ -67,7 +69,13 @@ export interface OverviewSettings {
 
 export function Overview({ children, mode }: IProps): React.ReactElement {
   const draggableRef = useRef<HTMLDivElement>(null);
-  const [open, setOpen] = useState(Settings.overview.opened);
+  const theme = useTheme();
+  // noSsr: this is a client-only app, so read the real match on first render.
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"), { noSsr: true });
+  // Start collapsed on mobile so the panel doesn't cover page content by default; desktop keeps
+  // the persisted preference, and the (onboarding-critical) tutorial panel always starts open.
+  const startsCollapsed = isMobile && mode !== "tutorial";
+  const [open, setOpen] = useState(() => (startsCollapsed ? false : Settings.overview.opened));
   const [x, setX] = useState(Settings.overview.x);
   const [y, setY] = useState(Settings.overview.y);
   const { classes } = useStyles();
@@ -81,8 +89,11 @@ export function Overview({ children, mode }: IProps): React.ReactElement {
   };
 
   useEffect(() => {
+    // Don't let mobile's forced-collapsed default or its (likely unintended) drag position
+    // clobber the desktop-persisted preference.
+    if (isMobile) return;
     Settings.overview = { x, y, opened: open };
-  }, [open, x, y]);
+  }, [open, x, y, isMobile]);
 
   const fakeDrag = useMemo(
     () =>
