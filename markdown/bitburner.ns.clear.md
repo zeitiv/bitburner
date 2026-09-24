@@ -6,7 +6,7 @@
 
 Clear data from a file.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 clear(handle: string): void;
@@ -14,11 +14,41 @@ clear(handle: string): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  handle | string | Text file to clear. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+handle
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Text file to clear.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 void
 

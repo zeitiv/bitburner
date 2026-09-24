@@ -1,71 +1,83 @@
+import { Player } from "@player";
+import { AugmentationName, FactionName } from "@enums";
 import { Fragment } from "./Fragment";
 import { ActiveFragment } from "./ActiveFragment";
-import { FragmentType } from "./FragmentType";
-import { IStaneksGift } from "./IStaneksGift";
-import { IPlayer } from "../PersonObjects/IPlayer";
+import { FragmentTypeEnum } from "./FragmentType";
+import { BaseGift } from "./BaseGift";
 import { Factions } from "../Faction/Factions";
 import { CalculateEffect } from "./formulas/effect";
 import { StaneksGiftEvents } from "./StaneksGiftEvents";
-import { Generic_fromJSON, Generic_toJSON, Reviver } from "../utils/JSONReviver";
-import { CONSTANTS } from "../Constants";
+import { Generic_fromJSON, Generic_toJSON, IReviverValue, constructorsForReviver } from "../utils/JSONReviver";
 import { StanekConstants } from "./data/Constants";
-import { BitNodeMultipliers } from "../BitNode/BitNodeMultipliers";
-import { Player } from "../Player";
-import { AugmentationNames } from "../Augmentation/data/AugmentationNames";
+import { currentNodeMults } from "../BitNode/BitNodeMultipliers";
+import { defaultMultipliers, mergeMultipliers, Multipliers, scaleMultipliers } from "../PersonObjects/Multipliers";
+import { Augmentations } from "../Augmentation/Augmentations";
+import { getKeyList } from "../utils/helpers/getKeyList";
 
-export class StaneksGift implements IStaneksGift {
+export class StaneksGift extends BaseGift {
+  isBonusCharging = false;
+  justCharged = true;
   storedCycles = 0;
-  fragments: ActiveFragment[] = [];
 
   baseSize(): number {
-    return StanekConstants.BaseSize + BitNodeMultipliers.StaneksGiftExtraSize + Player.sourceFileLvl(13);
+    return StanekConstants.BaseSize + currentNodeMults.StaneksGiftExtraSize + Player.activeSourceFileLvl(13);
   }
 
   width(): number {
-    return Math.floor(this.baseSize() / 2 + 1);
+    return Math.max(2, Math.min(Math.floor(this.baseSize() / 2 + 1), StanekConstants.MaxSize));
   }
   height(): number {
-    return Math.floor(this.baseSize() / 2 + 0.6);
+    return Math.max(3, Math.min(Math.floor(this.baseSize() / 2 + 0.6), StanekConstants.MaxSize));
   }
 
-  charge(player: IPlayer, af: ActiveFragment, threads: number): void {
-    af.avgCharge = (af.numCharge * af.avgCharge + threads) / (af.numCharge + 1);
-    af.numCharge++;
+  charge(af: ActiveFragment, threads: number): void {
+    if (threads > af.highestCharge) {
+      af.numCharge = (af.highestCharge * af.numCharge) / threads + 1;
+      af.highestCharge = threads;
+    } else {
+      af.numCharge += threads / af.highestCharge;
+    }
 
-    const cotmg = Factions["Church of the Machine God"];
-    cotmg.playerReputation += (player.faction_rep_mult * (Math.pow(threads, 0.95) * (cotmg.favor + 100))) / 1000;
+    const cotmg = Factions[FactionName.ChurchOfTheMachineGod];
+    cotmg.playerReputation += (Player.mults.faction_rep * (Math.pow(threads, 0.95) * (cotmg.favor + 100))) / 1000;
+    this.justCharged = true;
   }
 
   inBonus(): boolean {
-    return (this.storedCycles * CONSTANTS._idleSpeed) / 1000 > 1;
+    return this.storedCycles >= 5;
   }
 
-  process(p: IPlayer, numCycles = 1): void {
-    if (!p.hasAugmentation(AugmentationNames.StaneksGift1)) return;
+  process(numCycles = 1): void {
+    if (!Player.hasAugmentation(AugmentationName.StaneksGift1)) return;
     this.storedCycles += numCycles;
-    this.storedCycles -= 10;
-    this.storedCycles = Math.max(0, this.storedCycles);
-    this.updateMults(p);
+    const usedCycles = this.isBonusCharging ? 5 : 1;
+    this.isBonusCharging = false;
+    this.storedCycles = Math.max(0, this.storedCycles - usedCycles);
+    // Only update multipliers (slow) if there was charging done since last process tick.
+    if (this.justCharged) {
+      Player.applyEntropy(Player.entropy);
+      this.justCharged = false;
+    }
     StaneksGiftEvents.emit();
   }
 
   effect(fragment: ActiveFragment): number {
-    // Find all the neighbooring cells
-    const cells = fragment.neighboors();
-    // find the neighbooring active fragments.
+    // Find all the neighboring cells
+    const cells = fragment.neighbors();
+    // find the neighboring active fragments.
     const maybeFragments = cells.map((n) => this.fragmentAt(n[0], n[1]));
 
     // Filter out undefined with typescript "Type guard". Whatever
-    let neighboors = maybeFragments.filter((v: ActiveFragment | undefined): v is ActiveFragment => !!v);
+    let neighbors = maybeFragments.filter((v: ActiveFragment | undefined): v is ActiveFragment => !!v);
 
-    neighboors = neighboors.filter((fragment) => fragment.fragment().type === FragmentType.Booster);
+    neighbors = neighbors.filter((fragment) => fragment.fragment().type === FragmentTypeEnum.Booster);
     let boost = 1;
 
-    neighboors = neighboors.filter((v, i, s) => s.indexOf(v) === i);
-    for (const neighboor of neighboors) {
+    neighbors = neighbors.filter((v, i, s) => s.indexOf(v) === i);
+    for (const neighboor of neighbors) {
       boost *= neighboor.fragment().power;
     }
-    return CalculateEffect(fragment.avgCharge, fragment.numCharge, fragment.fragment().power, boost);
+    return CalculateEffect(fragment.highestCharge, fragment.numCharge, fragment.fragment().power, boost);
   }
 
   canPlace(rootX: number, rootY: number, rotation: number, fragment: Fragment): boolean {
@@ -88,16 +100,6 @@ export class StaneksGift implements IStaneksGift {
 
   findFragment(rootX: number, rootY: number): ActiveFragment | undefined {
     return this.fragments.find((f) => f.x === rootX && f.y === rootY);
-  }
-
-  fragmentAt(worldX: number, worldY: number): ActiveFragment | undefined {
-    for (const aFrag of this.fragments) {
-      if (aFrag.fullAt(worldX, worldY)) {
-        return aFrag;
-      }
-    }
-
-    return undefined;
   }
 
   count(fragment: Fragment): number {
@@ -125,85 +127,103 @@ export class StaneksGift implements IStaneksGift {
 
   clearCharge(): void {
     this.fragments.forEach((f) => {
-      f.avgCharge = 0;
+      f.highestCharge = 0;
       f.numCharge = 0;
     });
   }
 
-  updateMults(p: IPlayer): void {
-    p.reapplyAllAugmentations(true);
-    p.reapplyAllSourceFiles();
-
+  calculateMults(): Multipliers {
+    const mults = defaultMultipliers();
     for (const aFrag of this.fragments) {
       const fragment = aFrag.fragment();
 
       const power = this.effect(aFrag);
       switch (fragment.type) {
-        case FragmentType.HackingChance:
-          p.hacking_chance_mult *= power;
+        case FragmentTypeEnum.HackingSpeed:
+          mults.hacking_speed *= power;
           break;
-        case FragmentType.HackingSpeed:
-          p.hacking_speed_mult *= power;
+        case FragmentTypeEnum.HackingMoney:
+          mults.hacking_money *= power;
           break;
-        case FragmentType.HackingMoney:
-          p.hacking_money_mult *= power;
+        case FragmentTypeEnum.HackingGrow:
+          mults.hacking_grow *= power;
           break;
-        case FragmentType.HackingGrow:
-          p.hacking_grow_mult *= power;
+        case FragmentTypeEnum.Hacking:
+          mults.hacking *= power;
+          mults.hacking_exp *= power;
           break;
-        case FragmentType.Hacking:
-          p.hacking_mult *= power;
-          p.hacking_exp_mult *= power;
+        case FragmentTypeEnum.Strength:
+          mults.strength *= power;
+          mults.strength_exp *= power;
           break;
-        case FragmentType.Strength:
-          p.strength_mult *= power;
-          p.strength_exp_mult *= power;
+        case FragmentTypeEnum.Defense:
+          mults.defense *= power;
+          mults.defense_exp *= power;
           break;
-        case FragmentType.Defense:
-          p.defense_mult *= power;
-          p.defense_exp_mult *= power;
+        case FragmentTypeEnum.Dexterity:
+          mults.dexterity *= power;
+          mults.dexterity_exp *= power;
           break;
-        case FragmentType.Dexterity:
-          p.dexterity_mult *= power;
-          p.dexterity_exp_mult *= power;
+        case FragmentTypeEnum.Agility:
+          mults.agility *= power;
+          mults.agility_exp *= power;
           break;
-        case FragmentType.Agility:
-          p.agility_mult *= power;
-          p.agility_exp_mult *= power;
+        case FragmentTypeEnum.Charisma:
+          mults.charisma *= power;
+          mults.charisma_exp *= power;
           break;
-        case FragmentType.Charisma:
-          p.charisma_mult *= power;
-          p.charisma_exp_mult *= power;
+        case FragmentTypeEnum.HacknetMoney:
+          mults.hacknet_node_money *= power;
           break;
-        case FragmentType.HacknetMoney:
-          p.hacknet_node_money_mult *= power;
+        case FragmentTypeEnum.HacknetCost:
+          mults.hacknet_node_purchase_cost /= power;
+          mults.hacknet_node_ram_cost /= power;
+          mults.hacknet_node_core_cost /= power;
+          mults.hacknet_node_level_cost /= power;
           break;
-        case FragmentType.HacknetCost:
-          p.hacknet_node_purchase_cost_mult /= power;
-          p.hacknet_node_ram_cost_mult /= power;
-          p.hacknet_node_core_cost_mult /= power;
-          p.hacknet_node_level_cost_mult /= power;
+        case FragmentTypeEnum.Rep:
+          mults.company_rep *= power;
+          mults.faction_rep *= power;
           break;
-        case FragmentType.Rep:
-          p.company_rep_mult *= power;
-          p.faction_rep_mult *= power;
+        case FragmentTypeEnum.WorkMoney:
+          mults.work_money *= power;
           break;
-        case FragmentType.WorkMoney:
-          p.work_money_mult *= power;
+        case FragmentTypeEnum.Crime:
+          mults.crime_success *= power;
+          mults.crime_money *= power;
           break;
-        case FragmentType.Crime:
-          p.crime_success_mult *= power;
-          p.crime_money_mult *= power;
-          break;
-        case FragmentType.Bladeburner:
-          p.bladeburner_max_stamina_mult *= power;
-          p.bladeburner_stamina_gain_mult *= power;
-          p.bladeburner_analysis_mult *= power;
-          p.bladeburner_success_chance_mult *= power;
+        case FragmentTypeEnum.Bladeburner:
+          mults.bladeburner_max_stamina *= power;
+          mults.bladeburner_stamina_gain *= power;
+          mults.bladeburner_analysis *= power;
+          mults.bladeburner_success_chance *= power;
           break;
       }
     }
-    p.updateSkillLevels();
+    return mults;
+  }
+
+  updateMults(): void {
+    const mults = this.calculateMults();
+    Player.mults = mergeMultipliers(Player.mults, mults);
+    Player.updateSkillLevels();
+    const zoeAmt = Player.sleeves.reduce((n, sleeve) => n + (sleeve.hasAugmentation(AugmentationName.ZOE) ? 1 : 0), 0);
+    if (zoeAmt === 0) return;
+    // Less powerful for each copy.
+    const scaling = 3 / (zoeAmt + 2);
+    const sleeveMults = scaleMultipliers(mults, scaling);
+    for (const sleeve of Player.sleeves) {
+      if (!sleeve.hasAugmentation(AugmentationName.ZOE)) continue;
+      sleeve.resetMultipliers();
+      //reapplying augmentation's multiplier
+      for (let i = 0; i < sleeve.augmentations.length; ++i) {
+        const aug = Augmentations[sleeve.augmentations[i].name];
+        sleeve.applyAugmentation(aug);
+      }
+      //applying stanek multiplier
+      sleeve.mults = mergeMultipliers(sleeve.mults, sleeveMults);
+      sleeve.updateSkillLevels();
+    }
   }
 
   prestigeAugmentation(): void {
@@ -215,20 +235,17 @@ export class StaneksGift implements IStaneksGift {
     this.storedCycles = 0;
   }
 
-  /**
-   * Serialize Staneks Gift to a JSON save state.
-   */
-  toJSON(): any {
-    return Generic_toJSON("StaneksGift", this);
+  static includedProperties = getKeyList(StaneksGift, { removedKeys: ["justCharged"] });
+
+  /** Serialize Stanek's Gift to a JSON save state. */
+  toJSON(): IReviverValue {
+    return Generic_toJSON("StaneksGift", this, StaneksGift.includedProperties);
   }
 
-  /**
-   * Initializes Staneks Gift from a JSON save state
-   */
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-  static fromJSON(value: any): StaneksGift {
-    return Generic_fromJSON(StaneksGift, value.data);
+  /** Initializes Stanek's Gift from a JSON save state */
+  static fromJSON(value: IReviverValue): StaneksGift {
+    return Generic_fromJSON(StaneksGift, value.data, StaneksGift.includedProperties);
   }
 }
 
-Reviver.constructors.StaneksGift = StaneksGift;
+constructorsForReviver.StaneksGift = StaneksGift;

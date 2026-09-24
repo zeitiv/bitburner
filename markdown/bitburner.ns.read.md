@@ -6,21 +6,51 @@
 
 Read content of a file.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-read(handle: string): any;
+read(filename: string): string;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  handle | string | Filename to read from. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
 
-any
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+filename
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the file to be read.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
+
+string
 
 Data in the specified text file.
 
@@ -28,7 +58,9 @@ Data in the specified text file.
 
 RAM cost: 0 GB
 
-This function is used to read data from a text file (.txt).
+This function is used to read data from a text file (.txt, .json, .css), a script (.js, .jsx, .ts, .tsx), a literature file (.lit), or a message (.msg).
 
-This function will return the data in the specified text file. If the text file does not exist, an empty string will be returned.
+This function will return the data in the specified file. If the file does not exist, an empty string will be returned.
+
+With literature files, the returned data is a raw HTML string.
 

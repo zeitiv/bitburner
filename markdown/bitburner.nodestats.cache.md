@@ -6,8 +6,8 @@
 
 Cache level. Only applicable for Hacknet Servers
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-cache: number;
+cache?: number;
 ```

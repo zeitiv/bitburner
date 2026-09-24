@@ -4,25 +4,55 @@
 
 ## NS.getServerUsedRam() method
 
-Get the used RAM on a server.
+Get the used RAM on a server. This includes ram used by running scripts as well as blocked ram on darknet servers.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getServerUsedRam(host: string): number;
+getServerUsedRam(host?: string): number;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  host | string | Hostname of the target server. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+host
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Hostname/IP of the target server. Optional. Defaults to current server if not provided.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 
-used ram (GB)
+The amount of used RAM (GB) on the specified server.
 
 ## Remarks
 

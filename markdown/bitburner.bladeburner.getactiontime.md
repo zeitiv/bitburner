@@ -6,20 +6,65 @@
 
 Get the time to complete an action.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getActionTime(type: string, name: string): number;
+getActionTime(type: BladeburnerActionType, name: BladeburnerActionName): number;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  type | string | Type of action. |
-|  name | string | Name of action. Must be an exact match. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+type
+
+
+</td><td>
+
+[BladeburnerActionType](./bitburner.bladeburneractiontype.md)
+
+
+</td><td>
+
+Type of action.
+
+
+</td></tr>
+<tr><td>
+
+name
+
+
+</td><td>
+
+[BladeburnerActionName](./bitburner.bladeburneractionname.md)
+
+
+</td><td>
+
+Name of action. Must be an exact match.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 
@@ -29,5 +74,5 @@ Number of milliseconds it takes to complete the specified action.
 
 RAM cost: 4 GB
 
-Returns the number of seconds it takes to complete the specified action
+Returns the number of milliseconds it takes to complete the specified action
 

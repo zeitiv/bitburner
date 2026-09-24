@@ -4,9 +4,9 @@
 
 ## Server.isConnectedTo property
 
-Flag indicating whether player is curently connected to this server
+Flag indicating whether player is currently connected to this server
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 isConnectedTo: boolean;

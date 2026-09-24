@@ -4,213 +4,226 @@
  */
 import * as walk from "acorn-walk";
 import { parse } from "acorn";
+import type * as acorn from "acorn";
+import { fromObject } from "convert-source-map";
 
-import { makeRuntimeRejectMsg } from "./NetscriptEvaluator";
-import { ScriptUrl } from "./Script/ScriptUrl";
-import { WorkerScript } from "./Netscript/WorkerScript";
-import { Script } from "./Script/Script";
-import { areImportsEquals } from "./Terminal/DirectoryHelpers";
-import { IPlayer } from "./PersonObjects/IPlayer";
+import { LoadedModule, type ScriptURL, type ScriptModule } from "./Script/LoadedModule";
+import type { Script } from "./Script/Script";
+import type { ScriptFilePath } from "./Paths/ScriptFilePath";
+import { FileType, getFileType, getModuleScript, transformScript } from "./utils/ScriptTransformer";
 
 // Makes a blob that contains the code of a given script.
 function makeScriptBlob(code: string): Blob {
   return new Blob([code], { type: "text/javascript" });
 }
 
-export async function compile(player: IPlayer, script: Script, scripts: Script[]): Promise<void> {
-  if (!shouldCompile(script, scripts)) return;
-  // The URL at the top is the one we want to import. It will
-  // recursively import all the other modules in the urlStack.
-  //
-  // Webpack likes to turn the import into a require, which sort of
-  // but not really behaves like import. Particularly, it cannot
-  // load fully dynamic content. So we hide the import from webpack
-  // by placing it inside an eval call.
-  await script.updateRamUsage(player, scripts);
-  const uurls = _getScriptUrls(script, scripts, []);
-  const url = uurls[uurls.length - 1].url;
-  if (script.url && script.url !== url) {
-    // Thoughts: Should we be revoking any URLs here?
-    // If a script is modified repeatedly between two states,
-    // we could reuse the blob at a later time.
-    // BlobCache.removeByValue(script.url);
-    // URL.revokeObjectURL(script.url);
-    // if (script.dependencies.length > 0) {
-    //   script.dependencies.forEach((dep) => {
-    //     removeBlobFromCache(dep.url);
-    //     URL.revokeObjectURL(dep.url);
-    //   });
-    // }
-  }
-  script.url = url;
-  script.module = new Promise((resolve) => resolve(eval("import(url)")));
-  script.dependencies = uurls;
-}
-
-// Begin executing a user JS script, and return a promise that resolves
-// or rejects when the script finishes.
-// - script is a script to execute (see Script.js). We depend only on .filename and .code.
-// scripts is an array of other scripts on the server.
-// env is the global environment that should be visible to all the scripts
-// (i.e. hack, grow, etc.).
-// When the promise returned by this resolves, we'll have finished
-// running the main function of the script.
-export async function executeJSScript(
-  player: IPlayer,
-  scripts: Script[] = [],
-  workerScript: WorkerScript,
-): Promise<void> {
-  const script = workerScript.getScript();
-  if (script === null) throw new Error("script is null");
-  await compile(player, script, scripts);
-  workerScript.ramUsage = script.ramUsage;
-  const loadedModule = await script.module;
-
-  const ns = workerScript.env.vars;
-
-  // TODO: putting await in a non-async function yields unhelpful
-  // "SyntaxError: unexpected reserved word" with no line number information.
-  if (!loadedModule.main) {
-    throw makeRuntimeRejectMsg(
-      workerScript,
-      `${script.filename} cannot be run because it does not have a main function.`,
-    );
-  }
-  return loadedModule.main(ns);
-}
-
-function isDependencyOutOfDate(filename: string, scripts: Script[], scriptModuleSequenceNumber: number): boolean {
-  const depScript = scripts.find((s) => s.filename == filename);
-
-  // If the script is not present on the server, we should recompile, if only to get any necessary
-  // compilation errors.
-  if (!depScript) return true;
-
-  const depIsMoreRecent = depScript.moduleSequenceNumber > scriptModuleSequenceNumber;
-  return depIsMoreRecent;
-}
-/** Returns whether we should compile the script parameter.
- *
- * @param {Script} script
- * @param {Script[]} scripts
- */
-function shouldCompile(script: Script, scripts: Script[]): boolean {
-  if (script.module === "") return true;
-  return script.dependencies.some((dep) => isDependencyOutOfDate(dep.filename, scripts, script.moduleSequenceNumber));
-}
-
-// Gets a stack of blob urls, the top/right-most element being
-// the blob url for the named script on the named server.
+// Webpack likes to turn the import into a require, which sort of
+// but not really behaves like import. So we use a "magic comment"
+// to disable that and leave it as a dynamic import.
 //
-// - script -- the script for whom we are getting a URL.
-// - scripts -- all the scripts available on this server
-// - seen -- The modules above this one -- to prevent mutual dependency.
-//
-// TODO We don't make any effort to cache a given module when it is imported at
-// different parts of the tree. That hasn't presented any problem with during
-// testing, but it might be an idea for the future. Would require a topo-sort
-// then url-izing from leaf-most to root-most.
-/**
- * @param {Script} script
- * @param {Script[]} scripts
- * @param {Script[]} seen
- * @returns {ScriptUrl[]} All of the compiled scripts, with the final one
- *                         in the list containing the blob corresponding to
- *                         the script parameter.
- */
-// BUG: apparently seen is never consulted. Oops.
-function _getScriptUrls(script: Script, scripts: Script[], seen: Script[]): ScriptUrl[] {
-  // Inspired by: https://stackoverflow.com/a/43834063/91401
-  const urlStack: ScriptUrl[] = [];
-  // Seen contains the dependents of the current script. Make sure we include that in the script dependents.
-  for (const dependent of seen) {
-    if (!script.dependents.some((s) => s.server === dependent.server && s.filename == dependent.filename)) {
-      script.dependents.push({ server: dependent.server, filename: dependent.filename });
-    }
+// However, we need to be able to replace this implementation in tests. Ideally
+// it would be fine, but Jest causes segfaults when using dynamic import: see
+// https://github.com/nodejs/node/issues/35889 and
+// https://github.com/facebook/jest/issues/11438
+// import() is not a function, so it can't be replaced. We need this separate
+// config object to provide a hook point.
+export const config = {
+  doImport(url: ScriptURL): Promise<ScriptModule> {
+    return import(/*webpackIgnore:true*/ url) as Promise<ScriptModule>;
+  },
+};
+
+// Maps code to LoadedModules, so we can reuse compiled code across servers,
+// or possibly across files (if someone makes two copies of the same script,
+// or changes a script and then changes it back).
+// Modules can never be garbage collected by Javascript, so it's good to try
+// to keep from making more than we need.
+const moduleCache = new Map<string, WeakRef<LoadedModule>>();
+const cleanup = new FinalizationRegistry((mapKey: string) => {
+  // A new entry can be created with the same key, before this callback is called.
+  if (moduleCache.get(mapKey)?.deref() === undefined) {
+    moduleCache.delete(mapKey);
   }
-  seen.push(script);
+});
+
+export function compile(script: Script, scripts: Map<ScriptFilePath, Script>): Promise<ScriptModule> {
+  // Return the module if it already exists
+  if (script.mod) return script.mod.module;
+
   try {
-    // Replace every import statement with an import to a blob url containing
-    // the corresponding script. E.g.
-    //
-    // import {foo} from "bar.js";
-    //
-    // becomes
-    //
-    // import {foo} from "blob://<uuid>"
-    //
-    // Where the blob URL contains the script content.
-
-    // Parse the code into an ast tree
-    const ast: any = parse(script.code, { sourceType: "module", ecmaVersion: "latest", ranges: true });
-
-    const importNodes: Array<any> = [];
-    // Walk the nodes of this tree and find any import declaration statements.
-    walk.simple(ast, {
-      ImportDeclaration(node: any) {
-        // Push this import onto the stack to replace
-        importNodes.push({
-          filename: node.source.value,
-          start: node.source.range[0] + 1,
-          end: node.source.range[1] - 1,
-        });
-      },
-      ExportNamedDeclaration(node: any) {
-        if (node.source) {
-          importNodes.push({
-            filename: node.source.value,
-            start: node.source.range[0] + 1,
-            end: node.source.range[1] - 1,
-          });
-        }
-      },
-      ExportAllDeclaration(node: any) {
-        if (node.source) {
-          importNodes.push({
-            filename: node.source.value,
-            start: node.source.range[0] + 1,
-            end: node.source.range[1] - 1,
-          });
-        }
-      },
-    });
-    // Sort the nodes from last start index to first. This replaces the last import with a blob first,
-    // preventing the ranges for other imports from being shifted.
-    importNodes.sort((a, b) => b.start - a.start);
-    let transformedCode = script.code;
-    // Loop through each node and replace the script name with a blob url.
-    for (const node of importNodes) {
-      const filename = node.filename.startsWith("./") ? node.filename.substring(2) : node.filename;
-
-      // Find the corresponding script.
-      const matchingScripts = scripts.filter((s) => areImportsEquals(s.filename, filename));
-      if (matchingScripts.length === 0) continue;
-
-      const [importedScript] = matchingScripts;
-
-      const urls = _getScriptUrls(importedScript, scripts, seen);
-
-      // The top url in the stack is the replacement import file for this script.
-      urlStack.push(...urls);
-      const blob = urls[urls.length - 1].url;
-
-      // Replace the blob inside the import statement.
-      transformedCode = transformedCode.substring(0, node.start) + blob + transformedCode.substring(node.end);
-    }
-
-    // We automatically define a print function() in the NetscriptJS module so that
-    // accidental calls to window.print() do not bring up the "print screen" dialog
-    transformedCode += `\n\nfunction print() {throw new Error("Invalid call to window.print(). Did you mean to use Netscript's print()?");}`;
-
-    const blob = URL.createObjectURL(makeScriptBlob(transformedCode));
-    // Push the blob URL onto the top of the stack.
-    urlStack.push(new ScriptUrl(script.filename, blob, script.moduleSequenceNumber));
-    return urlStack;
-  } catch (err) {
-    // If there is an error, we need to clean up the URLs.
-    for (const url of urlStack) URL.revokeObjectURL(url.url);
-    throw err;
-  } finally {
-    seen.pop();
+    script.mod = generateLoadedModule(script, scripts, []);
+  } catch (error) {
+    throw new Error(`Cannot generate module ${script.filename}`, { cause: error });
   }
+  return script.mod.module;
+}
+
+/** Add the necessary dependency relationships for a script.
+ * Dependents are used only for passing invalidation up an import tree, so only direct dependents need to be stored.
+ * Direct and indirect dependents need to have the current url/script added to their dependency map for error text.
+ *
+ * This should only be called once the script has a LoadedModule. */
+function addDependencyInfo(script: Script, seenStack: Script[]) {
+  if (!script.mod) throw new Error(`addDependencyInfo called without a LoadedModule (${script.filename})`);
+  if (seenStack.length) {
+    script.dependents.add(seenStack[seenStack.length - 1]);
+    for (const dependent of seenStack) dependent.dependencies.set(script.mod.url, script);
+  }
+  // Add self to dependencies (it's not part of the stack, since we don't want
+  // it in dependents.)
+  script.dependencies.set(script.mod.url, script);
+}
+
+/**
+ * @param script the script that needs a URL assigned
+ * @param scripts array of other scripts on the server
+ * @param seenStack A stack of scripts that were higher up in the import tree in a recursive call.
+ */
+function generateLoadedModule(script: Script, scripts: Map<ScriptFilePath, Script>, seenStack: Script[]): LoadedModule {
+  // Early return for recursive calls where the script already has a URL
+  if (script.mod) {
+    addDependencyInfo(script, seenStack);
+    return script.mod;
+  }
+
+  if (script.code === "") {
+    throw new Error(`Script content is an empty string. Filename: ${script.filename}, server: ${script.server}.`);
+  }
+  let scriptCode;
+  let sourceMap;
+  const fileType = getFileType(script.filename);
+  switch (fileType) {
+    case FileType.JS:
+      scriptCode = script.code;
+      break;
+    case FileType.JSX:
+    case FileType.TS:
+    case FileType.TSX:
+      ({ scriptCode, sourceMap } = transformScript(script.code, fileType));
+      break;
+    default:
+      throw new Error(`Invalid file type: ${fileType}. Filename: ${script.filename}, server: ${script.server}.`);
+  }
+  if (!scriptCode) {
+    throw new Error(`Cannot transform script. Filename: ${script.filename}, server: ${script.server}.`);
+  }
+
+  // Inspired by: https://stackoverflow.com/a/43834063/91401
+  const ast = parse(scriptCode, { sourceType: "module", ecmaVersion: "latest", ranges: true });
+  interface ImportNode {
+    filename: string;
+    start: number;
+    end: number;
+  }
+  const importNodes: ImportNode[] = [];
+  // Walk the nodes of this tree and find any import declaration statements.
+  walk.simple(ast, {
+    ImportDeclaration(node: acorn.ImportDeclaration) {
+      // Push this import onto the stack to replace
+      if (!node.source) {
+        return;
+      }
+      if (typeof node.source.value !== "string" || !node.source.range) {
+        console.error("Invalid node when walking ImportDeclaration in generateLoadedModule. node:", node);
+        return;
+      }
+      importNodes.push({
+        filename: node.source.value,
+        start: node.source.range[0] + 1,
+        end: node.source.range[1] - 1,
+      });
+    },
+    ExportNamedDeclaration(node: acorn.ExportNamedDeclaration) {
+      if (!node.source) {
+        return;
+      }
+      if (typeof node.source.value !== "string" || !node.source.range) {
+        console.error("Invalid node when walking ExportNamedDeclaration in generateLoadedModule. node:", node);
+        return;
+      }
+      importNodes.push({
+        filename: node.source.value,
+        start: node.source.range[0] + 1,
+        end: node.source.range[1] - 1,
+      });
+    },
+    ExportAllDeclaration(node: acorn.ExportAllDeclaration) {
+      if (!node.source) {
+        return;
+      }
+      if (typeof node.source.value !== "string" || !node.source.range) {
+        console.error("Invalid node when walking ExportAllDeclaration in generateLoadedModule. node:", node);
+        return;
+      }
+      importNodes.push({
+        filename: node.source.value,
+        start: node.source.range[0] + 1,
+        end: node.source.range[1] - 1,
+      });
+    },
+  });
+  // Sort the nodes from last start index to first. This replaces the last import with a blob first,
+  // preventing the ranges for other imports from being shifted.
+  importNodes.sort((a, b) => b.start - a.start);
+  let newCode = scriptCode;
+  // Loop through each node and replace the script name with a blob url.
+  for (const node of importNodes) {
+    const importedScript = getModuleScript(node.filename, script.filename, scripts);
+    for (const scriptInSeenStack of seenStack) {
+      if (scriptInSeenStack.filename === script.filename) {
+        throw new Error(
+          `Circular dependencies detected. ${script.filename} imports ${importedScript.filename}, but ` +
+            `${importedScript.filename} or its dependencies import ${script.filename}.`,
+        );
+      }
+    }
+    seenStack.push(script);
+    importedScript.mod = generateLoadedModule(importedScript, scripts, seenStack);
+    seenStack.pop();
+    newCode = newCode.substring(0, node.start) + importedScript.mod.url + newCode.substring(node.end);
+  }
+
+  const cachedMod = moduleCache.get(newCode)?.deref();
+  if (cachedMod) {
+    script.mod = cachedMod;
+  } else {
+    // Add an inline source-map to make debugging nicer. This won't be right
+    // in all cases, since we can share the same script across multiple
+    // servers; it will be listed under the first server it was compiled for.
+    // We don't include this in the cache key, so that other instances of the
+    // script dedupe properly.
+    const sourceURL = `${script.server}/${script.filename}`;
+    let adjustedCode = newCode + `\n//# sourceURL=${sourceURL}`;
+    if (sourceMap) {
+      let inlineSourceMap;
+      try {
+        inlineSourceMap = fromObject({ ...JSON.parse(sourceMap), sources: [sourceURL], sourceRoot: "/" }).toComment();
+      } catch (error) {
+        console.warn(`Cannot generate inline source map for ${script.filename} in ${script.server}`, error);
+      }
+      if (inlineSourceMap) {
+        adjustedCode += `\n${inlineSourceMap}`;
+      }
+    }
+    // At this point we have the full code and can construct a new blob / assign the URL.
+
+    const url = URL.createObjectURL(makeScriptBlob(adjustedCode)) as ScriptURL;
+    const module = config.doImport(url).catch((e) => {
+      script.invalidateModule();
+      console.error(`Error occurred while attempting to compile ${script.filename} on ${script.server}:`);
+      console.error(e);
+      throw e;
+    });
+    // We can *immediately* invalidate the Blob, because we've already started the fetch
+    // by starting the import. From now on, any imports using the blob's URL *must*
+    // directly return the module, without even attempting to fetch, due to the way
+    // modules work.
+    URL.revokeObjectURL(url);
+    script.mod = new LoadedModule(url, module);
+    moduleCache.set(newCode, new WeakRef(script.mod));
+    cleanup.register(script.mod, newCode);
+  }
+
+  addDependencyInfo(script, seenStack);
+  return script.mod;
 }

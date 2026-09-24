@@ -1,7 +1,7 @@
-import React from "react";
+import type React from "react";
 
-import { Page } from "../ui/Router";
-import { hash } from "../hash/hash";
+import type { Page } from "../ui/Router";
+import { commitHash } from "./helpers/commitHash";
 import { CONSTANTS } from "../Constants";
 
 enum GameEnv {
@@ -16,7 +16,7 @@ enum Platform {
 
 interface GameVersion {
   version: string;
-  hash: string;
+  commitHash: string;
 
   toDisplay: () => string;
 }
@@ -29,64 +29,125 @@ interface BrowserFeatures {
   indexedDb: boolean;
 }
 
-interface IErrorMetadata {
-  error: Error;
-  errorInfo?: React.ErrorInfo;
+interface CrashReportMetadata {
+  error: Record<string, unknown>;
+  reactErrorInfo?: React.ErrorInfo;
   page?: Page;
 
   environment: GameEnv;
   platform: Platform;
   version: GameVersion;
-  features: BrowserFeatures;
+  browserFeatures: BrowserFeatures;
 }
 
-export interface IErrorData {
-  metadata: IErrorMetadata;
+export interface CrashReport {
+  metadata: CrashReportMetadata;
 
   title: string;
   body: string;
 
-  features: string;
-  fileName?: string;
-
   issueUrl: string;
 }
 
+export const newIssueUrl = `https://github.com/bitburner-official/bitburner-src/issues/new`;
 
-export const newIssueUrl = `https://github.com/danielyxie/bitburner/issues/new`;
-
-function getErrorMetadata(error: Error, errorInfo?: React.ErrorInfo, page?: Page): IErrorMetadata {
-  const isElectron = navigator.userAgent.toLowerCase().indexOf(" electron/") > -1;
-  const env = process.env.NODE_ENV === "development" ? GameEnv.Development : GameEnv.Production;
-  const version: GameVersion = {
-    version: CONSTANTS.VersionString,
-    hash: hash(),
-    toDisplay: () => `v${CONSTANTS.VersionString} (${hash()})`,
+export function parseUnknownError(error: unknown): {
+  errorAsString: string;
+  stack?: string;
+  causeAsString?: string;
+  causeStack?: string;
+} {
+  const errorAsString = String(error);
+  let stack: string | undefined = undefined;
+  let causeAsString: string | undefined = undefined;
+  let causeStack: string | undefined = undefined;
+  if (error instanceof Error) {
+    stack = error.stack;
+    if (error.cause != null) {
+      causeAsString = String(error.cause);
+      if (error.cause instanceof Error) {
+        causeStack = error.cause.stack;
+      }
+    }
   }
-  const features: BrowserFeatures = {
+  return {
+    errorAsString,
+    stack,
+    causeAsString,
+    causeStack,
+  };
+}
+
+export function getErrorMessageWithStackAndCause(error: unknown, prefix = ""): string {
+  const errorData = parseUnknownError(error);
+  let errorMessage = `${prefix}${errorData.errorAsString}`;
+  if (errorData.stack) {
+    errorMessage += `\n\nStack: ${errorData.stack}`;
+  }
+  if (errorData.causeAsString) {
+    errorMessage += `\nError cause: ${errorData.causeAsString}`;
+    if (errorData.causeStack) {
+      errorMessage += `\nCause stack: ${errorData.causeStack}`;
+    }
+  }
+  return errorMessage;
+}
+
+export function getCrashReportMetadata(
+  error: unknown,
+  reactErrorInfo?: React.ErrorInfo,
+  page?: Page,
+): CrashReportMetadata {
+  const isElectron = navigator.userAgent.toLowerCase().includes(" electron/");
+  const env = process.env.NODE_ENV === "development" ? GameEnv.Development : GameEnv.Production;
+  const version = {
+    version: CONSTANTS.VersionString,
+    commitHash: commitHash(),
+    toDisplay: () => `v${CONSTANTS.VersionString} (${commitHash()})`,
+  };
+  const browserFeatures = {
     userAgent: navigator.userAgent,
 
     language: navigator.language,
     cookiesEnabled: navigator.cookieEnabled,
     doNotTrack: navigator.doNotTrack,
-    indexedDb: (!!window.indexedDB),
-  }
-  const metadata: IErrorMetadata = {
+    indexedDb: !!window.indexedDB,
+  };
+  const errorObj = typeof error === "object" && error !== null ? (error as Record<string, unknown>) : {};
+  return {
     platform: isElectron ? Platform.Steam : Platform.Browser,
     environment: env,
-    version, features,
-    error, errorInfo, page,
-  }
-  return metadata;
+    version,
+    browserFeatures,
+    error: errorObj,
+    reactErrorInfo,
+    page,
+  };
 }
 
-export function getErrorForDisplay(error: Error, errorInfo?: React.ErrorInfo, page?: Page): IErrorData {
-  const metadata = getErrorMetadata(error, errorInfo, page);
-  const fileName = (metadata.error as any).fileName;
-  const features = `lang=${metadata.features.language} cookiesEnabled=${metadata.features.cookiesEnabled.toString()}` +
-    ` doNotTrack=${metadata.features.doNotTrack} indexedDb=${metadata.features.indexedDb.toString()}`;
+export function getCrashReport(error: unknown, reactErrorInfo?: React.ErrorInfo, page?: Page): CrashReport {
+  const metadata = getCrashReportMetadata(error, reactErrorInfo, page);
+  const errorData = parseUnknownError(error);
+  const fileName = String(metadata.error.fileName);
+  const features =
+    `lang=${metadata.browserFeatures.language} cookiesEnabled=${metadata.browserFeatures.cookiesEnabled.toString()}` +
+    ` doNotTrack=${
+      metadata.browserFeatures.doNotTrack ?? "null"
+    } indexedDb=${metadata.browserFeatures.indexedDb.toString()}`;
 
-  const title = `${metadata.error.name}: ${metadata.error.message}${metadata.page && ` (at "${Page[metadata.page]}")`}`;
+  const title = `${metadata.error.name}: ${metadata.error.message} (at "${metadata.page}")`;
+  let causeAndCauseStack = errorData.causeAsString
+    ? `
+### Error cause: ${errorData.causeAsString}
+`
+    : "";
+  if (errorData.causeStack) {
+    causeAndCauseStack += `Cause stack:
+\`\`\`
+${errorData.causeStack}
+\`\`\`
+`;
+  }
   const body = `
 ## ${title}
 
@@ -100,36 +161,72 @@ Please fill this information with details if relevant.
 
 ### Environment
 
-* Error: ${metadata.error?.toString() ?? 'n/a'}
-* Page: ${metadata.page ? Page[metadata.page] : 'n/a'}
+* Error: ${errorData.errorAsString ?? "n/a"}
+* Page: ${metadata.page ?? "n/a"}
 * Version: ${metadata.version.toDisplay()}
 * Environment: ${GameEnv[metadata.environment]}
 * Platform: ${Platform[metadata.platform]}
 * UserAgent: ${navigator.userAgent}
 * Features: ${features}
-* Source: ${fileName ?? 'n/a'}
+* Source: ${fileName ?? "n/a"}
 
-${metadata.environment === GameEnv.Development ? `
 ### Stack Trace
 \`\`\`
-${metadata.errorInfo?.componentStack.toString().trim()}
+${errorData.stack}
 \`\`\`
-` : ''}
+${causeAndCauseStack}
+### React Component Stack
+\`\`\`
+${metadata.reactErrorInfo?.componentStack}
+\`\`\`
+
 ### Save
 \`\`\`
 Copy your save here if possible
 \`\`\`
 `.trim();
 
-  const issueUrl = `${newIssueUrl}?title=${encodeURIComponent(title)}&body=${encodeURIComponent(body)}`;
+  const issueUrl = `${newIssueUrl}?title=${encodeURIComponent(title.toWellFormed())}&body=${encodeURIComponent(
+    body.toWellFormed(),
+  )}`;
 
-  const data: IErrorData = {
+  return {
     metadata,
-    fileName,
-    features,
     title,
     body,
     issueUrl,
+  };
+}
+
+export function isSaveDataFromNewerVersions(versionSave?: string): boolean {
+  if (versionSave == null) {
+    return false;
   }
-  return data;
+  // The empty string and the x.y.z format are from pre-v1 versions.
+  if (versionSave === "" || versionSave.includes(".")) {
+    return false;
+  }
+  const versionNumber = Number(versionSave);
+  if (!Number.isFinite(versionNumber) || versionNumber <= CONSTANTS.VersionNumber) {
+    return false;
+  }
+  return true;
+}
+
+export function isStanekGiftImplemented(versionSave?: string): boolean {
+  // It's debatable if we should return true or false here. If versionSave is undefined, there must be something wrong
+  // with the loading process. I think we should return true here and let the caller show the error popup.
+  if (versionSave == null) {
+    return true;
+  }
+  // The empty string and the x.y.z format are from pre-v1 versions.
+  if (versionSave === "" || versionSave.includes(".")) {
+    return false;
+  }
+  const versionNumber = Number(versionSave);
+  // Stanek's Gift was added in v1.1.0 (VersionNumber = 6).
+  if (!Number.isFinite(versionNumber) || versionNumber <= 5) {
+    return false;
+  }
+  return true;
 }

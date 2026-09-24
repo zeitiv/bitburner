@@ -4,7 +4,9 @@
 
 ## GangMemberInfo.cha property
 
-<b>Signature:</b>
+Charisma skill level
+
+**Signature:**
 
 ```typescript
 cha: number;

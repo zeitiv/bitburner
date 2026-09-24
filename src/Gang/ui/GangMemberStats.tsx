@@ -7,48 +7,22 @@ import { useGang } from "./Context";
 
 import Typography from "@mui/material/Typography";
 import Tooltip from "@mui/material/Tooltip";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableRow,
-} from "@mui/material";
+import { Table, TableBody, TableCell, TableRow } from "@mui/material";
 
-import { numeralWrapper } from "../../ui/numeralFormat";
+import { formatMultiplier, formatRespect, formatWanted } from "../../ui/formatNumber";
 import { GangMember } from "../GangMember";
 import { Settings } from "../../Settings/Settings";
-import { formatNumber } from "../../utils/StringHelperFunctions";
 import { MoneyRate } from "../../ui/React/MoneyRate";
-import { characterOverviewStyles as useStyles } from "../../ui/React/CharacterOverview";
+import { StatsRow } from "../../ui/React/StatsRow";
+import { useStyles } from "../../ui/React/CharacterOverview";
+import { getKeyFromReactElements } from "../../utils/StringHelperFunctions";
 
 interface IProps {
   member: GangMember;
 }
 
-export const generateTableRow = (
-  name: string,
-  level: number,
-  exp: number,
-  color: string,
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-  classes: any
-): React.ReactElement => {
-  return (
-    <TableRow>
-      <TableCell classes={{ root: classes.cellNone }}>
-        <Typography style={{ color: color }}>{name}</Typography>
-      </TableCell>
-      <TableCell align="right" classes={{ root: classes.cellNone }}>
-        <Typography style={{ color: color }}>
-          {formatNumber(level, 0)} ({numeralWrapper.formatExp(exp)} exp)
-        </Typography>
-      </TableCell>
-    </TableRow>
-  )
-}
-
 export function GangMemberStats(props: IProps): React.ReactElement {
-  const classes = useStyles();
+  const { classes } = useStyles();
 
   const asc = {
     hack: props.member.calculateAscensionMult(props.member.hack_asc_points),
@@ -59,14 +33,12 @@ export function GangMemberStats(props: IProps): React.ReactElement {
     cha: props.member.calculateAscensionMult(props.member.cha_asc_points),
   };
 
-
-
   const gang = useGang();
   const data = [
-    [`Money:`, <MoneyRate money={5 * props.member.calculateMoneyGain(gang)} />],
-    [`Respect:`, `${numeralWrapper.formatRespect(5 * props.member.calculateRespectGain(gang))} / sec`],
-    [`Wanted Level:`, `${numeralWrapper.formatWanted(5 * props.member.calculateWantedLevelGain(gang))} / sec`],
-    [`Total Respect:`, `${numeralWrapper.formatRespect(props.member.earnedRespect)}`],
+    [`Money:`, <MoneyRate key="money" money={5 * props.member.calculateMoneyGain(gang)} />],
+    [`Respect:`, `${formatRespect(5 * props.member.calculateRespectGain(gang))} / sec`],
+    [`Wanted Level:`, `${formatWanted(5 * props.member.calculateWantedLevelGain(gang))} / sec`],
+    [`Total Respect:`, `${formatRespect(props.member.earnedRespect)}`],
   ];
 
   return (
@@ -74,47 +46,65 @@ export function GangMemberStats(props: IProps): React.ReactElement {
       <Tooltip
         title={
           <Typography>
-            Hk: x{numeralWrapper.formatMultiplier(props.member.hack_mult * asc.hack)}(x
-            {numeralWrapper.formatMultiplier(props.member.hack_mult)} Eq, x{numeralWrapper.formatMultiplier(asc.hack)}{" "}
-            Asc)
+            Hk: x{formatMultiplier(props.member.hack_mult * asc.hack)}(x
+            {formatMultiplier(props.member.hack_mult)} Eq, x{formatMultiplier(asc.hack)} Asc)
             <br />
-            St: x{numeralWrapper.formatMultiplier(props.member.str_mult * asc.str)}
-            (x{numeralWrapper.formatMultiplier(props.member.str_mult)} Eq, x{numeralWrapper.formatMultiplier(asc.str)}{" "}
-            Asc)
+            St: x{formatMultiplier(props.member.str_mult * asc.str)}
+            (x{formatMultiplier(props.member.str_mult)} Eq, x{formatMultiplier(asc.str)} Asc)
             <br />
-            Df: x{numeralWrapper.formatMultiplier(props.member.def_mult * asc.def)}
-            (x{numeralWrapper.formatMultiplier(props.member.def_mult)} Eq, x{numeralWrapper.formatMultiplier(asc.def)}{" "}
-            Asc)
+            Df: x{formatMultiplier(props.member.def_mult * asc.def)}
+            (x{formatMultiplier(props.member.def_mult)} Eq, x{formatMultiplier(asc.def)} Asc)
             <br />
-            Dx: x{numeralWrapper.formatMultiplier(props.member.dex_mult * asc.dex)}
-            (x{numeralWrapper.formatMultiplier(props.member.dex_mult)} Eq, x{numeralWrapper.formatMultiplier(asc.dex)}{" "}
-            Asc)
+            Dx: x{formatMultiplier(props.member.dex_mult * asc.dex)}
+            (x{formatMultiplier(props.member.dex_mult)} Eq, x{formatMultiplier(asc.dex)} Asc)
             <br />
-            Ag: x{numeralWrapper.formatMultiplier(props.member.agi_mult * asc.agi)}
-            (x{numeralWrapper.formatMultiplier(props.member.agi_mult)} Eq, x{numeralWrapper.formatMultiplier(asc.agi)}{" "}
-            Asc)
+            Ag: x{formatMultiplier(props.member.agi_mult * asc.agi)}
+            (x{formatMultiplier(props.member.agi_mult)} Eq, x{formatMultiplier(asc.agi)} Asc)
             <br />
-            Ch: x{numeralWrapper.formatMultiplier(props.member.cha_mult * asc.cha)}
-            (x{numeralWrapper.formatMultiplier(props.member.cha_mult)} Eq, x{numeralWrapper.formatMultiplier(asc.cha)}{" "}
-            Asc)
+            Ch: x{formatMultiplier(props.member.cha_mult * asc.cha)}
+            (x{formatMultiplier(props.member.cha_mult)} Eq, x{formatMultiplier(asc.cha)} Asc)
           </Typography>
         }
       >
-        <Table sx={{ display: 'table', mb: 1, width: '100%' }}>
+        <Table sx={{ display: "table", mb: 1, width: "100%" }}>
           <TableBody>
-            {generateTableRow("Hacking", props.member.hack, props.member.hack_exp, Settings.theme.hack, classes)}
-            {generateTableRow("Strength", props.member.str, props.member.str_exp, Settings.theme.combat, classes)}
-            {generateTableRow("Defense", props.member.def, props.member.def_exp, Settings.theme.combat, classes)}
-            {generateTableRow("Dexterity", props.member.dex, props.member.dex_exp, Settings.theme.combat, classes)}
-            {generateTableRow("Agility", props.member.agi, props.member.agi_exp, Settings.theme.combat, classes)}
-            {generateTableRow("Charisma", props.member.cha, props.member.cha_exp, Settings.theme.cha, classes)}
+            <StatsRow
+              name="Hacking"
+              color={Settings.theme.hack}
+              data={{ level: props.member.hack, exp: props.member.hack_exp }}
+            />
+            <StatsRow
+              name="Strength"
+              color={Settings.theme.combat}
+              data={{ level: props.member.str, exp: props.member.str_exp }}
+            />
+            <StatsRow
+              name="Defense"
+              color={Settings.theme.combat}
+              data={{ level: props.member.def, exp: props.member.def_exp }}
+            />
+            <StatsRow
+              name="Dexterity"
+              color={Settings.theme.combat}
+              data={{ level: props.member.dex, exp: props.member.dex_exp }}
+            />
+            <StatsRow
+              name="Agility"
+              color={Settings.theme.combat}
+              data={{ level: props.member.agi, exp: props.member.agi_exp }}
+            />
+            <StatsRow
+              name="Charisma"
+              color={Settings.theme.cha}
+              data={{ level: props.member.cha, exp: props.member.cha_exp }}
+            />
             <TableRow>
               <TableCell classes={{ root: classes.cellNone }}>
                 <br />
               </TableCell>
             </TableRow>
             {data.map(([a, b]) => (
-              <TableRow key={a.toString() + b.toString()}>
+              <TableRow key={getKeyFromReactElements(a, b)}>
                 <TableCell classes={{ root: classes.cellNone }}>
                   <Typography>{a}</Typography>
                 </TableCell>

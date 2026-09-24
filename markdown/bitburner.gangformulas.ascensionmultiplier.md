@@ -6,7 +6,7 @@
 
 Calculate ascension mult.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 ascensionMultiplier(points: number): number;
@@ -14,11 +14,41 @@ ascensionMultiplier(points: number): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  points | number | Amount of ascension points. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+points
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Amount of ascension points.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 

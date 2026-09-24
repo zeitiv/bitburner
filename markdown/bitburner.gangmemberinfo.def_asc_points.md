@@ -4,7 +4,9 @@
 
 ## GangMemberInfo.def\_asc\_points property
 
-<b>Signature:</b>
+Total Defense Ascension points accumulated
+
+**Signature:**
 
 ```typescript
 def_asc_points: number;

@@ -4,21 +4,55 @@
 
 ## Corporation.issueDividends() method
 
-Issue dividends
+Issue dividends.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-issueDividends(percent: number): void;
+issueDividends(rate: number): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  percent | number | Percent of profit to issue as dividends. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+rate
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Fraction of profit to issue as dividends.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 void
+
+## Remarks
+
+RAM cost: 20 GB
 

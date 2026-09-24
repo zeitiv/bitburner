@@ -6,23 +6,224 @@
 
 Office for a division in a city.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-interface Office 
+export interface Office 
 ```
 
 ## Properties
 
-|  Property | Type | Description |
-|  --- | --- | --- |
-|  [employeeProd](./bitburner.office.employeeprod.md) | [EmployeeJobs](./bitburner.employeejobs.md) | Positions of the employees |
-|  [employees](./bitburner.office.employees.md) | string\[\] | Name of all the employees |
-|  [loc](./bitburner.office.loc.md) | string | City of the office |
-|  [maxEne](./bitburner.office.maxene.md) | number | Maximum amount of energy of the employees |
-|  [maxHap](./bitburner.office.maxhap.md) | number | Maximum happiness of the employees |
-|  [maxMor](./bitburner.office.maxmor.md) | number | Maximum morale of the employees |
-|  [minEne](./bitburner.office.minene.md) | number | Minimum amount of energy of the employees |
-|  [minHap](./bitburner.office.minhap.md) | number | Minimum happiness of the employees |
-|  [size](./bitburner.office.size.md) | number | Maximum number of employee |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[avgEnergy](./bitburner.office.avgenergy.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Average energy of the employees
+
+
+</td></tr>
+<tr><td>
+
+[avgMorale](./bitburner.office.avgmorale.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Average morale of the employees
+
+
+</td></tr>
+<tr><td>
+
+[city](./bitburner.office.city.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[CityName](./bitburner.cityname.md)
+
+
+</td><td>
+
+City of the office
+
+
+</td></tr>
+<tr><td>
+
+[employeeJobs](./bitburner.office.employeejobs.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Record&lt;[CorpEmployeePosition](./bitburner.corpemployeeposition.md)<!-- -->, number&gt;
+
+
+</td><td>
+
+Positions of the employees
+
+
+</td></tr>
+<tr><td>
+
+[employeeProductionByJob](./bitburner.office.employeeproductionbyjob.md)
+
+
+</td><td>
+
+
+</td><td>
+
+Record&lt;[CorpEmployeePosition](./bitburner.corpemployeeposition.md)<!-- -->, number&gt;
+
+
+</td><td>
+
+Production of the employees
+
+
+</td></tr>
+<tr><td>
+
+[maxEnergy](./bitburner.office.maxenergy.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Maximum amount of energy of the employees
+
+
+</td></tr>
+<tr><td>
+
+[maxMorale](./bitburner.office.maxmorale.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Maximum morale of the employees
+
+
+</td></tr>
+<tr><td>
+
+[numEmployees](./bitburner.office.numemployees.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Amount of employees
+
+
+</td></tr>
+<tr><td>
+
+[size](./bitburner.office.size.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Maximum number of employee
+
+
+</td></tr>
+<tr><td>
+
+[totalExperience](./bitburner.office.totalexperience.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Total experience of all employees
+
+
+</td></tr>
+</tbody></table>
 

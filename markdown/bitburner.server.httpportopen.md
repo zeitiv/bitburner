@@ -4,9 +4,9 @@
 
 ## Server.httpPortOpen property
 
-Flag indicating whether HTTP Port is open
+Whether or not the HTTP Port is open
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 httpPortOpen: boolean;

@@ -1,193 +1,104 @@
+import { CityName } from "@enums";
 import { BladeburnerConstants } from "./data/Constants";
-import { getRandomInt } from "../utils/helpers/getRandomInt";
-import { Generic_fromJSON, Generic_toJSON, Reviver } from "../utils/JSONReviver";
+import { getRandomIntInclusive } from "../utils/helpers/getRandomIntInclusive";
+import { Generic_fromJSON, Generic_toJSON, IReviverValue, constructorsForReviver } from "../utils/JSONReviver";
 import { addOffset } from "../utils/helpers/addOffset";
-
-interface IChangePopulationByCountParams {
-  estChange: number;
-  estOffset: number;
-}
-
-interface IChangePopulationByPercentageParams {
-  nonZero: boolean;
-  changeEstEqually: boolean;
-}
+import { clampInteger, clampNumber } from "../utils/helpers/clampNumber";
 
 export class City {
-  /**
-   * Name of the city.
-   */
-  name = "";
-
-  /**
-   * Population of the city.
-   */
-  pop = 0;
-
-  /**
-   * Population estimation of the city.
-   */
-  popEst = 0;
-
-  /**
-   * Number of communities in the city.
-   */
-  comms = 0;
-
-  /**
-   * Chaos level of the city.
-   */
+  name: CityName;
+  pop = 0; // Population
+  popEst = 0; // Population estimate
+  comms = 0; // Number of communities
   chaos = 0;
 
-  constructor(name: string = BladeburnerConstants.CityNames[2]) {
+  constructor(name = CityName.Sector12) {
     this.name = name;
 
     // Synthoid population and estimate
-    this.pop = getRandomInt(BladeburnerConstants.PopulationThreshold, 1.5 * BladeburnerConstants.PopulationThreshold);
+    this.pop = getRandomIntInclusive(
+      BladeburnerConstants.PopulationThreshold,
+      1.5 * BladeburnerConstants.PopulationThreshold,
+    );
     this.popEst = this.pop * (Math.random() + 0.5);
 
     // Number of Synthoid communities population and estimate
-    this.comms = getRandomInt(5, 150);
+    this.comms = getRandomIntInclusive(5, 150);
     this.chaos = 0;
   }
 
-  /**
-   * p is the percentage, not the multiplier (e.g. pass in p = 5 for 5%)
-   */
+  /** @param {number} p - the percentage change, not the multiplier. e.g. pass in p = 5 for 5% */
   changeChaosByPercentage(p: number): void {
-    if (isNaN(p)) {
-      throw new Error("NaN passed into City.chaosChaosByPercentage()");
-    }
-    if (p === 0) {
-      return;
-    }
-    this.chaos += this.chaos * (p / 100);
-    if (this.chaos < 0) {
-      this.chaos = 0;
-    }
+    this.chaos = clampNumber(this.chaos * (1 + p / 100), 0);
   }
 
   improvePopulationEstimateByCount(n: number): void {
-    if (isNaN(n)) {
-      throw new Error("NaN passeed into City.improvePopulationEstimateByCount()");
-    }
-    if (this.popEst < this.pop) {
-      this.popEst += n;
-      if (this.popEst > this.pop) {
-        this.popEst = this.pop;
-      }
-    } else if (this.popEst > this.pop) {
-      this.popEst -= n;
-      if (this.popEst < this.pop) {
-        this.popEst = this.pop;
-      }
-    }
+    n = clampInteger(n, 0);
+    const diff = Math.abs(this.popEst - this.pop);
+    // Change would overshoot actual population -> make estimate accurate
+    if (diff <= n) this.popEst = this.pop;
+    // Otherwise make estimate closer by n
+    else if (this.popEst < this.pop) this.popEst += n;
+    else this.popEst -= n;
   }
 
-  /**
-   * p is the percentage, not the multiplier (e.g. pass in p = 5 for 5%)
-   */
+  /** @param {number} p - the percentage change, not the multiplier. e.g. pass in p = 5 for 5% */
   improvePopulationEstimateByPercentage(p: number, skillMult = 1): void {
-    p = p * skillMult;
-    if (isNaN(p)) {
-      throw new Error("NaN passed into City.improvePopulationEstimateByPercentage()");
-    }
+    const percentage = clampNumber(p * skillMult);
+    const m = percentage / 100;
     if (this.popEst < this.pop) {
-      ++this.popEst; // In case estimate is 0
-      this.popEst *= 1 + p / 100;
-      if (this.popEst > this.pop) {
-        this.popEst = this.pop;
-      }
-    } else if (this.popEst > this.pop) {
-      this.popEst *= 1 - p / 100;
-      if (this.popEst < this.pop) {
-        this.popEst = this.pop;
-      }
+      // We use an additive factor so we don't get "stuck" at 0.
+      const popGrown = (this.popEst + percentage) * (1 + m);
+      this.popEst = clampNumber(popGrown, 0, this.pop);
+    } else {
+      // We use an subtractive factor so we can reach 0 in finite steps.
+      const popShrunk = (this.popEst - percentage) / (1 + m);
+      this.popEst = clampNumber(popShrunk, this.pop);
     }
   }
 
   /**
-   * @params options:
-   *  estChange(int): How much the estimate should change by
-   *  estOffset(int): Add offset to estimate (offset by percentage)
-   */
-  changePopulationByCount(n: number, params: IChangePopulationByCountParams = { estChange: 0, estOffset: 0 }): void {
-    if (isNaN(n)) {
-      throw new Error("NaN passed into City.changePopulationByCount()");
-    }
-    this.pop += n;
+   * @param params.estChange - Number to change the estimate by
+   * @param params.estOffset - Offset percentage to apply to estimate */
+  changePopulationByCount(n: number, params = { estChange: 0, estOffset: 0 }): void {
+    n = clampInteger(n);
+    this.pop = clampInteger(this.pop + n, 0);
     if (params.estChange && !isNaN(params.estChange)) {
       this.popEst += params.estChange;
     }
     if (params.estOffset) {
       this.popEst = addOffset(this.popEst, params.estOffset);
     }
-    this.popEst = Math.max(this.popEst, 0);
+    this.popEst = clampInteger(this.popEst, 0);
   }
 
   /**
-   * @p is the percentage, not the multiplier. e.g. pass in p = 5 for 5%
-   * @params options:
-   *  changeEstEqually(bool) - Change the population estimate by an equal amount
-   *  nonZero (bool)         - Set to true to ensure that population always changes by at least 1
-   */
-  changePopulationByPercentage(
-    p: number,
-    params: IChangePopulationByPercentageParams = {
-      nonZero: false,
-      changeEstEqually: false,
-    },
-  ): number {
-    if (isNaN(p)) {
-      throw new Error("NaN passed into City.changePopulationByPercentage()");
-    }
-    if (p === 0) {
-      return 0;
-    }
-    let change = Math.round(this.pop * (p / 100));
+   * @param {number} p - the percentage change, not the multiplier. e.g. pass in p = 5 for 5%
+   * @param {boolean} params.changeEstEqually - Whether to change the population estimate by an equal amount
+   * @param {boolean} params.nonZero - Whether to ensure that population always changes by at least 1 */
+  changePopulationByPercentage(p: number, params = { nonZero: false, changeEstEqually: false }): number {
+    let change = clampInteger(this.pop * (p / 100));
 
-    // Population always changes by at least 1
-    if (params.nonZero && change === 0) {
-      p > 0 ? (change = 1) : (change = -1);
-    }
+    if (params.nonZero && change === 0) change = p > 0 ? 1 : -1;
 
-    this.pop += change;
-    if (params.changeEstEqually) {
-      this.popEst += change;
-      if (this.popEst < 0) {
-        this.popEst = 0;
-      }
-    }
+    this.pop = clampInteger(this.pop + change, 0);
+    if (params.changeEstEqually) this.popEst = clampInteger(this.popEst + change, 0);
     return change;
   }
 
   changeChaosByCount(n: number): void {
-    if (isNaN(n)) {
-      throw new Error("NaN passed into City.changeChaosByCount()");
-    }
-    if (n === 0) {
-      return;
-    }
-    this.chaos += n;
-    if (this.chaos < 0) {
-      this.chaos = 0;
-    }
+    this.chaos = clampNumber(this.chaos + n, 0);
   }
 
-  /**
-   * Serialize the current object to a JSON save state.
-   */
-  toJSON(): any {
+  /** Serialize the current object to a JSON save state. */
+  toJSON(): IReviverValue {
     return Generic_toJSON("City", this);
   }
 
-  /**
-   * Initiatizes a City object from a JSON save state.
-   */
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-  static fromJSON(value: any): City {
+  /** Initializes a City object from a JSON save state. */
+  static fromJSON(value: IReviverValue): City {
     return Generic_fromJSON(City, value.data);
   }
 }
 
-Reviver.constructors.City = City;
+constructorsForReviver.City = City;

@@ -6,19 +6,49 @@
 
 Get skill level.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getSkillLevel(name: string): number;
+getSkillLevel(skillName: BladeburnerSkillName): number;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  name | string |  |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+skillName
+
+
+</td><td>
+
+[BladeburnerSkillName](./bitburner.bladeburnerskillname.md)
+
+
+</td><td>
+
+Name of skill. Case-sensitive and must be an exact match.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 

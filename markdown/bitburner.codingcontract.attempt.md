@@ -4,32 +4,105 @@
 
 ## CodingContract.attempt() method
 
-Attemps a coding contract.
+Attempts a coding contract, returning a reward string on success or empty string on failure.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-attempt(answer: string[] | number, filename: string, host?: string, opts?: CodingAttemptOptions): boolean | string;
+attempt(answer: any, filename: string, host?: string): string;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  answer | string\[\] \| number | Solution for the contract. |
-|  filename | string |  |
-|  host | string | Host of the server containing the contract. Optional. Defaults to current server if not provided. |
-|  opts | [CodingAttemptOptions](./bitburner.codingattemptoptions.md) | Optional parameters for configuring function behavior. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
 
-boolean \| string
 
-True if the solution was correct, false otherwise. If the returnReward option is configured, then the function will instead return a string. If the contract is successfully solved, the string will contain a description of the contract’s reward. Otherwise, it will be an empty string.
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+answer
+
+
+</td><td>
+
+any
+
+
+</td><td>
+
+Attempted solution for the contract. This can be a string formatted like submitting manually, or the answer in the format of the specific contract type.
+
+
+</td></tr>
+<tr><td>
+
+filename
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Filename of the contract.
+
+
+</td></tr>
+<tr><td>
+
+host
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Hostname/IP of the server containing the contract. Optional. Defaults to current server if not provided.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
+
+string
+
+A reward description string on success, or an empty string on failure.
 
 ## Remarks
 
 RAM cost: 10 GB
 
 Attempts to solve the Coding Contract with the provided solution.
+
+## Example
+
+
+```js
+const reward = ns.codingcontract.attempt("[solution, as, a, string]", filename, hostname);
+// or
+const reward = ns.codingcontract.attempt(["answer", "as", "an", "array"], filename, hostname);
+if (reward) {
+  ns.tprint(`Contract solved successfully! Reward: ${reward}`);
+} else {
+  ns.tprint("Failed to solve contract.");
+}
+```
 

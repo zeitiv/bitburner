@@ -6,21 +6,81 @@
 
 Set an action autolevel.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-setActionAutolevel(type: string, name: string, autoLevel: boolean): void;
+setActionAutolevel(type: BladeburnerActionType, name: BladeburnerActionName, autoLevel: boolean): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  type | string | Type of action. |
-|  name | string | Name of action. Must be an exact match. |
-|  autoLevel | boolean | Whether or not to autolevel this action |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+type
+
+
+</td><td>
+
+[BladeburnerActionType](./bitburner.bladeburneractiontype.md)
+
+
+</td><td>
+
+Type of action.
+
+
+</td></tr>
+<tr><td>
+
+name
+
+
+</td><td>
+
+[BladeburnerActionName](./bitburner.bladeburneractionname.md)
+
+
+</td><td>
+
+Name of action. Must be an exact match.
+
+
+</td></tr>
+<tr><td>
+
+autoLevel
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether or not to autolevel this action
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 void
 

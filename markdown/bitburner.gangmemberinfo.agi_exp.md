@@ -4,7 +4,9 @@
 
 ## GangMemberInfo.agi\_exp property
 
-<b>Signature:</b>
+Current agility experience
+
+**Signature:**
 
 ```typescript
 agi_exp: number;

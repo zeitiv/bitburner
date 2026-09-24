@@ -1,42 +1,55 @@
 /**
- * TODO
+ * TODO unplanned
  * Add police clashes
  * balance point to keep them from running out of control
  */
+import type { PromisePair } from "../Types/Promises";
 
-import { Faction } from "../Faction/Faction";
 import { Factions } from "../Faction/Factions";
 
 import { dialogBoxCreate } from "../ui/React/DialogBox";
-import { Reviver, Generic_toJSON, Generic_fromJSON } from "../utils/JSONReviver";
+import { constructorsForReviver, Generic_toJSON, Generic_fromJSON, IReviverValue } from "../utils/JSONReviver";
 
 import { exceptionAlert } from "../utils/helpers/exceptionAlert";
-import { getRandomInt } from "../utils/helpers/getRandomInt";
+import { getRandomIntInclusive } from "../utils/helpers/getRandomIntInclusive";
 
 import { GangMemberUpgrade } from "./GangMemberUpgrade";
 import { GangConstants } from "./data/Constants";
-import { CONSTANTS } from "../Constants";
 import { GangMemberTasks } from "./GangMemberTasks";
 import { IAscensionResult } from "./IAscensionResult";
 
-import { AllGangs } from "./AllGangs";
+import { AllGangs, getClashWinChance } from "./AllGangs";
 import { GangMember } from "./GangMember";
 
 import { WorkerScript } from "../Netscript/WorkerScript";
-import { IPlayer } from "../PersonObjects/IPlayer";
+import { Player } from "@player";
 import { PowerMultiplier } from "./data/power";
-import { IGang } from "./IGang";
+import { FactionName } from "@enums";
+import { CONSTANTS } from "../Constants";
 
-export class Gang implements IGang {
-  facName: string;
+export enum RecruitmentResult {
+  Success = "Success",
+  EmptyName = "Member name cannot be an empty string",
+  DuplicatedName = "This name was used",
+  ExceedMaxNumber = "Your gang recruited maximum number of members",
+  NotEnoughRespect = "Your gang does not have enough respect to recruit more members",
+}
+
+export const GangPromise: PromisePair<number> = { promise: null, resolve: null };
+
+export class Gang {
+  facName: FactionName;
   members: GangMember[];
   wanted: number;
   respect: number;
 
   isHackingGang: boolean;
 
+  /** Respect gain rate, per cycle */
   respectGainRate: number;
+  /** Wanted level gain rate, per cycle */
   wantedGainRate: number;
+  /** Money gain rate, per cycle */
   moneyGainRate: number;
 
   storedCycles: number;
@@ -48,7 +61,7 @@ export class Gang implements IGang {
 
   notifyMemberDeath: boolean;
 
-  constructor(facName = "", hacking = false) {
+  constructor(facName = FactionName.SlumSnakes, hacking = false) {
     this.facName = facName;
     this.members = [];
     this.wanted = 1;
@@ -64,7 +77,7 @@ export class Gang implements IGang {
     // limit is reached, and then calculates and applies the gains only at that limit
     this.storedCycles = 0;
 
-    // Separate variable to keep track of cycles for Territry + Power gang, which
+    // Separate variable to keep track of cycles for Territory + Power gang, which
     // happens on a slower "clock" than normal processing
     this.storedTerritoryAndPowerCycles = 0;
 
@@ -82,76 +95,88 @@ export class Gang implements IGang {
     return AllGangs[this.facName].territory;
   }
 
-  process(numCycles = 1, player: IPlayer): void {
-    const CyclesPerSecond = 1000 / CONSTANTS._idleSpeed;
-
-    if (isNaN(numCycles)) {
-      console.error(`NaN passed into Gang.process(): ${numCycles}`);
-    }
+  /** Main process function called by the engine loop every game cycle */
+  process(numCycles = 1): void {
     this.storedCycles += numCycles;
+    if (this.storedCycles < GangConstants.minCyclesToProcess) return;
 
-    // Only process if there are at least 2 seconds, and at most 5 seconds
-    if (this.storedCycles < 2 * CyclesPerSecond) return;
-    const cycles = Math.min(this.storedCycles, 5 * CyclesPerSecond);
+    // Calculate how many cycles to actually process.
+    const cycles = Math.min(this.storedCycles, GangConstants.maxCyclesToProcess);
 
     try {
-      this.processGains(cycles, player);
+      this.processGains(cycles);
       this.processExperienceGains(cycles);
       this.processTerritoryAndPowerGains(cycles);
       this.storedCycles -= cycles;
-    } catch (e: any) {
-      console.error(`Exception caught when processing Gang: ${e}`);
+    } catch (e: unknown) {
+      exceptionAlert(e, true);
+    }
+
+    // Handle "nextUpdate" resolver after this update
+    if (GangPromise.resolve) {
+      GangPromise.resolve(cycles * CONSTANTS.MilliPerCycle);
+      GangPromise.resolve = null;
+      GangPromise.promise = null;
     }
   }
 
-  processGains(numCycles = 1, player: IPlayer): void {
-    // Get gains per cycle
-    let moneyGains = 0;
-    let respectGains = 0;
-    let wantedLevelGains = 0;
+  /** Process respect/wanted/money gains
+   * @param numCycles The number of cycles to process. */
+  processGains(numCycles: number): void {
+    let moneyGainPerCycle = 0;
+    let wantedLevelGainPerCycle = 0;
+    let respectGainsTotal = 0;
+    /** Number of members performing actions that lower wanted level */
     let justice = 0;
-    for (let i = 0; i < this.members.length; ++i) {
-      respectGains += this.members[i].calculateRespectGain(this);
-      moneyGains += this.members[i].calculateMoneyGain(this);
-      const wantedLevelGain = this.members[i].calculateWantedLevelGain(this);
-      wantedLevelGains += wantedLevelGain;
-      if (this.members[i].getTask().baseWanted < 0) justice++; // this member is lowering wanted.
+
+    for (const member of this.members) {
+      respectGainsTotal += member.earnRespect(numCycles, this);
+      moneyGainPerCycle += member.calculateMoneyGain(this);
+      wantedLevelGainPerCycle += member.calculateWantedLevelGain(this);
+      if (member.getTask().baseWanted < 0) justice++;
     }
-    this.respectGainRate = respectGains;
-    this.wantedGainRate = wantedLevelGains;
-    this.moneyGainRate = moneyGains;
-    const gain = respectGains * numCycles;
-    this.respect += gain;
+
+    this.respectGainRate = respectGainsTotal / numCycles;
+    this.wantedGainRate = wantedLevelGainPerCycle;
+    this.moneyGainRate = moneyGainPerCycle;
+    this.respect += respectGainsTotal;
+
     // Faction reputation gains is respect gain divided by some constant
-    const fac = Factions[this.facName];
-    if (!(fac instanceof Faction)) {
+    const gangFaction = Factions[this.facName];
+    if (!gangFaction) {
       dialogBoxCreate(
         "ERROR: Could not get Faction associates with your gang. This is a bug, please report to game dev",
       );
       throw new Error("Could not find the faction associated with this gang.");
     }
-    const favorMult = 1 + fac.favor / 100;
+    const favorMult = 1 + gangFaction.favor / 100;
 
-    fac.playerReputation += (player.faction_rep_mult * gain * favorMult) / GangConstants.GangRespectToReputationRatio;
+    gangFaction.playerReputation +=
+      (Player.mults.faction_rep * respectGainsTotal * favorMult) / GangConstants.GangRespectToReputationRatio;
 
-    // Keep track of respect gained per member
-    for (let i = 0; i < this.members.length; ++i) {
-      this.members[i].recordEarnedRespect(numCycles, this);
-    }
-    if (!(this.wanted === 1 && wantedLevelGains < 0)) {
+    if (this.wanted !== 1 || wantedLevelGainPerCycle >= 0) {
       const oldWanted = this.wanted;
-      let newWanted = oldWanted + wantedLevelGains * numCycles;
-      newWanted = newWanted * (1 - justice * 0.001); // safeguard
+      const newWanted = oldWanted + wantedLevelGainPerCycle * numCycles;
+      // Allows recovery when wanted / respect ratio is too high
+      this.wanted = newWanted * (1 - justice * 0.001);
+      this.wantedGainRate = (this.wanted - oldWanted) / numCycles;
       // Prevent overflow
-      if (wantedLevelGains <= 0 && newWanted > oldWanted) newWanted = 1;
-
-      this.wanted = newWanted;
-      if (this.wanted < 1) this.wanted = 1;
+      if (this.wanted < 1 || (wantedLevelGainPerCycle <= 0 && this.wanted > oldWanted)) {
+        this.wanted = 1;
+      }
     }
-    player.gainMoney(moneyGains * numCycles, "gang");
+    Player.gainMoney(moneyGainPerCycle * numCycles, "gang");
   }
 
-  processTerritoryAndPowerGains(numCycles = 1): void {
+  /** Process Territory and Power
+   * @param numCycles The number of cycles to process. */
+  processTerritoryAndPowerGains(numCycles: number): void {
+    function calculateTerritoryGain(winGang: string, loseGang: string): number {
+      const powerBonus = Math.max(1, 1 + Math.log(AllGangs[winGang].power / AllGangs[loseGang].power) / Math.log(50));
+      const gains = Math.min(AllGangs[loseGang].territory, powerBonus * 0.0001 * (Math.random() + 0.5));
+      return gains;
+    }
+
     this.storedTerritoryAndPowerCycles += numCycles;
     if (this.storedTerritoryAndPowerCycles < GangConstants.CyclesPerTerritoryAndPowerUpdate) return;
     this.storedTerritoryAndPowerCycles -= GangConstants.CyclesPerTerritoryAndPowerUpdate;
@@ -159,7 +184,7 @@ export class Gang implements IGang {
     // Process power first
     const gangName = this.facName;
     for (const name of Object.keys(AllGangs)) {
-      if (AllGangs.hasOwnProperty(name)) {
+      if (Object.hasOwn(AllGangs, name)) {
         if (name == gangName) {
           AllGangs[name].power += this.calculatePower();
         } else {
@@ -191,13 +216,13 @@ export class Gang implements IGang {
     }
 
     // Then process territory
-    const gangs = GangConstants.Names.filter((g) => AllGangs[g].territory > 0);
+    const gangs = GangConstants.Names.filter((g) => AllGangs[g].territory > 0 || g === gangName);
     if (gangs.length > 1) {
       for (let i = 0; i < gangs.length; ++i) {
         const others = gangs.filter((e) => {
           return e !== gangs[i];
         });
-        const other = getRandomInt(0, others.length - 1);
+        const other = getRandomIntInclusive(0, others.length - 1);
 
         const thisGang = gangs[i];
         const otherGang = others[other];
@@ -208,26 +233,11 @@ export class Gang implements IGang {
           if (!(Math.random() < this.territoryClashChance)) continue;
         }
 
-        const thisPwr = AllGangs[thisGang].power;
-        const otherPwr = AllGangs[otherGang].power;
-        const thisChance = thisPwr / (thisPwr + otherPwr);
-
-        function calculateTerritoryGain(winGang: string, loseGang: string): number {
-          const powerBonus = Math.max(
-            1,
-            1 + Math.log(AllGangs[winGang].power / AllGangs[loseGang].power) / Math.log(50),
-          );
-          const gains = Math.min(AllGangs[loseGang].territory, powerBonus * 0.0001 * (Math.random() + 0.5));
-          return gains;
-        }
-
-        if (Math.random() < thisChance) {
+        if (Math.random() < getClashWinChance(thisGang, otherGang)) {
           if (AllGangs[otherGang].territory <= 0) return;
           const territoryGain = calculateTerritoryGain(thisGang, otherGang);
           AllGangs[thisGang].territory += territoryGain;
-          if (AllGangs[thisGang].territory > 1) AllGangs[thisGang].territory = 1;
           AllGangs[otherGang].territory -= territoryGain;
-          if (AllGangs[thisGang].territory < 0) AllGangs[thisGang].territory = 0;
           if (thisGang === gangName) {
             this.clash(true); // Player won
             AllGangs[otherGang].power *= 1 / 1.01;
@@ -240,9 +250,7 @@ export class Gang implements IGang {
           if (AllGangs[thisGang].territory <= 0) return;
           const territoryGain = calculateTerritoryGain(otherGang, thisGang);
           AllGangs[thisGang].territory -= territoryGain;
-          if (AllGangs[otherGang].territory < 0) AllGangs[otherGang].territory = 0;
           AllGangs[otherGang].territory += territoryGain;
-          if (AllGangs[otherGang].territory > 1) AllGangs[otherGang].territory = 1;
           if (thisGang === gangName) {
             this.clash(false); // Player lost
           } else if (otherGang === gangName) {
@@ -252,14 +260,21 @@ export class Gang implements IGang {
             AllGangs[thisGang].power *= 1 / 1.01;
           }
         }
+
+        const total = Object.values(AllGangs)
+          .map((g) => g.territory)
+          .reduce((p, c) => p + c, 0);
+        Object.values(AllGangs).forEach((g) => (g.territory /= total));
       }
     }
   }
 
-  processExperienceGains(numCycles = 1): void {
-    for (let i = 0; i < this.members.length; ++i) {
-      this.members[i].gainExperience(numCycles);
-      this.members[i].updateSkillLevels();
+  /** Process member experience gain
+   * @param numCycles The number of cycles to process. */
+  processExperienceGains(numCycles: number): void {
+    for (const member of this.members) {
+      member.gainExperience(numCycles);
+      member.updateSkillLevels();
     }
   }
 
@@ -287,31 +302,55 @@ export class Gang implements IGang {
     }
   }
 
-  canRecruitMember(): boolean {
-    if (this.members.length >= GangConstants.MaximumGangMembers) return false;
-    return this.respect >= this.getRespectNeededToRecruitMember();
+  canRecruitMember(): RecruitmentResult {
+    if (this.members.length >= GangConstants.MaximumGangMembers) {
+      return RecruitmentResult.ExceedMaxNumber;
+    }
+    if (this.respect < this.respectForNextRecruit()) {
+      return RecruitmentResult.NotEnoughRespect;
+    }
+    return RecruitmentResult.Success;
   }
 
-  getRespectNeededToRecruitMember(): number {
-    // First N gang members are free (can be recruited at 0 respect)
-    const numFreeMembers = 3;
-    if (this.members.length < numFreeMembers) return 0;
-
-    const i = this.members.length - (numFreeMembers - 1);
-    return Math.pow(5, i);
+  /** @returns The respect threshold needed for the next member recruitment. Infinity if already at or above max members. */
+  respectForNextRecruit(): number {
+    if (this.members.length < GangConstants.numFreeMembers) return 0;
+    if (this.members.length >= GangConstants.MaximumGangMembers) {
+      return Infinity;
+    }
+    const exponent = this.members.length - GangConstants.numFreeMembers + 1;
+    return Math.pow(GangConstants.recruitThresholdBase, exponent);
   }
 
-  recruitMember(name: string): boolean {
-    name = String(name);
-    if (name === "" || !this.canRecruitMember()) return false;
+  getRecruitsAvailable(): number {
+    if (this.members.length >= GangConstants.MaximumGangMembers) {
+      return 0;
+    }
+    const numFreeMembers = GangConstants.numFreeMembers;
+    const recruitCostBase = GangConstants.recruitThresholdBase;
+    const membersRecruitabile =
+      Math.floor(Math.max(Math.log(this.respect), 0) / Math.log(recruitCostBase)) + numFreeMembers;
+    return Math.min(membersRecruitabile, GangConstants.MaximumGangMembers) - this.members.length;
+  }
+
+  recruitMember(name: string): RecruitmentResult {
+    if (name === "") {
+      return RecruitmentResult.EmptyName;
+    }
+
+    const resultOfCheckingIfGangCanRecruitMember = this.canRecruitMember();
+    if (resultOfCheckingIfGangCanRecruitMember !== RecruitmentResult.Success) {
+      return resultOfCheckingIfGangCanRecruitMember;
+    }
 
     // Check for already-existing names
-    const sameNames = this.members.filter((m) => m.name === name);
-    if (sameNames.length >= 1) return false;
+    if (this.members.some((m) => m.name === name)) {
+      return RecruitmentResult.DuplicatedName;
+    }
 
     const member = new GangMember(name);
     this.members.push(member);
-    return true;
+    return RecruitmentResult.Success;
   }
 
   // Money and Respect gains multiplied by this number (< 1)
@@ -323,8 +362,7 @@ export class Gang implements IGang {
   calculatePower(): number {
     let memberTotal = 0;
     for (let i = 0; i < this.members.length; ++i) {
-      if (!GangMemberTasks.hasOwnProperty(this.members[i].task) || this.members[i].task !== "Territory Warfare")
-        continue;
+      if (this.members[i].task !== "Territory Warfare") continue;
       memberTotal += this.members[i].calculatePower();
     }
     return 0.015 * Math.max(0.002, this.getTerritory()) * memberTotal;
@@ -334,7 +372,7 @@ export class Gang implements IGang {
     // Player loses a percentage of total respect, plus whatever respect that member has earned
     const totalRespect = this.respect;
     const lostRespect = 0.05 * totalRespect + member.earnedRespect;
-    this.respect = Math.max(0, totalRespect - lostRespect);
+    this.respect = Math.max(1, totalRespect - lostRespect);
 
     for (let i = 0; i < this.members.length; ++i) {
       if (member.name === this.members[i].name) {
@@ -357,7 +395,7 @@ export class Gang implements IGang {
         workerScript.log("gang.ascendMember", () => `Ascended Gang member ${member.name}`);
       }
       return res;
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (workerScript == null) {
         exceptionAlert(e);
       }
@@ -377,7 +415,7 @@ export class Gang implements IGang {
     return Math.max(1, discount);
   }
 
-  // Returns only valid tasks for this gang. Excludes 'Unassigned'
+  /** Returns only valid tasks for this gang. Excludes 'Unassigned' */
   getAllTaskNames(): string[] {
     return Object.keys(GangMemberTasks).filter((taskName: string) => {
       const task = GangMemberTasks[taskName];
@@ -395,20 +433,15 @@ export class Gang implements IGang {
     return upg.cost / this.getDiscount();
   }
 
-  /**
-   * Serialize the current object to a JSON save state.
-   */
-  toJSON(): any {
+  /** Serialize the current object to a JSON save state. */
+  toJSON(): IReviverValue {
     return Generic_toJSON("Gang", this);
   }
 
-  /**
-   * Initiatizes a Gang object from a JSON save state.
-   */
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-  static fromJSON(value: any): Gang {
+  /** Initializes a Gang object from a JSON save state. */
+  static fromJSON(value: IReviverValue): Gang {
     return Generic_fromJSON(Gang, value.data);
   }
 }
 
-Reviver.constructors.Gang = Gang;
+constructorsForReviver.Gang = Gang;

@@ -9,8 +9,9 @@
 import { HashUpgrades } from "./HashUpgrades";
 import { HashUpgrade } from "./HashUpgrade";
 
-import { IMap } from "../types";
-import { Generic_fromJSON, Generic_toJSON, Reviver } from "../utils/JSONReviver";
+import { Generic_fromJSON, Generic_toJSON, IReviverValue, constructorsForReviver } from "../utils/JSONReviver";
+import type { Result } from "@nsdefs";
+import { HashUpgradeEnum } from "./Enums";
 
 export class HashManager {
   // Max number of hashes this can hold. Equal to the sum of capacities of
@@ -21,7 +22,7 @@ export class HashManager {
   hashes = 0;
 
   // Map of Hash Upgrade Name -> levels in that upgrade
-  upgrades: IMap<number> = {};
+  upgrades: Record<string, number> = {};
 
   constructor() {
     for (const name of Object.keys(HashUpgrades)) {
@@ -29,10 +30,8 @@ export class HashManager {
     }
   }
 
-  /**
-   * Generic helper function for getting a multiplier from a HashUpgrade
-   */
-  getMult(upgName: string): number {
+  /** Generic helper function for getting a multiplier from a HashUpgrade */
+  getMult(upgName: HashUpgradeEnum): number {
     const upg = HashUpgrades[upgName];
     const currLevel = this.upgrades[upgName];
     if (upg == null || currLevel == null) {
@@ -43,25 +42,21 @@ export class HashManager {
     return 1 + (upg.value * currLevel) / 100;
   }
 
-  /**
-   * One of the Hash upgrades improves studying. This returns that multiplier
-   */
+  /** One of the Hash upgrades improves studying. This returns that multiplier */
   getStudyMult(): number {
-    const upgName = "Improve Studying";
+    const upgName = HashUpgradeEnum.ImproveStudying;
 
     return this.getMult(upgName);
   }
 
-  /**
-   * One of the Hash upgrades improves gym training. This returns that multiplier
-   */
+  /** One of the Hash upgrades improves gym training. This returns that multiplier */
   getTrainingMult(): number {
-    const upgName = "Improve Gym Training";
+    const upgName = HashUpgradeEnum.ImproveGymTraining;
 
     return this.getMult(upgName);
   }
 
-  getUpgrade(upgName: string): HashUpgrade | null {
+  getUpgrade(upgName: HashUpgradeEnum): HashUpgrade | null {
     const upg = HashUpgrades[upgName];
     if (!upg) {
       console.error(`Invalid Upgrade Name given to HashManager.getUpgrade(): ${upgName}`);
@@ -70,10 +65,8 @@ export class HashManager {
     return upg;
   }
 
-  /**
-   * Get the cost (in hashes) of an upgrade
-   */
-  getUpgradeCost(upgName: string): number {
+  /** Get the cost (in hashes) of an upgrade */
+  getUpgradeCost(upgName: HashUpgradeEnum, count = 1): number {
     const upg = this.getUpgrade(upgName);
     const currLevel = this.upgrades[upgName];
     if (upg == null || currLevel == null) {
@@ -81,7 +74,7 @@ export class HashManager {
       return Infinity;
     }
 
-    return upg.getCost(currLevel);
+    return upg.getCost(currLevel, count);
   }
 
   prestige(): void {
@@ -94,14 +87,12 @@ export class HashManager {
     this.updateCapacity(0);
   }
 
-  /**
-   * Reverts an upgrade and refunds the hashes used to buy it
-   */
-  refundUpgrade(upgName: string): void {
+  /** Reverts an upgrade and refunds the hashes used to buy it */
+  refundUpgrade(upgName: HashUpgradeEnum, count = 1): void {
     const upg = HashUpgrades[upgName];
 
     // Reduce the level first, so we get the right cost
-    --this.upgrades[upgName];
+    this.upgrades[upgName] -= count;
 
     const currLevel = this.upgrades[upgName];
     if (upg == null || currLevel == null || currLevel < 0) {
@@ -109,7 +100,7 @@ export class HashManager {
       return;
     }
 
-    const cost = upg.getCost(currLevel);
+    const cost = upg.getCost(currLevel, count);
     this.hashes += cost;
   }
 
@@ -134,38 +125,36 @@ export class HashManager {
   }
 
   /**
-   * Returns boolean indicating whether or not the upgrade was successfully purchased
-   * Note that this does NOT actually implement the effect
+   * Returns boolean indicating whether or not the upgrade was successfully purchased.
+   * Note that this function does NOT actually implement the effect.
    */
-  upgrade(upgName: string): boolean {
+  upgrade(upgName: HashUpgradeEnum, count = 1): Result {
     const upg = HashUpgrades[upgName];
     if (upg == null) {
-      console.error(`Invalid Upgrade Name given to HashManager.upgrade(): ${upgName}`);
-      return false;
+      return { success: false, message: `Invalid Upgrade Name given to HashManager.upgrade(): ${upgName}` };
     }
 
-    const cost = this.getUpgradeCost(upgName);
+    const cost = this.getUpgradeCost(upgName, count);
 
     if (this.hashes < cost) {
-      return false;
+      return { success: false, message: "Not enough hashes" };
     }
 
     this.hashes -= cost;
-    ++this.upgrades[upgName];
+    this.upgrades[upgName] += count;
 
-    return true;
+    return { success: true };
   }
 
   //Serialize the current object to a JSON save state.
-  toJSON(): any {
+  toJSON(): IReviverValue {
     return Generic_toJSON("HashManager", this);
   }
 
-  // Initiatizes a HashManager object from a JSON save state.
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-  static fromJSON(value: any): HashManager {
+  // Initializes a HashManager object from a JSON save state.
+  static fromJSON(value: IReviverValue): HashManager {
     return Generic_fromJSON(HashManager, value.data);
   }
 }
 
-Reviver.constructors.HashManager = HashManager;
+constructorsForReviver.HashManager = HashManager;

@@ -6,20 +6,65 @@
 
 Check if any script with a filename is running.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-scriptRunning(script: string, host: string): boolean;
+scriptRunning(script: string, host?: string): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  script | string | Filename of script to check. This is case-sensitive. |
-|  host | string | Host of target server. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+script
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Filename of script to check. This is case-sensitive.
+
+
+</td></tr>
+<tr><td>
+
+host
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Hostname/IP of the target server. Optional. Defaults to current server if not provided.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 boolean
 
@@ -31,30 +76,16 @@ RAM cost: 1 GB
 
 Returns a boolean indicating whether any instance of the specified script is running on the target server, regardless of its arguments.
 
-This is different than the isRunning function because it does not try to identify a specific instance of a running script by its arguments.
+This is different than the [isRunning](./bitburner.ns.isrunning.md) function because it does not try to identify a specific instance of a running script by its arguments.
 
-## Example 1
-
-
-```ts
-// NS1:
-//The function call will return true if there is any script named foo.script running on the foodnstuff server, and false otherwise:
-scriptRunning("foo.script", "foodnstuff");
-
-//The function call will return true if there is any script named “foo.script” running on the current server, and false otherwise:
-scriptRunning("foo.script", getHostname());
-```
-\*
-
-## Example 2
+## Example
 
 
-```ts
-// NS2:
-//The function call will return true if there is any script named foo.script running on the foodnstuff server, and false otherwise:
-ns.scriptRunning("foo.script", "foodnstuff");
+```js
+//The function call will return true if there is any script named foo.js running on the foodnstuff server, and false otherwise:
+ns.scriptRunning("foo.js", "foodnstuff");
 
-//The function call will return true if there is any script named “foo.script” running on the current server, and false otherwise:
-ns.scriptRunning("foo.script", ns.getHostname());
+//The function call will return true if there is any script named “foo.js” running on the current server, and false otherwise:
+ns.scriptRunning("foo.js", ns.getHostname());
 ```
 

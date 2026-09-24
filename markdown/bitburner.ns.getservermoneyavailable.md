@@ -6,19 +6,49 @@
 
 Get money available on a server.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getServerMoneyAvailable(host: string): number;
+getServerMoneyAvailable(host?: string): number;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  host | string | Host of target server |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+host
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Hostname/IP of the target server. Optional. Defaults to current server if not provided.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 
@@ -30,20 +60,10 @@ RAM cost: 0.1 GB
 
 Returns the amount of money available on a server. Running this function on the home computer will return the player’s money.
 
-## Example 1
+## Example
 
 
-```ts
-// NS1:
-getServerMoneyAvailable("foodnstuff");
-getServerMoneyAvailable("home"); //Returns player's money
-```
-
-## Example 2
-
-
-```ts
-// NS2:
+```js
 ns.getServerMoneyAvailable("foodnstuff");
 ns.getServerMoneyAvailable("home"); // Returns player's money
 ```

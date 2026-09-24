@@ -4,8 +4,8 @@
 
 ## Player.jobs property
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-jobs: any;
+jobs: Partial<Record<CompanyName, JobName>>;
 ```

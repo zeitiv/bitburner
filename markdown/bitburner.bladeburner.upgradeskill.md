@@ -6,19 +6,65 @@
 
 Upgrade skill.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-upgradeSkill(name: string): boolean;
+upgradeSkill(skillName: BladeburnerSkillName, count?: number): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  name | string |  |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+skillName
+
+
+</td><td>
+
+[BladeburnerSkillName](./bitburner.bladeburnerskillname.md)
+
+
+</td><td>
+
+Name of skill to be upgraded. Case-sensitive and must be an exact match.
+
+
+</td></tr>
+<tr><td>
+
+count
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Number of times to upgrade the skill. Defaults to 1 if not specified.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 boolean
 
@@ -28,7 +74,7 @@ true if the skill is successfully upgraded, and false otherwise.
 
 RAM cost: 4 GB
 
-Attempts to upgrade the specified Bladeburner skill.
+Attempts to upgrade the specified Bladeburner skill the specified number of times.
 
 Returns true if the skill is successfully upgraded, and false otherwise.
 

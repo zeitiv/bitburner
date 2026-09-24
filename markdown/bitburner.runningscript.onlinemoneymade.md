@@ -4,7 +4,9 @@
 
 ## RunningScript.onlineMoneyMade property
 
-<b>Signature:</b>
+Total amount of money made by this script when online
+
+**Signature:**
 
 ```typescript
 onlineMoneyMade: number;

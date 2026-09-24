@@ -6,16 +6,16 @@
 
 Get the number of sleeves you own.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 getNumSleeves(): number;
 ```
-<b>Returns:</b>
+**Returns:**
 
 number
 
-number of duplicate sleeves the player has.
+Number of duplicate sleeves the player has.
 
 ## Remarks
 

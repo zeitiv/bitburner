@@ -1,39 +1,24 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import { Box, Typography } from "@mui/material";
+import { Theme } from "@mui/material/styles";
+import { makeStyles } from "tss-react/mui";
 
-import { IPlayer } from "../PersonObjects/IPlayer";
-import { IEngine } from "../IEngine";
-import { ITerminal } from "../Terminal/ITerminal";
+import { Player } from "@player";
 import { installAugmentations } from "../Augmentation/AugmentationHelpers";
 import { saveObject } from "../SaveObject";
-import { onExport } from "../ExportBonus";
-import { LocationName } from "../Locations/data/LocationNames";
-import { Location } from "../Locations/Location";
-import { Locations } from "../Locations/Locations";
+import { CompletedProgramName, LocationName, SimplePage } from "@enums";
 import { ITutorial, iTutorialStart } from "../InteractiveTutorial";
 import { InteractiveTutorialRoot } from "./InteractiveTutorial/InteractiveTutorialRoot";
 import { ITutorialEvents } from "./InteractiveTutorial/ITutorialEvents";
 
-import { Faction } from "../Faction/Faction";
-import { prestigeAugmentation } from "../Prestige";
+import { prestigeWorkerScripts } from "../NetscriptWorker";
 import { dialogBoxCreate } from "./React/DialogBox";
 import { GetAllServers } from "../Server/AllServers";
-import { Factions } from "../Faction/Factions";
-import { buyStock, sellStock, shortStock, sellShort } from "../StockMarket/BuyingAndSelling";
-import {
-  cancelOrder,
-  eventEmitterForUiReset,
-  initStockMarketFnForReact,
-  placeOrder,
-  StockMarket,
-} from "../StockMarket/StockMarket";
+import { StockMarket } from "../StockMarket/StockMarket";
 
-import { Theme } from "@mui/material/styles";
-import makeStyles from "@mui/styles/makeStyles";
-import createStyles from "@mui/styles/createStyles";
-import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
-
-import { Page, IRouter, ScriptEditorRouteOptions } from "./Router";
+import type { ComplexPage } from "./Enums";
+import type { IRouter, PageContext, PageWithContext } from "./Router";
+import { isSimplePage, Page } from "./Router";
 import { Overview } from "./React/Overview";
 import { SidebarRoot } from "../Sidebar/ui/SidebarRoot";
 import { AugmentationsRoot } from "../Augmentation/ui/AugmentationsRoot";
@@ -42,21 +27,24 @@ import { BladeburnerRoot } from "../Bladeburner/ui/BladeburnerRoot";
 import { GangRoot } from "../Gang/ui/GangRoot";
 import { CorporationRoot } from "../Corporation/ui/CorporationRoot";
 import { InfiltrationRoot } from "../Infiltration/ui/InfiltrationRoot";
-import { ResleeveRoot } from "../PersonObjects/Resleeving/ui/ResleeveRoot";
+import { GraftingRoot } from "../PersonObjects/Grafting/ui/GraftingRoot";
 import { WorkInProgressRoot } from "./WorkInProgressRoot";
-import { GameOptionsRoot } from "../ui/React/GameOptionsRoot";
+import { GameOptionsPageEvents, GameOptionsRoot } from "../GameOptions/ui/GameOptionsRoot";
 import { SleeveRoot } from "../PersonObjects/Sleeve/ui/SleeveRoot";
 import { HacknetRoot } from "../Hacknet/ui/HacknetRoot";
 import { GenericLocation } from "../Locations/ui/GenericLocation";
+import { JobRoot } from "../Locations/ui/JobRoot";
 import { LocationCity } from "../Locations/ui/City";
 import { ProgramsRoot } from "../Programs/ui/ProgramsRoot";
-import { Root as ScriptEditorRoot } from "../ScriptEditor/ui/ScriptEditorRoot";
+import { ScriptEditorRoot } from "../ScriptEditor/ui/ScriptEditorRoot";
 import { MilestonesRoot } from "../Milestones/ui/MilestonesRoot";
 import { TerminalRoot } from "../Terminal/ui/TerminalRoot";
-import { TutorialRoot } from "../Tutorial/ui/TutorialRoot";
-import { ActiveScriptsRoot } from "../ui/ActiveScripts/ActiveScriptsRoot";
+import { Terminal } from "../Terminal";
+import { DocumentationRoot } from "../Documentation/ui/DocumentationRoot";
+import { ActiveScriptsRoot } from "./ActiveScripts/ActiveScriptsRoot";
 import { FactionsRoot } from "../Faction/ui/FactionsRoot";
 import { FactionRoot } from "../Faction/ui/FactionRoot";
+import { AugmentationsPage as FactionAugmentations } from "../Faction/ui/AugmentationsPage";
 import { CharacterStats } from "./CharacterStats";
 import { TravelAgencyRoot } from "../Locations/ui/TravelAgencyRoot";
 import { StockMarketRoot } from "../StockMarket/ui/StockMarketRoot";
@@ -65,184 +53,159 @@ import { StaneksGiftRoot } from "../CotMG/ui/StaneksGiftRoot";
 import { staneksGift } from "../CotMG/Helper";
 import { CharacterOverview } from "./React/CharacterOverview";
 import { BladeburnerCinematic } from "../Bladeburner/ui/BladeburnerCinematic";
-import { workerScripts } from "../Netscript/WorkerScripts";
 import { Unclickable } from "../Exploits/Unclickable";
 import { Snackbar, SnackbarProvider } from "./React/Snackbar";
 import { LogBoxManager } from "./React/LogBoxManager";
 import { AlertManager } from "./React/AlertManager";
 import { PromptManager } from "./React/PromptManager";
-import { InvitationModal } from "../Faction/ui/InvitationModal";
+import { FactionInvitationManager } from "../Faction/ui/FactionInvitationManager";
 import { calculateAchievements } from "../Achievements/Achievements";
-
-import { enterBitNode } from "../RedPill";
-import { Context } from "./Context";
-import { RecoveryMode, RecoveryRoot } from "./React/RecoveryRoot";
+import { ActivateRecoveryMode, RecoveryMode, RecoveryRoot } from "./React/RecoveryRoot";
 import { AchievementsRoot } from "../Achievements/AchievementsRoot";
 import { ErrorBoundary } from "./ErrorBoundary";
-import { Settings } from "../Settings/Settings";
 import { ThemeBrowser } from "../Themes/ui/ThemeBrowser";
-import { ImportSaveRoot } from "./React/ImportSaveRoot";
+import { ImportSaveComparison } from "./React/ImportSaveComparison";
 import { BypassWrapper } from "./React/BypassWrapper";
 
-import _wrap from "lodash/wrap";
-import _functions from "lodash/functions";
+import { Apr1 } from "./Apr1";
+import { V2Modal } from "../utils/V2Modal";
+import { useRerender } from "./React/hooks";
+import { HistoryProvider } from "./React/Documentation";
+import { GoRoot } from "../Go/ui/GoRoot";
+import { Settings } from "../Settings/Settings";
+import { isBitNodeFinished } from "../BitNode/BitNodeUtils";
+import { UIEventEmitter, UIEventType } from "./UIEventEmitter";
+import { exceptionAlert } from "../utils/helpers/exceptionAlert";
+import { SpecialServers } from "../Server/data/SpecialServers";
+import { ErrorModal } from "../ErrorHandling/ErrorModal";
+import { DWRoot } from "../DarkNet/DWRoot";
+import { DocumentationPopUp } from "../Documentation/ui/DocumentationPopUp";
 
 const htmlLocation = location;
 
-interface IProps {
-  terminal: ITerminal;
-  player: IPlayer;
-  engine: IEngine;
-}
+const useStyles = makeStyles()((theme: Theme) => ({
+  root: {
+    msOverflowStyle: "none" /* for Internet Explorer, Edge */,
+    scrollbarWidth: "none" /* for Firefox */,
+    margin: theme.spacing(0),
+    flexGrow: 1,
+    padding: "8px",
+    minHeight: "100vh",
+    boxSizing: "border-box",
+    width: "1px",
+  },
+}));
 
-const useStyles = makeStyles((theme: Theme) =>
-  createStyles({
-    root: {
-      "-ms-overflow-style": "none" /* for Internet Explorer, Edge */,
-      "scrollbar-width": "none" /* for Firefox */,
-      margin: theme.spacing(0),
-      flexGrow: 1,
-      display: "block",
-      padding: "8px",
-      minHeight: "100vh",
-      boxSizing: "border-box",
-    },
-  }),
-);
+const MAX_PAGES_IN_HISTORY = 10;
+
+type RouterAction = (
+  | {
+      type: "toPage";
+      page: Page;
+      context?: PageContext<ComplexPage>;
+    }
+  | {
+      type: "back";
+    }
+) & { stackTrace: string | undefined };
+
+/**
+ * When the main UI is not loaded, all router actions ("toPage" and "back") are stored in this array. After that, we
+ * will run them and show a warning popup. This queue is empty in a normal situation. If it has items, there are bugs
+ * that try to route the main UI when it's not loaded.
+ */
+const pendingRouterActions: RouterAction[] = [];
 
 export let Router: IRouter = {
   page: () => {
-    throw new Error("Router called before initialization");
+    return Page.LoadingScreen;
   },
+  /**
+   * This function is only called in ImportSave.tsx. That component is only used when the main UI shows Page.ImportSave,
+   * so it's impossible for this function to run before the main UI is loaded. If it happens, it's a fatal error. In
+   * that case, throwing an error is the only option.
+   */
   allowRouting: () => {
-    throw new Error("Router called before initialization");
+    throw new Error("Router.allowRouting() was called before initialization.");
   },
-  toActiveScripts: () => {
-    throw new Error("Router called before initialization");
+  hidingMessages: () => true,
+  toPage: (page: Page, context?: PageContext<ComplexPage>) => {
+    const stackTrace = new Error().stack;
+    console.error("Router.toPage() was called before initialization.", page, context, stackTrace);
+    pendingRouterActions.push({
+      type: "toPage",
+      page,
+      context,
+      stackTrace,
+    });
   },
-  toAugmentations: () => {
-    throw new Error("Router called before initialization");
-  },
-  toBitVerse: () => {
-    throw new Error("Router called before initialization");
-  },
-  toBladeburner: () => {
-    throw new Error("Router called before initialization");
-  },
-  toStats: () => {
-    throw new Error("Router called before initialization");
-  },
-  toCity: () => {
-    throw new Error("Router called before initialization");
-  },
-  toCorporation: () => {
-    throw new Error("Router called before initialization");
-  },
-  toCreateProgram: () => {
-    throw new Error("Router called before initialization");
-  },
-  toDevMenu: () => {
-    throw new Error("Router called before initialization");
-  },
-  toFaction: () => {
-    throw new Error("Router called before initialization");
-  },
-  toFactions: () => {
-    throw new Error("Router called before initialization");
-  },
-  toGameOptions: () => {
-    throw new Error("Router called before initialization");
-  },
-  toGang: () => {
-    throw new Error("Router called before initialization");
-  },
-  toHacknetNodes: () => {
-    throw new Error("Router called before initialization");
-  },
-  toInfiltration: () => {
-    throw new Error("Router called before initialization");
-  },
-  toJob: () => {
-    throw new Error("Router called before initialization");
-  },
-  toMilestones: () => {
-    throw new Error("Router called before initialization");
-  },
-  toResleeves: () => {
-    throw new Error("Router called before initialization");
-  },
-  toScriptEditor: () => {
-    throw new Error("Router called before initialization");
-  },
-  toSleeves: () => {
-    throw new Error("Router called before initialization");
-  },
-  toStockMarket: () => {
-    throw new Error("Router called before initialization");
-  },
-  toTerminal: () => {
-    throw new Error("Router called before initialization");
-  },
-  toTravel: () => {
-    throw new Error("Router called before initialization");
-  },
-  toTutorial: () => {
-    throw new Error("Router called before initialization");
-  },
-  toWork: () => {
-    throw new Error("Router called before initialization");
-  },
-  toBladeburnerCinematic: () => {
-    throw new Error("Router called before initialization");
-  },
-  toLocation: () => {
-    throw new Error("Router called before initialization");
-  },
-  toStaneksGift: () => {
-    throw new Error("Router called before initialization");
-  },
-  toAchievements: () => {
-    throw new Error("Router called before initialization");
-  },
-  toThemeBrowser: () => {
-    throw new Error("Router called before initialization");
-  },
-  toImportSave: () => {
-    throw new Error("Router called before initialization");
+  back: () => {
+    const stackTrace = new Error().stack;
+    console.error("Default Router.back() was called before initialization.", stackTrace);
+    pendingRouterActions.push({
+      type: "back",
+      stackTrace,
+    });
   },
 };
 
-function determineStartPage(player: IPlayer): Page {
-  if (RecoveryMode) return Page.Recovery;
-  if (player.isWorking) return Page.Work;
-  return Page.Terminal;
+function determineStartPage(): PageWithContext {
+  if (RecoveryMode) {
+    return { page: Page.Recovery };
+  }
+  /**
+   * If the save data contains the server list, but WD data is invalid, isBitNodeFinished() will throw an error, and the
+   * main UI will show a black screen instead of the recovery screen.
+   */
+  try {
+    if (isBitNodeFinished()) {
+      // Go to BitVerse UI without animation.
+      return { page: Page.BitVerse, flume: false, quick: true };
+    }
+  } catch (error) {
+    ActivateRecoveryMode(error);
+    return { page: Page.Recovery };
+  }
+  if (Player.currentWork !== null) {
+    return { page: Page.Work };
+  }
+  return { page: Page.Terminal };
 }
 
-export function GameRoot({ player, engine, terminal }: IProps): React.ReactElement {
-  const classes = useStyles();
-  const [{ files, vim }, setEditorOptions] = useState({ files: {}, vim: false });
-  const [page, setPage] = useState(determineStartPage(player));
-  const setRerender = useState(0)[1];
-  const [faction, setFaction] = useState<Faction>(
-    player.currentWorkFactionName ? Factions[player.currentWorkFactionName] : (undefined as unknown as Faction),
-  );
-  if (faction === undefined && page === Page.Faction)
-    throw new Error("Trying to go to a page without the proper setup");
+export function GameRoot(): React.ReactElement {
+  const { classes } = useStyles();
 
-  const [flume, setFlume] = useState<boolean>(false);
-  const [quick, setQuick] = useState<boolean>(false);
-  const [location, setLocation] = useState<Location>(undefined as unknown as Location);
-  if (location === undefined && (page === Page.Infiltration || page === Page.Location || page === Page.Job))
-    throw new Error("Trying to go to a page without the proper setup");
+  const [pages, setPages] = useState<PageWithContext[]>(() => [determineStartPage()]);
+  let pageWithContext = pages[0];
 
-  const [cinematicText, setCinematicText] = useState("");
+  /**
+   * Theoretically, this case cannot happen because of the check in Router.back(). Nevertheless, we should still check
+   * it. In the future, if we call "setPages" and remove items in the "pages" array without checking it properly,
+   * this case can still happen.
+   */
+  if (pageWithContext === undefined) {
+    /**
+     * We have to delay showing the warning popup due to these reasons:
+     * - React will complain: "Warning: Cannot update a component (`AlertManager`) while rendering a different
+     * component (`GameRoot`)".
+     * - There is a potential problem in AlertManager.tsx. Please check the comment there for more information.
+     */
+    setTimeout(() => {
+      exceptionAlert(new Error(`pageWithContext is undefined`));
+    }, 1000);
+    pageWithContext = { page: Page.Terminal };
+  }
+
+  const setNextPage = (pageWithContext: PageWithContext) =>
+    setPages((prev) => {
+      const next = [pageWithContext, ...prev];
+      next.length = Math.min(next.length, MAX_PAGES_IN_HISTORY);
+      return next;
+    });
+
+  const rerender = useRerender();
+
   const [errorBoundaryKey, setErrorBoundaryKey] = useState<number>(0);
-  const [sidebarOpened, setSideBarOpened] = useState(Settings.IsSidebarOpened);
-
-  const [importString, setImportString] = useState<string>(undefined as unknown as string);
-  const [importAutomatic, setImportAutomatic] = useState<boolean>(false);
-  if (importString === undefined && page === Page.ImportSave)
-    throw new Error("Trying to go to a page without the proper setup");
 
   const [allowRoutingCalls, setAllowRoutingCalls] = useState(true);
 
@@ -250,157 +213,118 @@ export function GameRoot({ player, engine, terminal }: IProps): React.ReactEleme
     setErrorBoundaryKey(errorBoundaryKey + 1);
   }
 
-  function rerender(): void {
-    setRerender((old) => old + 1);
-  }
   useEffect(() => {
     return ITutorialEvents.subscribe(rerender);
-  }, []);
+  }, [rerender]);
 
   function killAllScripts(): void {
-    for (const server of GetAllServers()) {
-      server.runningScripts = [];
+    for (const server of GetAllServers(true)) {
+      server.runningScriptMap.clear();
     }
-    saveObject.saveGame();
-    setTimeout(() => htmlLocation.reload(), 2000);
+    saveObject
+      .saveGame()
+      .then(() => {
+        setTimeout(() => htmlLocation.reload(), 0);
+      })
+      .catch((error) => {
+        exceptionAlert(error);
+      });
   }
 
+  function attemptedForbiddenRouting(name: string) {
+    console.error(`Routing is currently disabled - Attempted router.${name}()`);
+  }
+
+  const hiddenPages = new Set([
+    Page.Recovery,
+    Page.ImportSave,
+    Page.BitVerse,
+    Page.Infiltration,
+    Page.BladeburnerCinematic,
+  ]);
+
   Router = {
-    page: () => page,
+    page: () => pageWithContext.page,
     allowRouting: (value: boolean) => setAllowRoutingCalls(value),
-    toActiveScripts: () => setPage(Page.ActiveScripts),
-    toAugmentations: () => setPage(Page.Augmentations),
-    toBladeburner: () => setPage(Page.Bladeburner),
-    toStats: () => setPage(Page.Stats),
-    toCorporation: () => setPage(Page.Corporation),
-    toCreateProgram: () => setPage(Page.CreateProgram),
-    toDevMenu: () => setPage(Page.DevMenu),
-    toFaction: (faction?: Faction) => {
-      setPage(Page.Faction);
-      if (faction) setFaction(faction);
+    hidingMessages: () => hiddenPages.has(pageWithContext.page),
+    toPage: (page: Page, context?: PageContext<ComplexPage>) => {
+      if (!allowRoutingCalls) return attemptedForbiddenRouting("toPage");
+      switch (page) {
+        case Page.Travel:
+          Player.gotoLocation(LocationName.TravelAgency);
+          break;
+        case Page.BitVerse:
+          prestigeWorkerScripts();
+          calculateAchievements();
+          break;
+        case Page.Options:
+          // If the current page is "Options" and something calls Router.toPage("Options", { tab: "Foo" }) to switch the
+          // tab, we need to emit an event to tell GameOptionsRoot to set its currentTab state. Changing the tab in the
+          // properties of GameOptionsRoot does not set the state.
+          if (Router.page() === Page.Options && context && "tab" in context && context.tab != null) {
+            GameOptionsPageEvents.emit(context.tab);
+          }
+          break;
+      }
+      // If the current page is Page.Work, the player is focusing on their current work. Switching to another page ends
+      // that focus, so we must call Player.stopFocusing() immediately after Router.toPage() to keep Player.focus in
+      // sync. Instead of repeating this logic wherever Router.toPage() is called, we should centralize the check and
+      // the Player.stopFocusing() call here.
+      if (pageWithContext.page === Page.Work && page !== Page.Work && Player.currentWork && Player.focus) {
+        Player.stopFocusing();
+      }
+      setNextPage({ page, ...context } as PageWithContext);
     },
-    toFactions: () => setPage(Page.Factions),
-    toGameOptions: () => setPage(Page.Options),
-    toGang: () => setPage(Page.Gang),
-    toHacknetNodes: () => setPage(Page.Hacknet),
-    toMilestones: () => setPage(Page.Milestones),
-    toResleeves: () => setPage(Page.Resleeves),
-    toScriptEditor: (files: Record<string, string>, options?: ScriptEditorRouteOptions) => {
-      setEditorOptions({
-        files,
-        vim: !!options?.vim,
-      });
-      setPage(Page.ScriptEditor);
-    },
-    toSleeves: () => setPage(Page.Sleeves),
-    toStockMarket: () => setPage(Page.StockMarket),
-    toTerminal: () => setPage(Page.Terminal),
-    toTutorial: () => setPage(Page.Tutorial),
-    toJob: () => {
-      setLocation(Locations[player.companyName]);
-      setPage(Page.Job);
-    },
-    toCity: () => {
-      setPage(Page.City);
-    },
-    toTravel: () => {
-      player.gotoLocation(LocationName.TravelAgency);
-      setPage(Page.Travel);
-    },
-    toBitVerse: (flume: boolean, quick: boolean) => {
-      setFlume(flume);
-      setQuick(quick);
-      calculateAchievements();
-      setPage(Page.BitVerse);
-    },
-    toInfiltration: (location: Location) => {
-      setLocation(location);
-      setPage(Page.Infiltration);
-    },
-    toWork: () => setPage(Page.Work),
-    toBladeburnerCinematic: () => {
-      setPage(Page.BladeburnerCinematic);
-      setCinematicText(cinematicText);
-    },
-    toLocation: (location: Location) => {
-      setLocation(location);
-      setPage(Page.Location);
-    },
-    toStaneksGift: () => {
-      setPage(Page.StaneksGift);
-    },
-    toAchievements: () => {
-      setPage(Page.Achievements);
-    },
-    toThemeBrowser: () => {
-      setPage(Page.ThemeBrowser);
-    },
-    toImportSave: (base64save: string, automatic = false) => {
-      setImportString(base64save);
-      setImportAutomatic(automatic);
-      setPage(Page.ImportSave);
+    back: () => {
+      if (!allowRoutingCalls) {
+        return attemptedForbiddenRouting("back");
+      }
+      /**
+       * If something calls Router.back() when the "pages" array has only 1 item, that array will be empty when the UI
+       * is rerendered, and pageWithContext will be undefined. To avoid this problem, we return immediately in that case.
+       */
+      if (pages.length === 1) {
+        return;
+      }
+      setPages((pages) => pages.slice(1));
     },
   };
 
-
   useEffect(() => {
-    // Wrap Router navigate functions to be able to disable the execution
-    _functions(Router).
-      filter((fnName) => fnName.startsWith('to')).
-      forEach((fnName) => {
-        // @ts-ignore - tslint does not like this, couldn't find a way to make it cooperate
-        Router[fnName] = _wrap(Router[fnName], (func, ...args) => {
-          if (!allowRoutingCalls) {
-            // Let's just log to console.
-            console.log(`Routing is currently disabled - Attempted router.${fnName}()`);
-            return;
-          }
-
-           // Call the function normally
-          return func(...args);
-        });
-      });
-  });
-
-  useEffect(() => {
-    if (page !== Page.Terminal) window.scrollTo(0, 0);
-  });
+    if (pageWithContext.page !== Page.Terminal) window.scrollTo(0, 0);
+  }, [pageWithContext.page]);
 
   function softReset(): void {
     dialogBoxCreate("Soft Reset!");
-    prestigeAugmentation();
+    installAugmentations(true);
     resetErrorBoundary();
-    Router.toTerminal();
+    Router.toPage(Page.Terminal);
   }
 
   let mainPage = <Typography>Cannot load</Typography>;
   let withSidebar = true;
-  let withPopups = true;
+  const hidePopups = Router.hidingMessages();
   let bypassGame = false;
-  switch (page) {
+  switch (pageWithContext.page) {
     case Page.Recovery: {
-      mainPage = <RecoveryRoot router={Router} softReset={softReset} />;
+      mainPage = <RecoveryRoot softReset={softReset} />;
       withSidebar = false;
-      withPopups = false;
       bypassGame = true;
       break;
     }
     case Page.BitVerse: {
-      mainPage = <BitverseRoot flume={flume} enter={enterBitNode} quick={quick} />;
+      mainPage = <BitverseRoot flume={pageWithContext.flume} quick={pageWithContext.quick} />;
       withSidebar = false;
-      withPopups = false;
       break;
     }
     case Page.Infiltration: {
-      mainPage = <InfiltrationRoot location={location} />;
+      mainPage = <InfiltrationRoot />;
       withSidebar = false;
-      withPopups = false;
       break;
     }
     case Page.BladeburnerCinematic: {
       mainPage = <BladeburnerCinematic />;
       withSidebar = false;
-      withPopups = false;
       break;
     }
     case Page.Work: {
@@ -409,7 +333,7 @@ export function GameRoot({ player, engine, terminal }: IProps): React.ReactEleme
       break;
     }
     case Page.Terminal: {
-      mainPage = <TerminalRoot terminal={terminal} router={Router} player={player} />;
+      mainPage = <TerminalRoot />;
       break;
     }
     case Page.Sleeves: {
@@ -427,21 +351,27 @@ export function GameRoot({ player, engine, terminal }: IProps): React.ReactEleme
     case Page.ScriptEditor: {
       mainPage = (
         <ScriptEditorRoot
-          files={files}
-          hostname={player.getCurrentServer().hostname}
-          player={player}
-          router={Router}
-          vim={vim}
+          files={pageWithContext.files ?? new Map()}
+          hostname={pageWithContext.options?.hostname ?? Player.getCurrentServer().hostname}
+          vim={pageWithContext.options === undefined ? Settings.MonacoDefaultToVim : pageWithContext.options.vim}
         />
       );
       break;
     }
     case Page.ActiveScripts: {
-      mainPage = <ActiveScriptsRoot workerScripts={workerScripts} />;
+      mainPage = <ActiveScriptsRoot page={SimplePage.ActiveScripts} />;
+      break;
+    }
+    case Page.RecentlyKilledScripts: {
+      mainPage = <ActiveScriptsRoot page={SimplePage.RecentlyKilledScripts} />;
+      break;
+    }
+    case Page.RecentErrors: {
+      mainPage = <ActiveScriptsRoot page={SimplePage.RecentErrors} />;
       break;
     }
     case Page.Hacknet: {
-      mainPage = <HacknetRoot player={player} />;
+      mainPage = <HacknetRoot />;
       break;
     }
     case Page.CreateProgram: {
@@ -449,31 +379,27 @@ export function GameRoot({ player, engine, terminal }: IProps): React.ReactEleme
       break;
     }
     case Page.Factions: {
-      mainPage = <FactionsRoot player={player} router={Router} />;
+      mainPage = <FactionsRoot />;
       break;
     }
     case Page.Faction: {
-      mainPage = <FactionRoot faction={faction} />;
+      mainPage = <FactionRoot faction={pageWithContext.faction} />;
+      break;
+    }
+    case Page.FactionAugmentations: {
+      mainPage = <FactionAugmentations faction={pageWithContext.faction} />;
       break;
     }
     case Page.Milestones: {
-      mainPage = <MilestonesRoot player={player} />;
+      mainPage = <MilestonesRoot />;
       break;
     }
-    case Page.Tutorial: {
-      mainPage = (
-        <TutorialRoot
-          reactivateTutorial={() => {
-            prestigeAugmentation();
-            Router.toTerminal();
-            iTutorialStart();
-          }}
-        />
-      );
+    case Page.Documentation: {
+      mainPage = <DocumentationRoot docPage={pageWithContext.docPage} />;
       break;
     }
     case Page.DevMenu: {
-      mainPage = <DevMenuRoot player={player} engine={engine} router={Router} />;
+      mainPage = <DevMenuRoot />;
       break;
     }
     case Page.Gang: {
@@ -488,29 +414,16 @@ export function GameRoot({ player, engine, terminal }: IProps): React.ReactEleme
       mainPage = <BladeburnerRoot />;
       break;
     }
-    case Page.Resleeves: {
-      mainPage = <ResleeveRoot />;
+    case Page.Grafting: {
+      mainPage = <GraftingRoot />;
       break;
     }
     case Page.Travel: {
-      mainPage = <TravelAgencyRoot p={player} router={Router} />;
+      mainPage = <TravelAgencyRoot />;
       break;
     }
     case Page.StockMarket: {
-      mainPage = (
-        <StockMarketRoot
-          buyStockLong={buyStock}
-          buyStockShort={shortStock}
-          cancelOrder={cancelOrder}
-          eventEmitterForReset={eventEmitterForUiReset}
-          initStockMarket={initStockMarketFnForReact}
-          p={player}
-          placeOrder={placeOrder}
-          sellStockLong={sellStock}
-          sellStockShort={sellShort}
-          stockMarket={StockMarket}
-        />
-      );
+      mainPage = <StockMarketRoot stockMarket={StockMarket} />;
       break;
     }
     case Page.City: {
@@ -518,23 +431,31 @@ export function GameRoot({ player, engine, terminal }: IProps): React.ReactEleme
       break;
     }
     case Page.Job:
+      mainPage = <JobRoot />;
+      break;
     case Page.Location: {
-      mainPage = <GenericLocation loc={location} />;
+      mainPage = <GenericLocation location={pageWithContext.location} showBackButton={true} />;
       break;
     }
     case Page.Options: {
       mainPage = (
         <GameOptionsRoot
-          player={player}
-          router={Router}
-          save={() => saveObject.saveGame()}
+          tab={pageWithContext.tab}
+          save={() => {
+            saveObject.saveGame().catch((error) => exceptionAlert(error));
+          }}
           export={() => {
-            // Apply the export bonus before saving the game
-            onExport(player);
-            saveObject.exportGame();
+            saveObject.exportGame().catch((error) => exceptionAlert(error));
           }}
           forceKill={killAllScripts}
           softReset={softReset}
+          reactivateTutorial={() => {
+            prestigeWorkerScripts();
+            Player.getHomeComputer().pushProgram(CompletedProgramName.nuke);
+            Terminal.connectToServer(SpecialServers.Home);
+            Router.toPage(Page.Terminal);
+            iTutorialStart();
+          }}
         />
       );
       break;
@@ -543,16 +464,21 @@ export function GameRoot({ player, engine, terminal }: IProps): React.ReactEleme
       mainPage = (
         <AugmentationsRoot
           exportGameFn={() => {
-            // Apply the export bonus before saving the game
-            onExport(player);
-            saveObject.exportGame();
+            saveObject.exportGame().catch((error) => exceptionAlert(error));
           }}
           installAugmentationsFn={() => {
             installAugmentations();
-            Router.toTerminal();
           }}
         />
       );
+      break;
+    }
+    case Page.Go: {
+      mainPage = <GoRoot />;
+      break;
+    }
+    case Page.DarkNet: {
+      mainPage = <DWRoot />;
       break;
     }
     case Page.Achievements: {
@@ -560,67 +486,88 @@ export function GameRoot({ player, engine, terminal }: IProps): React.ReactEleme
       break;
     }
     case Page.ThemeBrowser: {
-      mainPage = <ThemeBrowser router={Router} />;
+      mainPage = <ThemeBrowser />;
       break;
     }
     case Page.ImportSave: {
-      mainPage = (
-        <ImportSaveRoot
-          importString={importString}
-          automatic={importAutomatic}
-          router={Router}
-        />
-      );
+      mainPage = <ImportSaveComparison saveData={pageWithContext.saveData} automatic={!!pageWithContext.automatic} />;
       withSidebar = false;
-      withPopups = false;
       bypassGame = true;
+      break;
     }
   }
 
+  useEffect(() => {
+    if (pendingRouterActions.length > 0) {
+      // Run all pending actions and show a warning popup.
+      for (const action of pendingRouterActions) {
+        if (action.type === "toPage") {
+          if (isSimplePage(action.page)) {
+            Router.toPage(action.page);
+          } else {
+            Router.toPage(action.page, action.context ?? {});
+          }
+        } else {
+          Router.back();
+        }
+      }
+      exceptionAlert(
+        new Error(
+          `Router was used before the main UI is loaded. pendingRouterActions: ${JSON.stringify(
+            pendingRouterActions,
+          )}.`,
+        ),
+      );
+      pendingRouterActions.length = 0;
+    }
+    // Emit an event to notify subscribers that the main UI is loaded.
+    UIEventEmitter.emit(UIEventType.MainUILoaded);
+  }, []);
+
   return (
-    <Context.Player.Provider value={player}>
-      <Context.Router.Provider value={Router}>
-        <ErrorBoundary key={errorBoundaryKey} router={Router} softReset={softReset}>
-          <BypassWrapper content={bypassGame ? mainPage : null}>
+    <>
+      <ErrorBoundary key={errorBoundaryKey} softReset={softReset}>
+        <BypassWrapper content={bypassGame ? mainPage : null}>
+          <HistoryProvider>
             <SnackbarProvider>
               <Overview mode={ITutorial.isRunning ? "tutorial" : "overview"}>
-                {!ITutorial.isRunning ? (
-                  <CharacterOverview save={() => saveObject.saveGame()} killScripts={killAllScripts} />
-                ) : (
-                  <InteractiveTutorialRoot />
-                )}
+                {(parentOpen) =>
+                  !ITutorial.isRunning ? (
+                    <CharacterOverview
+                      parentOpen={parentOpen}
+                      save={() => {
+                        saveObject.saveGame().catch((error) => exceptionAlert(error));
+                      }}
+                      killScripts={killAllScripts}
+                    />
+                  ) : (
+                    <InteractiveTutorialRoot />
+                  )
+                }
               </Overview>
               {withSidebar ? (
                 <Box display="flex" flexDirection="row" width="100%">
-                  <SidebarRoot
-                    player={player}
-                    router={Router}
-                    page={page}
-                    opened={sidebarOpened}
-                    onToggled={(isOpened) => {
-                      setSideBarOpened(isOpened);
-                      Settings.IsSidebarOpened = isOpened;
-                    }}
-                  />
+                  <SidebarRoot page={pageWithContext.page} />
                   <Box className={classes.root}>{mainPage}</Box>
                 </Box>
               ) : (
                 <Box className={classes.root}>{mainPage}</Box>
               )}
               <Unclickable />
-              {withPopups && (
-                <>
-                  <LogBoxManager />
-                  <AlertManager />
-                  <PromptManager />
-                  <InvitationModal />
-                  <Snackbar />
-                </>
-              )}
+              <LogBoxManager hidden={hidePopups} />
+              <AlertManager hidden={hidePopups} />
+              <ErrorModal />
+              <PromptManager hidden={hidePopups} />
+              <FactionInvitationManager hidden={hidePopups} />
+              <Snackbar hidden={hidePopups} />
+              {/* Allow opening the documentation popup in the BitVerse */}
+              <DocumentationPopUp hidden={hidePopups && pageWithContext.page !== Page.BitVerse} />
+              <Apr1 />
             </SnackbarProvider>
-          </BypassWrapper>
-        </ErrorBoundary>
-      </Context.Router.Provider>
-    </Context.Player.Provider>
+          </HistoryProvider>
+        </BypassWrapper>
+      </ErrorBoundary>
+      <V2Modal />
+    </>
   );
 }

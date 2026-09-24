@@ -1,43 +1,37 @@
-import React, { useState, useRef, useEffect } from "react";
-import { IBladeburner } from "../IBladeburner";
+import type { Bladeburner } from "../Bladeburner";
 
-import { IPlayer } from "../../PersonObjects/IPlayer";
-import Paper from "@mui/material/Paper";
-import List from "@mui/material/List";
-import ListItem from "@mui/material/ListItem";
-import Box from "@mui/material/Box";
-import Typography from "@mui/material/Typography";
-import TextField from "@mui/material/TextField";
+import React, { useState, useRef, useEffect } from "react";
+import { KEY } from "../../utils/KeyboardEventKey";
+
+import { Box, List, ListItem, Paper, TextField, Typography } from "@mui/material";
 import { Theme } from "@mui/material/styles";
-import makeStyles from "@mui/styles/makeStyles";
-import createStyles from "@mui/styles/createStyles";
+import { makeStyles } from "tss-react/mui";
+import { useRerender } from "../../ui/React/hooks";
 
 interface ILineProps {
-  content: any;
+  content: React.ReactNode;
 }
 
-const useStyles = makeStyles((theme: Theme) =>
-  createStyles({
-    textfield: {
-      margin: theme.spacing(0),
-      width: "100%",
-    },
-    input: {
-      backgroundColor: theme.colors.backgroundsecondary,
-    },
-    nopadding: {
-      padding: theme.spacing(0),
-    },
-    preformatted: {
-      whiteSpace: "pre-wrap",
-      margin: theme.spacing(0),
-    },
-    list: {
-      padding: theme.spacing(0),
-      height: "100%",
-    },
-  }),
-);
+const useStyles = makeStyles()((theme: Theme) => ({
+  textfield: {
+    margin: theme.spacing(0),
+    width: "100%",
+  },
+  input: {
+    backgroundColor: theme.colors.backgroundsecondary,
+  },
+  nopadding: {
+    padding: theme.spacing(0),
+  },
+  preformatted: {
+    whiteSpace: "pre-wrap",
+    margin: theme.spacing(0),
+  },
+  list: {
+    padding: theme.spacing(0),
+    height: "100%",
+  },
+}));
 
 function Line(props: ILineProps): React.ReactElement {
   return (
@@ -48,15 +42,14 @@ function Line(props: ILineProps): React.ReactElement {
 }
 
 interface IProps {
-  bladeburner: IBladeburner;
-  player: IPlayer;
+  bladeburner: Bladeburner;
 }
 
 export function Console(props: IProps): React.ReactElement {
-  const classes = useStyles();
+  const { classes } = useStyles();
   const [command, setCommand] = useState("");
-  const setRerender = useState(false)[1];
   const consoleInput = useRef<HTMLInputElement>(null);
+  useRerender(1000);
 
   function handleCommandChange(event: React.ChangeEvent<HTMLInputElement>): void {
     setCommand(event.target.value);
@@ -64,23 +57,12 @@ export function Console(props: IProps): React.ReactElement {
 
   const [consoleHistoryIndex, setConsoleHistoryIndex] = useState(props.bladeburner.consoleHistory.length);
 
-  function rerender(): void {
-    setRerender((old) => !old);
-  }
-
-  useEffect(() => {
-    const id = setInterval(rerender, 1000);
-    return () => {
-      clearInterval(id);
-    };
-  }, []);
-
   function handleKeyDown(event: React.KeyboardEvent<HTMLInputElement>): void {
-    if (event.keyCode === 13) {
+    if (event.key === KEY.ENTER) {
       event.preventDefault();
       if (command.length > 0) {
         props.bladeburner.postToConsole("> " + command);
-        props.bladeburner.executeConsoleCommands(props.player, command);
+        props.bladeburner.executeConsoleCommands(command);
         setConsoleHistoryIndex(props.bladeburner.consoleHistory.length);
         setCommand("");
       }
@@ -88,7 +70,7 @@ export function Console(props: IProps): React.ReactElement {
 
     const consoleHistory = props.bladeburner.consoleHistory;
 
-    if (event.keyCode === 38) {
+    if (event.key === KEY.UP_ARROW) {
       // up
       let i = consoleHistoryIndex;
       const len = consoleHistory.length;
@@ -108,7 +90,7 @@ export function Console(props: IProps): React.ReactElement {
       setCommand(prevCommand);
     }
 
-    if (event.keyCode === 40) {
+    if (event.key === KEY.DOWN_ARROW) {
       const i = consoleHistoryIndex;
       const len = consoleHistory.length;
 
@@ -139,14 +121,16 @@ export function Console(props: IProps): React.ReactElement {
 
   return (
     <Paper sx={{ p: 1 }}>
-      <Box sx={{
-        height: '60vh',
-        paddingBottom: '8px',
-        display: 'flex',
-        alignItems: 'stretch',
-        whiteSpace: 'pre-wrap',
-      }}
-        onClick={handleClick}>
+      <Box
+        sx={{
+          height: "60vh",
+          paddingBottom: "8px",
+          display: "flex",
+          alignItems: "stretch",
+          whiteSpace: "pre-wrap",
+        }}
+        onClick={handleClick}
+      >
         <Box>
           <Logs entries={[...props.bladeburner.consoleLogs]} />
         </Box>
@@ -182,7 +166,7 @@ interface ILogProps {
 function Logs({ entries }: ILogProps): React.ReactElement {
   const scrollHook = useRef<HTMLUListElement>(null);
 
-  // TODO: Text gets shifted up as new entries appear, if the user scrolled up it should attempt to keep the text focused
+  // TODO unplanned: Text gets shifted up as new entries appear, if the user scrolled up it should attempt to keep the text focused
   function scrollToBottom(): void {
     if (!scrollHook.current) return;
     scrollHook.current.scrollTop = scrollHook.current.scrollHeight;
@@ -194,9 +178,7 @@ function Logs({ entries }: ILogProps): React.ReactElement {
 
   return (
     <List sx={{ height: "100%", overflow: "auto", p: 1 }} ref={scrollHook}>
-      {entries && entries.map((log: any, i: number) => (
-        <Line key={i} content={log} />
-      ))}
+      {entries && entries.map((log: string, i: number) => <Line key={i} content={log} />)}
     </List>
   );
 }

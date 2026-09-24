@@ -1,13 +1,17 @@
+import { Person as IPerson } from "@nsdefs";
 import { CONSTANTS } from "../Constants";
-import * as names from "./data/companypositionnames";
+import { JobName, JobField } from "@enums";
+import type { Skills } from "../PersonObjects/Skills";
 
-/* tslint:disable:completed-docs */
-
-export interface IConstructorParams {
-  name: string;
-  nextPosition: string | null;
+export interface CompanyPositionCtorParams {
+  nextPosition: JobName | null;
+  field: JobField;
   baseSalary: number;
   repMultiplier: number;
+  applyText?: string;
+  hiredText?: string;
+  isPartTime?: boolean;
+  isStartingJob?: boolean;
 
   reqdHacking?: number;
   reqdStrength?: number;
@@ -33,15 +37,17 @@ export interface IConstructorParams {
 }
 
 export class CompanyPosition {
-  /**
-   * Position title
-   */
-  name: string;
+  /** Position title */
+  name: JobName;
 
-  /**
-   * Title of next position to be promoted to
-   */
-  nextPosition: string | null;
+  /** Field type of the position (software, it, business, etc) */
+  field: JobField;
+
+  /** Whether this position is shown in the job list even when the player does not satisfy its requirements */
+  isStartingJob: boolean;
+
+  /** Title of next position to be promoted to */
+  nextPosition: JobName | null;
 
   /**
    * Base salary for this position ($ per 200ms game cycle)
@@ -49,14 +55,19 @@ export class CompanyPosition {
    */
   baseSalary: number;
 
-  /**
-   * Reputation multiplier
-   */
+  /** Reputation multiplier */
   repMultiplier: number;
 
-  /**
-   * Required stats to earn this position
-   */
+  /** Text to display when applying for this job */
+  applyText: string;
+
+  /** Text to display when receiving this job */
+  hiredText: string;
+
+  /** Whether this position is part-time */
+  isPartTime: boolean;
+
+  /** Required stats to earn this position */
   requiredAgility: number;
   requiredCharisma: number;
   requiredDefense: number;
@@ -64,14 +75,10 @@ export class CompanyPosition {
   requiredHacking: number;
   requiredStrength: number;
 
-  /**
-   * Required company reputation to earn this position
-   */
+  /** Required company reputation to earn this position */
   requiredReputation: number;
 
-  /**
-   * Effectiveness of each stat time for job performance
-   */
+  /** Effectiveness of each stat time for job performance */
   hackingEffectiveness: number;
   strengthEffectiveness: number;
   defenseEffectiveness: number;
@@ -79,9 +86,7 @@ export class CompanyPosition {
   agilityEffectiveness: number;
   charismaEffectiveness: number;
 
-  /**
-   * Experience gain for performing job (per 200ms game cycle)
-   */
+  /** Experience gain for performing job (per 200ms game cycle) */
   hackingExpGain: number;
   strengthExpGain: number;
   defenseExpGain: number;
@@ -89,11 +94,16 @@ export class CompanyPosition {
   agilityExpGain: number;
   charismaExpGain: number;
 
-  constructor(p: IConstructorParams) {
-    this.name = p.name;
+  constructor(name: JobName, p: CompanyPositionCtorParams) {
+    this.name = name;
+    this.field = p.field;
+    this.isStartingJob = p.isStartingJob ?? false;
     this.nextPosition = p.nextPosition;
     this.baseSalary = p.baseSalary;
     this.repMultiplier = p.repMultiplier;
+    this.isPartTime = p.isPartTime ?? false;
+    this.applyText = p.applyText ?? `Apply for ${this.name} Job`;
+    this.hiredText = p.hiredText ?? `Congratulations, you are now employed as a ${this.name}`;
 
     this.requiredHacking = p.reqdHacking != null ? p.reqdHacking : 0;
     this.requiredStrength = p.reqdStrength != null ? p.reqdStrength : 0;
@@ -131,13 +141,25 @@ export class CompanyPosition {
     this.charismaExpGain = p.charismaExpGain != null ? p.charismaExpGain : 0;
   }
 
-  calculateJobPerformance(hack: number, str: number, def: number, dex: number, agi: number, cha: number): number {
-    const hackRatio: number = (this.hackingEffectiveness * hack) / CONSTANTS.MaxSkillLevel;
-    const strRatio: number = (this.strengthEffectiveness * str) / CONSTANTS.MaxSkillLevel;
-    const defRatio: number = (this.defenseEffectiveness * def) / CONSTANTS.MaxSkillLevel;
-    const dexRatio: number = (this.dexterityEffectiveness * dex) / CONSTANTS.MaxSkillLevel;
-    const agiRatio: number = (this.agilityEffectiveness * agi) / CONSTANTS.MaxSkillLevel;
-    const chaRatio: number = (this.charismaEffectiveness * cha) / CONSTANTS.MaxSkillLevel;
+  requiredSkills(jobStatReqOffset: number): Skills {
+    return {
+      hacking: this.requiredHacking > 0 ? this.requiredHacking + jobStatReqOffset : 0,
+      strength: this.requiredStrength > 0 ? this.requiredStrength + jobStatReqOffset : 0,
+      defense: this.requiredDefense > 0 ? this.requiredDefense + jobStatReqOffset : 0,
+      dexterity: this.requiredDexterity > 0 ? this.requiredDexterity + jobStatReqOffset : 0,
+      agility: this.requiredAgility > 0 ? this.requiredAgility + jobStatReqOffset : 0,
+      charisma: this.requiredCharisma > 0 ? this.requiredCharisma + jobStatReqOffset : 0,
+      intelligence: 0,
+    };
+  }
+
+  calculateJobPerformance(worker: IPerson): number {
+    const hackRatio: number = (this.hackingEffectiveness * worker.skills.hacking) / CONSTANTS.MaxSkillLevel;
+    const strRatio: number = (this.strengthEffectiveness * worker.skills.strength) / CONSTANTS.MaxSkillLevel;
+    const defRatio: number = (this.defenseEffectiveness * worker.skills.defense) / CONSTANTS.MaxSkillLevel;
+    const dexRatio: number = (this.dexterityEffectiveness * worker.skills.dexterity) / CONSTANTS.MaxSkillLevel;
+    const agiRatio: number = (this.agilityEffectiveness * worker.skills.agility) / CONSTANTS.MaxSkillLevel;
+    const chaRatio: number = (this.charismaEffectiveness * worker.skills.charisma) / CONSTANTS.MaxSkillLevel;
 
     let reputationGain: number =
       (this.repMultiplier * (hackRatio + strRatio + defRatio + dexRatio + agiRatio + chaRatio)) / 100;
@@ -145,47 +167,7 @@ export class CompanyPosition {
       console.error("Company reputation gain calculated to be NaN");
       reputationGain = 0;
     }
-
+    reputationGain += worker.skills.intelligence / CONSTANTS.MaxSkillLevel;
     return reputationGain;
-  }
-
-  isSoftwareJob(): boolean {
-    return names.SoftwareCompanyPositions.includes(this.name);
-  }
-
-  isITJob(): boolean {
-    return names.ITCompanyPositions.includes(this.name);
-  }
-
-  isSecurityEngineerJob(): boolean {
-    return names.SecurityEngineerCompanyPositions.includes(this.name);
-  }
-
-  isNetworkEngineerJob(): boolean {
-    return names.NetworkEngineerCompanyPositions.includes(this.name);
-  }
-
-  isBusinessJob(): boolean {
-    return names.BusinessCompanyPositions.includes(this.name);
-  }
-
-  isSecurityJob(): boolean {
-    return names.SecurityCompanyPositions.includes(this.name);
-  }
-
-  isAgentJob(): boolean {
-    return names.AgentCompanyPositions.includes(this.name);
-  }
-
-  isSoftwareConsultantJob(): boolean {
-    return names.SoftwareConsultantCompanyPositions.includes(this.name);
-  }
-
-  isBusinessConsultantJob(): boolean {
-    return names.BusinessConsultantCompanyPositions.includes(this.name);
-  }
-
-  isPartTimeJob(): boolean {
-    return names.PartTimeCompanyPositions.includes(this.name);
   }
 }

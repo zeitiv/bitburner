@@ -1,33 +1,31 @@
-/**
- * React component for displaying a single order in a stock's order book
- */
 import * as React from "react";
 
 import { Order } from "../Order";
-import { PositionTypes } from "../data/PositionTypes";
+import { PositionType } from "@enums";
 
-import { numeralWrapper } from "../../ui/numeralFormat";
+import { formatShares } from "../../ui/formatNumber";
 import { Money } from "../../ui/React/Money";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import Box from "@mui/material/Box";
+import { cancelOrder } from "../StockMarket";
 
-type IProps = {
-  cancelOrder: (params: any) => void;
+interface IProps {
   order: Order;
-};
+}
 
+/** React component for displaying a single order in a stock's order book */
 export function StockTickerOrder(props: IProps): React.ReactElement {
   function handleCancelOrderClick(): void {
-    props.cancelOrder({ order: props.order });
+    cancelOrder({ order: props.order });
   }
 
   const order = props.order;
 
-  const posTxt = order.pos === PositionTypes.Long ? "Long Position" : "Short Position";
+  const posTxt = order.pos === PositionType.Long ? "Long Position" : "Short Position";
   const txt = (
     <>
-      {order.type} - {posTxt} - {numeralWrapper.formatShares(order.shares)} @ <Money money={order.price} />
+      {order.type} - {posTxt} - {formatShares(order.shares)} @ <Money money={order.price} />
     </>
   );
 

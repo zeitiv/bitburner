@@ -6,27 +6,57 @@
 
 Get the execution time of a weaken() call.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getWeakenTime(host: string): number;
+getWeakenTime(host?: string): number;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  host | string | Host of target server. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+host
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Hostname/IP of the target server. Optional. Defaults to current server if not provided.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 
-Returns the amount of time in milliseconds it takes to execute the weaken Netscript function. Returns Infinity if called on a Hacknet Server.
+Returns the amount of time in milliseconds it takes to execute the [weaken](./bitburner.ns.weaken.md) Netscript function.
 
 ## Remarks
 
 RAM cost: 0.05 GB
 
-Returns the amount of time in milliseconds it takes to execute the weaken Netscript function on the target server. The function takes in an optional hackLvl parameter that can be specified to see what the weaken time would be at different hacking levels. The required time is increased by the security level of the target server and decreased by the player's hacking level.
+Returns the amount of time in milliseconds it takes to execute the [weaken](./bitburner.ns.weaken.md) Netscript function on the target server. The required time is increased by the security level of the target server and decreased by the player's hacking level.
 

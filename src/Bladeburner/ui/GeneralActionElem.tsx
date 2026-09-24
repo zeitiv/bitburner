@@ -1,96 +1,36 @@
-import React, { useState } from "react";
-import { ActionTypes } from "../data/ActionTypes";
-import { createProgressBarText } from "../../utils/helpers/createProgressBarText";
-import { formatNumber, convertTimeMsToTimeElapsedString } from "../../utils/StringHelperFunctions";
-import { IBladeburner } from "../IBladeburner";
-import { IAction } from "../IAction";
-import { GeneralActions } from "../data/GeneralActions";
-import { IPlayer } from "../../PersonObjects/IPlayer";
-import { CopyableText } from "../../ui/React/CopyableText";
+import type { Bladeburner } from "../Bladeburner";
+import type { GeneralAction } from "../Actions/GeneralAction";
 
-import { StartButton } from "./StartButton";
+import React from "react";
+import { convertTimeMsToTimeElapsedString } from "../../utils/StringHelperFunctions";
+import { Player } from "@player";
+import { Paper, Typography } from "@mui/material";
+import { useRerender } from "../../ui/React/hooks";
+import { ActionHeader } from "./ActionHeader";
+import { BladeburnerGeneralActionName } from "@enums";
+import { SuccessChance } from "./SuccessChance";
 
-import Typography from "@mui/material/Typography";
-import Box from "@mui/material/Box";
-import Paper from "@mui/material/Paper";
-
-interface IProps {
-  bladeburner: IBladeburner;
-  player: IPlayer;
-  action: IAction;
+interface GeneralActionElemProps {
+  bladeburner: Bladeburner;
+  action: GeneralAction;
 }
 
-export function GeneralActionElem(props: IProps): React.ReactElement {
-  const setRerender = useState(false)[1];
-  function rerender(): void {
-    setRerender((old) => !old);
-  }
-  const isActive = props.action.name === props.bladeburner.action.name;
-  const computedActionTimeCurrent = Math.min(
-    props.bladeburner.actionTimeCurrent + props.bladeburner.actionTimeOverflow,
-    props.bladeburner.actionTimeToComplete,
-  );
-  const actionTime = (function (): number {
-    switch (props.action.name) {
-      case "Training":
-      case "Field Analysis":
-        return 30;
-      case "Diplomacy":
-      case "Hyperbolic Regeneration Chamber":
-      case "Incite Violence":
-        return 60;
-      case "Recruitment":
-        return props.bladeburner.getRecruitmentTime(props.player);
-    }
-    return -1; // dead code
-  })();
-  const successChance =
-    props.action.name === "Recruitment"
-      ? Math.max(0, Math.min(props.bladeburner.getRecruitmentSuccessChance(props.player), 1))
-      : -1;
-
-  const actionData = GeneralActions[props.action.name];
-  if (actionData === undefined) {
-    throw new Error(`Cannot find data for ${props.action.name}`);
-  }
+export function GeneralActionElem({ bladeburner, action }: GeneralActionElemProps): React.ReactElement {
+  const rerender = useRerender();
+  const actionTime = action.getActionTime(bladeburner, Player);
 
   return (
     <Paper sx={{ my: 1, p: 1 }}>
-      {isActive ? (
-        <>
-          <CopyableText value={props.action.name} />
-          <Typography>
-            (IN PROGRESS - {formatNumber(computedActionTimeCurrent, 0)} /{" "}
-            {formatNumber(props.bladeburner.actionTimeToComplete, 0)})
-          </Typography>
-          <Typography>
-            {createProgressBarText({
-              progress: computedActionTimeCurrent / props.bladeburner.actionTimeToComplete,
-            })}
-          </Typography>
-        </>
-      ) : (
-        <Box display="flex" flexDirection="row" alignItems="center">
-          <CopyableText value={props.action.name} />
-          <StartButton
-            bladeburner={props.bladeburner}
-            type={ActionTypes[props.action.name as string]}
-            name={props.action.name}
-            rerender={rerender}
-          />
-        </Box>
-      )}
+      <ActionHeader bladeburner={bladeburner} action={action} rerender={rerender}></ActionHeader>
       <br />
-      <br />
-      <Typography>{actionData.desc}</Typography>
-      <br />
+      <Typography whiteSpace={"pre-wrap"}>{action.desc}</Typography>
       <br />
       <Typography>
         Time Required: {convertTimeMsToTimeElapsedString(actionTime * 1000)}
-        {successChance !== -1 && (
+        {action.name === BladeburnerGeneralActionName.Recruitment && (
           <>
             <br />
-            Estimated success chance: {formatNumber(successChance * 100, 1)}%
+            <SuccessChance action={action} bladeburner={bladeburner} />
           </>
         )}
       </Typography>

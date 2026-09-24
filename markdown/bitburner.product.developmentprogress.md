@@ -4,9 +4,9 @@
 
 ## Product.developmentProgress property
 
-Creation progress - A number between 0-100 representing percentage
+A number between 0-100 representing percentage completion
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 developmentProgress: number;

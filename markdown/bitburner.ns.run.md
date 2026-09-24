@@ -6,21 +6,81 @@
 
 Start another script on the current server.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-run(script: string, numThreads?: number, ...args: Array<string | number | boolean>): number;
+run(script: string, threadOrOptions?: number | RunOptions, ...args: ScriptArg[]): number;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  script | string | Filename of script to run. |
-|  numThreads | number | Optional thread count for new script. Set to 1 by default. Will be rounded to nearest integer. |
-|  args | Array&lt;string \| number \| boolean&gt; | Additional arguments to pass into the new script that is being run. Note that if any arguments are being passed into the new script, then the second argument numThreads must be filled in with a value. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+script
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Filename of script to run.
+
+
+</td></tr>
+<tr><td>
+
+threadOrOptions
+
+
+</td><td>
+
+number \| [RunOptions](./bitburner.runoptions.md)
+
+
+</td><td>
+
+_(Optional)_ Either an integer number of threads for new script, or a [RunOptions](./bitburner.runoptions.md) object. Threads defaults to 1.
+
+
+</td></tr>
+<tr><td>
+
+args
+
+
+</td><td>
+
+[ScriptArg](./bitburner.scriptarg.md)<!-- -->\[\]
+
+
+</td><td>
+
+Additional arguments to pass into the new script that is being run. Note that if any arguments are being passed into the new script, then the second argument threadOrOptions must be filled in with a value.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 
@@ -32,39 +92,25 @@ RAM cost: 1 GB
 
 Run a script as a separate process. This function can only be used to run scripts located on the current server (the server running the script that calls this function). Requires a significant amount of RAM to run this command.
 
+The second argument is either a thread count, or a [RunOptions](./bitburner.runoptions.md) object that can also specify the number of threads (among other things).
+
 If the script was successfully started, then this functions returns the PID of that script. Otherwise, it returns 0.
 
-PID stands for Process ID. The PID is a unique identifier for each script. The PID will always be a positive integer.
+PID stands for Process ID. The PID is a unique identifier for each script across all hosts. The PID will always be a positive integer.
 
-Running this function with a numThreads argument of 0 will return 0 without running the script. However, running this function with a negative numThreads argument will cause a runtime error.
+Running this function with 0 or fewer threads will cause a runtime error.
 
-## Example 1
-
-
-```ts
-// NS1:
-//The simplest way to use the run command is to call it with just the script name. The following example will run ‘foo.script’ single-threaded with no arguments:
-run("foo.script");
-
-//The following example will run ‘foo.script’ but with 5 threads instead of single-threaded:
-run("foo.script", 5);
-
-//This next example will run ‘foo.script’ single-threaded, and will pass the string ‘foodnstuff’ into the script as an argument:
-run("foo.script", 1, 'foodnstuff');
-```
-
-## Example 2
+## Example
 
 
-```ts
-// NS2:
-//The simplest way to use the run command is to call it with just the script name. The following example will run ‘foo.script’ single-threaded with no arguments:
-ns.run("foo.script");
+```js
+//The simplest way to use the run command is to call it with just the script name. The following example will run ‘foo.js’ single-threaded with no arguments:
+ns.run("foo.js");
 
-//The following example will run ‘foo.script’ but with 5 threads instead of single-threaded:
-ns.run("foo.script", 5);
+//The following example will run ‘foo.js’ but with 5 threads instead of single-threaded:
+ns.run("foo.js", {threads: 5});
 
-//This next example will run ‘foo.script’ single-threaded, and will pass the string ‘foodnstuff’ into the script as an argument:
-ns.run("foo.script", 1, 'foodnstuff');
+//This next example will run ‘foo.js’ single-threaded, and will pass the string ‘foodnstuff’ into the script as an argument:
+ns.run("foo.js", 1, "foodnstuff");
 ```
 

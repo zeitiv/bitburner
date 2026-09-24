@@ -6,20 +6,20 @@
 
 List all operations.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getOperationNames(): string[];
+getOperationNames(): BladeburnerOperationName[];
 ```
-<b>Returns:</b>
+**Returns:**
 
-string\[\]
+[BladeburnerOperationName](./bitburner.bladeburneroperationname.md)<!-- -->\[\]
 
 Array of strings containing the names of all Bladeburner operations.
 
 ## Remarks
 
-RAM cost: 0.4 GB
+RAM cost: 0 GB
 
 Returns an array of strings containing the names of all Bladeburner operations.
 

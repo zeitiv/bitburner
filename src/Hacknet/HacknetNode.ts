@@ -17,18 +17,17 @@ import {
 import { HacknetNodeConstants } from "./data/Constants";
 
 import { dialogBoxCreate } from "../ui/React/DialogBox";
-import { Generic_fromJSON, Generic_toJSON, Reviver } from "../utils/JSONReviver";
+import { Generic_fromJSON, Generic_toJSON, IReviverValue, constructorsForReviver } from "../utils/JSONReviver";
 import { ObjectValidator, minMax } from "../utils/Validator";
 
 export class HacknetNode implements IHacknetNode {
-
   static validationData: ObjectValidator<HacknetNode> = {
     cores: minMax(1, 1, HacknetNodeConstants.MaxCores),
     level: minMax(1, 1, HacknetNodeConstants.MaxLevel),
     ram: minMax(1, 1, HacknetNodeConstants.MaxRam),
     onlineTimeSeconds: minMax(0, 0, Infinity),
-    totalMoneyGenerated: minMax(0, 0, Infinity)
-  }
+    totalMoneyGenerated: minMax(0, 0, Infinity),
+  };
 
   // Node's number of cores
   cores = 1;
@@ -121,20 +120,15 @@ export class HacknetNode implements IHacknetNode {
     }
   }
 
-  /**
-   * Serialize the current object to a JSON save state.
-   */
-  toJSON(): any {
+  /** Serialize the current object to a JSON save state. */
+  toJSON(): IReviverValue {
     return Generic_toJSON("HacknetNode", this);
   }
 
-  /**
-   * Initiatizes a HacknetNode object from a JSON save state.
-   */
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-  static fromJSON(value: any): HacknetNode {
+  /** Initializes a HacknetNode object from a JSON save state. */
+  static fromJSON(value: IReviverValue): HacknetNode {
     return Generic_fromJSON(HacknetNode, value.data);
   }
 }
 
-Reviver.constructors.HacknetNode = HacknetNode;
+constructorsForReviver.HacknetNode = HacknetNode;

@@ -6,12 +6,12 @@
 
 List member task names.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 getTaskNames(): string[];
 ```
-<b>Returns:</b>
+**Returns:**
 
 string\[\]
 
@@ -19,7 +19,7 @@ All valid tasks that Gang members can be assigned to.
 
 ## Remarks
 
-RAM cost: 1 GB
+RAM cost: 0 GB
 
 Get the name of all valid tasks that Gang members can be assigned to.
 

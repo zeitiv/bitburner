@@ -1,33 +1,4 @@
-export const BladeburnerConstants: {
-  CityNames: string[];
-  CyclesPerSecond: number;
-  StaminaGainPerSecond: number;
-  BaseStaminaLoss: number;
-  MaxStaminaToGainFactor: number;
-  DifficultyToTimeFactor: number;
-  DiffMultExponentialFactor: number;
-  DiffMultLinearFactor: number;
-  EffAgiLinearFactor: number;
-  EffDexLinearFactor: number;
-  EffAgiExponentialFactor: number;
-  EffDexExponentialFactor: number;
-  BaseRecruitmentTimeNeeded: number;
-  PopulationThreshold: number;
-  PopulationExponent: number;
-  ChaosThreshold: number;
-  BaseStatGain: number;
-  BaseIntGain: number;
-  ActionCountGrowthPeriod: number;
-  RankToFactionRepFactor: number;
-  RankNeededForFaction: number;
-  ContractSuccessesPerLevel: number;
-  OperationSuccessesPerLevel: number;
-  RanksPerSkillPoint: number;
-  ContractBaseMoneyGain: number;
-  HrcHpGain: number;
-  HrcStaminaGain: number;
-} = {
-  CityNames: ["Aevum", "Chongqing", "Sector-12", "New Tokyo", "Ishima", "Volhaven"],
+export const BladeburnerConstants = {
   CyclesPerSecond: 5, // Game cycle is 200 ms
 
   StaminaGainPerSecond: 0.0085,
@@ -62,6 +33,9 @@ export const BladeburnerConstants: {
   BaseStatGain: 1, // Base stat gain per second
   BaseIntGain: 0.003, // Base intelligence stat gain
 
+  BasePopGrowth: 100, // Base amount a population will grow by
+  PopGrowthCeiling: 1.5e9, // Amount of population a city can have before BasePopGrowth does not apply
+
   ActionCountGrowthPeriod: 480, // Time (s) it takes for action count to grow by its specified value
 
   RankToFactionRepFactor: 2, // Delta Faction Rep = this * Delta Rank
@@ -76,4 +50,4 @@ export const BladeburnerConstants: {
 
   HrcHpGain: 2, // HP Gained from Hyperbolic Regeneration chamber
   HrcStaminaGain: 1, // Percentage Stamina gained from Hyperbolic Regeneration Chamber
-};
+} as const;

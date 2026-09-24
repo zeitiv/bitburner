@@ -1,18 +1,18 @@
+import { Player } from "@player";
 import { CONSTANTS } from "../Constants";
-import { IPlayer } from "../PersonObjects/IPlayer";
 
-export function getHospitalizationCost(p: IPlayer): number {
-  if (p.money < 0) {
+export function getHospitalizationCost(): number {
+  if (Player.money < 0) {
     return 0;
   }
 
-  return Math.min(p.money * 0.1, (p.max_hp - p.hp) * CONSTANTS.HospitalCostPerHp);
+  return Math.min(Player.money * 0.1, (Player.hp.max - Player.hp.current) * CONSTANTS.HospitalCostPerHp);
 }
 
-export function calculateHospitalizationCost(p: IPlayer, damage: number): number {
-  const oldhp = p.hp;
-  p.hp -= damage;
-  const cost = getHospitalizationCost(p);
-  p.hp = oldhp;
+export function calculateHospitalizationCost(damage: number): number {
+  const oldhp = Player.hp.current;
+  Player.hp.current -= damage;
+  const cost = getHospitalizationCost();
+  Player.hp.current = oldhp;
   return cost;
 }

@@ -1,54 +1,48 @@
-import React from "react";
-import { IAction } from "../IAction";
-import { IBladeburner } from "../IBladeburner";
-import { BladeburnerConstants } from "../data/Constants";
-import { use } from "../../ui/Context";
+import type { Bladeburner } from "../Bladeburner";
+import type { LevelableAction } from "../Types";
 
-import Typography from "@mui/material/Typography";
-import Tooltip from "@mui/material/Tooltip";
-import Box from "@mui/material/Box";
-import IconButton from "@mui/material/IconButton";
+import React from "react";
+import { Box, IconButton, Tooltip, Typography } from "@mui/material";
 import ArrowDropUpIcon from "@mui/icons-material/ArrowDropUp";
 import ArrowDropDownIcon from "@mui/icons-material/ArrowDropDown";
 
-interface IProps {
-  action: IAction;
+import { BladeburnerConstants } from "../data/Constants";
+import { Contract } from "../Actions/Contract";
+
+interface ActionLevelProps {
+  action: LevelableAction;
   isActive: boolean;
-  bladeburner: IBladeburner;
+  bladeburner: Bladeburner;
   rerender: () => void;
 }
 
-export function ActionLevel({ action, isActive, bladeburner, rerender }: IProps): React.ReactElement {
-  const player = use.Player();
-
+export function ActionLevel({ action, isActive, bladeburner, rerender }: ActionLevelProps): React.ReactElement {
   const canIncrease = action.level < action.maxLevel;
   const canDecrease = action.level > 1;
+  const successesNeededForNextLevel = action.getSuccessesNeededForNextLevel(
+    action instanceof Contract
+      ? BladeburnerConstants.ContractSuccessesPerLevel
+      : BladeburnerConstants.OperationSuccessesPerLevel,
+  );
 
   function increaseLevel(): void {
     if (!canIncrease) return;
     ++action.level;
-    if (isActive) bladeburner.startAction(player, bladeburner.action);
+    if (isActive) bladeburner.startAction(bladeburner.action);
     rerender();
   }
 
   function decreaseLevel(): void {
     if (!canDecrease) return;
     --action.level;
-    if (isActive) bladeburner.startAction(player, bladeburner.action);
+    if (isActive) bladeburner.startAction(bladeburner.action);
     rerender();
   }
 
   return (
     <Box display="flex" flexDirection="row" alignItems="center">
       <Box display="flex">
-        <Tooltip
-          title={
-            <Typography>
-              {action.getSuccessesNeededForNextLevel(BladeburnerConstants.ContractSuccessesPerLevel)} successes needed
-              for next level
-            </Typography>
-          }
-        >
+        <Tooltip title={<Typography>{successesNeededForNextLevel} successes needed for next level</Typography>}>
           <Typography>
             Level: {action.level} / {action.maxLevel}
           </Typography>

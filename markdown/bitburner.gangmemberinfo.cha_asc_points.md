@@ -4,7 +4,9 @@
 
 ## GangMemberInfo.cha\_asc\_points property
 
-<b>Signature:</b>
+Total Charisma Ascension points accumulated
+
+**Signature:**
 
 ```typescript
 cha_asc_points: number;

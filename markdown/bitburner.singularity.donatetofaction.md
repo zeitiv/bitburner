@@ -6,20 +6,65 @@
 
 Donate to a faction.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-donateToFaction(faction: string, amount: number): boolean;
+donateToFaction(faction: FactionName, amount: number): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  faction | string | Name of faction to donate to. |
-|  amount | number | Amount of money to donate. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+faction
+
+
+</td><td>
+
+[FactionName](./bitburner.factionname.md)
+
+
+</td><td>
+
+Name of faction to donate to.
+
+
+</td></tr>
+<tr><td>
+
+amount
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Amount of money to donate.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 boolean
 
@@ -30,4 +75,8 @@ True if the money was donated, and false otherwise.
 RAM cost: 5 GB \* 16/4/1
 
 Attempts to donate money to the specified faction in exchange for reputation. Returns true if you successfully donate the money, and false otherwise.
+
+You cannot donate to your gang's faction.
+
+The specified faction must offer at least 1 type of work. You can use [getFactionWorkTypes](./bitburner.singularity.getfactionworktypes.md) to get the list of work types of a faction.
 

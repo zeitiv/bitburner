@@ -6,39 +6,64 @@
 
 Runs SQLInject.exe on a server.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-sqlinject(host: string): void;
+sqlinject(host?: string): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  host | string | Hostname of the target server. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
 
-void
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+host
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Hostname/IP of the target server. Optional. Defaults to current server if not provided.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
+
+boolean
+
+True if the player runs the program successfully, and false otherwise.
 
 ## Remarks
 
 RAM cost: 0.05 GB
 
-## Example 1
+Runs the SQLInject.exe program on the target server. SQLInject.exe must exist on your home computer.
+
+## Example
 
 
-```ts
-// NS1:
-sqlinject("foodnstuff");
-```
-
-## Example 2
-
-
-```ts
-// NS2:
+```js
 ns.sqlinject("foodnstuff");
 ```
 

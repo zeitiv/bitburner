@@ -4,25 +4,55 @@
 
 ## NS.getServerMaxRam() method
 
-Get the max RAM on a server.
+Get the maximum amount of RAM on a server.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getServerMaxRam(host: string): number;
+getServerMaxRam(host?: string): number;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  host | string | Hostname of the target server. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+host
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Hostname/IP of the target server. Optional. Defaults to current server if not provided.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 
-max ram (GB)
+The maximum amount of RAM (GB) a server can have.
 
 ## Remarks
 

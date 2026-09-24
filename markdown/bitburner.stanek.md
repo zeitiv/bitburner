@@ -6,7 +6,7 @@
 
 Stanek's Gift API.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 interface Stanek 
@@ -14,16 +14,137 @@ interface Stanek
 
 ## Methods
 
-|  Method | Description |
-|  --- | --- |
-|  [activeFragments()](./bitburner.stanek.activefragments.md) | List of fragments in Stanek's Gift. |
-|  [canPlace(rootX, rootY, rotation, fragmentId)](./bitburner.stanek.canplace.md) | Check if fragment can be placed at specified location. |
-|  [charge(rootX, rootY)](./bitburner.stanek.charge.md) | Charge a fragment, increasing its power. |
-|  [clear()](./bitburner.stanek.clear.md) | Clear the board of all fragments. |
-|  [fragmentDefinitions()](./bitburner.stanek.fragmentdefinitions.md) | List possible fragments. |
-|  [get(rootX, rootY)](./bitburner.stanek.get.md) | Get placed fragment at location. |
-|  [height()](./bitburner.stanek.height.md) | Stanek's Gift height. |
-|  [place(rootX, rootY, rotation, fragmentId)](./bitburner.stanek.place.md) | Place fragment on Stanek's Gift. |
-|  [remove(rootX, rootY)](./bitburner.stanek.remove.md) | Remove fragment at location. |
-|  [width()](./bitburner.stanek.width.md) | Stanek's Gift width. |
+<table><thead><tr><th>
+
+Method
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[acceptGift()](./bitburner.stanek.acceptgift.md)
+
+
+</td><td>
+
+Accept Stanek's Gift by joining the Church of the Machine God
+
+
+</td></tr>
+<tr><td>
+
+[activeFragments()](./bitburner.stanek.activefragments.md)
+
+
+</td><td>
+
+List of fragments in Stanek's Gift.
+
+
+</td></tr>
+<tr><td>
+
+[canPlaceFragment(rootX, rootY, rotation, fragmentId)](./bitburner.stanek.canplacefragment.md)
+
+
+</td><td>
+
+Check if fragment can be placed at specified location.
+
+
+</td></tr>
+<tr><td>
+
+[chargeFragment(rootX, rootY)](./bitburner.stanek.chargefragment.md)
+
+
+</td><td>
+
+Charge a fragment, increasing its power.
+
+
+</td></tr>
+<tr><td>
+
+[clearGift()](./bitburner.stanek.cleargift.md)
+
+
+</td><td>
+
+Clear the board of all fragments.
+
+
+</td></tr>
+<tr><td>
+
+[fragmentDefinitions()](./bitburner.stanek.fragmentdefinitions.md)
+
+
+</td><td>
+
+List possible fragments.
+
+
+</td></tr>
+<tr><td>
+
+[getFragment(rootX, rootY)](./bitburner.stanek.getfragment.md)
+
+
+</td><td>
+
+Get placed fragment at location.
+
+
+</td></tr>
+<tr><td>
+
+[giftHeight()](./bitburner.stanek.giftheight.md)
+
+
+</td><td>
+
+Stanek's Gift height.
+
+
+</td></tr>
+<tr><td>
+
+[giftWidth()](./bitburner.stanek.giftwidth.md)
+
+
+</td><td>
+
+Stanek's Gift width.
+
+
+</td></tr>
+<tr><td>
+
+[placeFragment(rootX, rootY, rotation, fragmentId)](./bitburner.stanek.placefragment.md)
+
+
+</td><td>
+
+Place fragment on Stanek's Gift.
+
+
+</td></tr>
+<tr><td>
+
+[removeFragment(rootX, rootY)](./bitburner.stanek.removefragment.md)
+
+
+</td><td>
+
+Remove fragment at location.
+
+
+</td></tr>
+</tbody></table>
 

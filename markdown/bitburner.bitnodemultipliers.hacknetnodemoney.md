@@ -4,9 +4,9 @@
 
 ## BitNodeMultipliers.HacknetNodeMoney property
 
-Influences how much money is produced by Hacknet Nodes and the hash rate of Hacknet Servers (unlocked in BitNode-9)
+Influences how much money is produced by Hacknet Nodes. Influences the hash rate of Hacknet Servers (unlocked in BitNode-9)
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 HacknetNodeMoney: number;

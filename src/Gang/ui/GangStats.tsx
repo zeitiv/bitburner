@@ -5,8 +5,7 @@
 import React from "react";
 import { Factions } from "../../Faction/Factions";
 
-import { formatNumber } from "../../utils/StringHelperFunctions";
-import { numeralWrapper } from "../../ui/numeralFormat";
+import { formatNumberNoSuffix, formatRespect, formatWanted } from "../../ui/formatNumber";
 import { MoneyRate } from "../../ui/React/MoneyRate";
 import { Reputation } from "../../ui/React/Reputation";
 import { AllGangs } from "../AllGangs";
@@ -15,18 +14,34 @@ import { useGang } from "./Context";
 import Typography from "@mui/material/Typography";
 import Tooltip from "@mui/material/Tooltip";
 import Box from "@mui/material/Box";
+import { GangConstants } from "../data/Constants";
 
 export function GangStats(): React.ReactElement {
   const gang = useGang();
   const territoryMult = AllGangs[gang.facName].territory * 100;
   let territoryStr;
   if (territoryMult <= 0) {
-    territoryStr = formatNumber(0, 2);
+    territoryStr = formatNumberNoSuffix(0, 2);
   } else if (territoryMult >= 100) {
-    territoryStr = formatNumber(100, 2);
+    territoryStr = formatNumberNoSuffix(100, 2);
   } else {
-    territoryStr = formatNumber(territoryMult, 2);
+    territoryStr = formatNumberNoSuffix(territoryMult, 2);
   }
+  const hasEnoughBonusTime = gang.storedCycles > GangConstants.maxCyclesToProcess;
+  const bonusCyclesInOneSecond = 5 * GangConstants.maxCyclesToProcess;
+  const respectGainRateInBonusTime = hasEnoughBonusTime
+    ? `[Effective Gain: ${formatRespect(gang.respectGainRate * bonusCyclesInOneSecond)} / sec]`
+    : "";
+  const wantedGainRateInBonusTime = hasEnoughBonusTime
+    ? `[Effective Gain: ${formatWanted(gang.wantedGainRate * bonusCyclesInOneSecond)} / sec]`
+    : "";
+  const moneyGainRateInBonusTime = hasEnoughBonusTime ? (
+    <>
+      [Effective Gain: <MoneyRate money={gang.moneyGainRate * bonusCyclesInOneSecond} />]
+    </>
+  ) : (
+    ""
+  );
 
   return (
     <>
@@ -41,8 +56,8 @@ export function GangStats(): React.ReactElement {
           }
         >
           <Typography>
-            Respect: {numeralWrapper.formatRespect(gang.respect)} (
-            {numeralWrapper.formatRespect(5 * gang.respectGainRate)} / sec)
+            Respect: {formatRespect(gang.respect)} ({formatRespect(5 * gang.respectGainRate)} / sec){" "}
+            {respectGainRateInBonusTime}
           </Typography>
         </Tooltip>
       </Box>
@@ -57,20 +72,22 @@ export function GangStats(): React.ReactElement {
           }
         >
           <Typography>
-            Wanted Level: {numeralWrapper.formatWanted(gang.wanted)} (
-            {numeralWrapper.formatWanted(5 * gang.wantedGainRate)} / sec)
+            Wanted Level: {formatWanted(gang.wanted)} ({formatWanted(5 * gang.wantedGainRate)} / sec){" "}
+            {wantedGainRateInBonusTime}
           </Typography>
         </Tooltip>
       </Box>
 
       <Box display="flex">
         <Tooltip title={<Typography>Penalty for respect and money gain rates due to Wanted Level</Typography>}>
-          <Typography>Wanted Level Penalty: -{formatNumber((1 - gang.getWantedPenalty()) * 100, 2)}%</Typography>
+          <Typography>
+            Wanted Level Penalty: -{formatNumberNoSuffix((1 - gang.getWantedPenalty()) * 100, 2)}%
+          </Typography>
         </Tooltip>
       </Box>
 
       <Typography>
-        Money gain rate: <MoneyRate money={5 * gang.moneyGainRate} />
+        Money gain rate: <MoneyRate money={5 * gang.moneyGainRate} /> {moneyGainRateInBonusTime}
       </Typography>
 
       <Box display="flex">

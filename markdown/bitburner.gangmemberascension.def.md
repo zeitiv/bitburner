@@ -4,9 +4,9 @@
 
 ## GangMemberAscension.def property
 
-Defense multiplier gained from ascending
+Factor by which the defense ascension multiplier was increased (newMult / oldMult)
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 def: number;

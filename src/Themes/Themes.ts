@@ -1,8 +1,9 @@
-import { IMap } from "../types";
 import * as predefined from "./data";
 
+/**
+ * If we change this interface, we must change MainThemeSchema and UserInterfaceTheme.
+ */
 export interface ITheme {
-  [key: string]: string | undefined;
   primarylight: string;
   primary: string;
   primarydark: string;
@@ -36,6 +37,11 @@ export interface ITheme {
   backgroundprimary: string;
   backgroundsecondary: string;
   button: string;
+  maplocation: string;
+  bnlvl0: string;
+  bnlvl1: string;
+  bnlvl2: string;
+  bnlvl3: string;
 }
 
 export interface IPredefinedTheme {
@@ -51,6 +57,6 @@ export const defaultTheme: ITheme = {
   ...predefined.Default.colors,
 };
 
-export const getPredefinedThemes = (): IMap<IPredefinedTheme> => ({
+export const getPredefinedThemes = (): Record<string, IPredefinedTheme> => ({
   ...predefined,
 });

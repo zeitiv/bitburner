@@ -6,14 +6,14 @@
 
 Get the current styles
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 getStyles(): IStyleSettings;
 ```
-<b>Returns:</b>
+**Returns:**
 
-IStyleSettings
+[IStyleSettings](./bitburner.istylesettings.md)
 
 An object containing the player's styles
 

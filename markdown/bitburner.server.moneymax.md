@@ -6,8 +6,8 @@
 
 Maximum amount of money that this server can hold
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-moneyMax: number;
+moneyMax?: number;
 ```

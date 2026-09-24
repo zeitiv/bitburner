@@ -6,20 +6,65 @@
 
 Create a program.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-createProgram(program: string, focus?: boolean): boolean;
+createProgram(programName: ProgramName, focus?: boolean): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  program | string | Name of program to create. |
-|  focus | boolean | Acquire player focus on this program creation. Optional. Defaults to true. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+programName
+
+
+</td><td>
+
+[ProgramName](./bitburner.programname.md)
+
+
+</td><td>
+
+Name of program to create.
+
+
+</td></tr>
+<tr><td>
+
+focus
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+_(Optional)_ Acquire player focus on this program creation. Optional. Defaults to true.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 boolean
 
@@ -33,21 +78,14 @@ This function will automatically set you to start working on creating the specif
 
 This function returns true if you successfully start working on the specified program, and false otherwise.
 
-Note that creating a program using this function has the same hacking level requirements as it normally would. These level requirements are: \* BruteSSH.exe: 50 \* FTPCrack.exe: 100 \* relaySMTP.exe: 250 \* HTTPWorm.exe: 500 \* SQLInject.exe: 750 \* DeepscanV1.exe: 75 \* DeepscanV2.exe: 400 \* ServerProfiler.exe: 75 \* AutoLink.exe: 25
+Note that creating a program using this function has the same hacking level requirements as it normally would. You can call [getHackingLevelRequirementOfProgram](./bitburner.singularity.gethackinglevelrequirementofprogram.md) to get that value.
 
-## Example 1
-
-
-```ts
-// NS1:
-createProgram(“relaysmtp.exe”);
-```
-
-## Example 2
+## Example
 
 
-```ts
-// NS2:
-ns.createProgram(“relaysmtp.exe”);
+```js
+const programName = "BruteSSH.exe";
+const success = ns.singularity.createProgram(programName);
+if (!success) ns.tprint(`ERROR: Failed to start working on ${programName}`);
 ```
 

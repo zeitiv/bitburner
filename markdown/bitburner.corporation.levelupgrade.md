@@ -4,21 +4,55 @@
 
 ## Corporation.levelUpgrade() method
 
-Level an upgrade.
+Level up an upgrade.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-levelUpgrade(upgradeName: string): void;
+levelUpgrade(upgradeName: CorpUpgradeName): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  upgradeName | string | Name of the upgrade |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+upgradeName
+
+
+</td><td>
+
+[CorpUpgradeName](./bitburner.corpupgradename.md)
+
+
+</td><td>
+
+Name of the upgrade
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 void
+
+## Remarks
+
+RAM cost: 20 GB
 

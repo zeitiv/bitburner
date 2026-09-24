@@ -1,58 +1,73 @@
-import React, { ErrorInfo } from "react";
+import React, { type ErrorInfo } from "react";
 
-import { IErrorData, getErrorForDisplay } from "../utils/ErrorHelper";
+import { type CrashReport, getCrashReport } from "../utils/ErrorHelper";
 import { RecoveryRoot } from "./React/RecoveryRoot";
-import { IRouter, Page } from "./Router";
+import type { Page } from "./Router";
+import { Router } from "./GameRoot";
 
-interface IProps {
-  router: IRouter;
+type ErrorBoundaryProps = {
   softReset: () => void;
-}
+  children: React.ReactNode;
+};
 
-interface IState {
+type ErrorBoundaryState = {
   error?: Error;
-  errorInfo?: React.ErrorInfo;
+  reactErrorInfo?: ErrorInfo;
   page?: Page;
   hasError: boolean;
-}
+};
 
-export class ErrorBoundary extends React.Component<IProps, IState> {
-  state: IState
-
-  constructor(props: IProps) {
+export class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = { hasError: false } as IState;
+    this.state = { hasError: false };
   }
 
   reset(): void {
-    this.setState( { hasError: false } as IState);
+    this.setState({ hasError: false });
   }
 
-  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+  componentDidCatch(error: Error, reactErrorInfo: ErrorInfo): void {
     this.setState({
-      errorInfo,
-      page: this.props.router.page(),
+      reactErrorInfo: reactErrorInfo,
+      page: Router.page(),
     });
-    console.error(error, errorInfo);
+    console.error(error, reactErrorInfo);
   }
+
+  /**
+   * When an error is thrown, this function is called twice and renders RecoveryRoot with two different crashReport,
+   * even when there is only one error. The flow is roughly like this:
+   * - The error is thrown.
+   * - getDerivedStateFromError() -> Set hasError and error
+   * - render() -> Render RecoveryRoot with crashReport1, which does not contain reactErrorInfo and page
+   * - componentDidCatch() -> Set reactErrorInfo and page
+   * - render() -> Render RecoveryRoot with crashReport2, which contains reactErrorInfo and page
+   *
+   * This means that if we use useEffect(()=>{}, [crashReport]) in RecoveryRoot, that hook will be called twice with 2
+   * different crashReport. The second crashReport, which contains reactErrorInfo and page, is the "final" value that is
+   * shown on the recovery screen.
+   */
   render(): React.ReactNode {
     if (this.state.hasError) {
-      let errorData: IErrorData | undefined;
+      let crashReport: CrashReport | undefined;
       if (this.state.error) {
         try {
           // We don't want recursive errors, so in case this fails, it's in a try catch.
-          errorData = getErrorForDisplay(this.state.error, this.state.errorInfo, this.state.page);
+          crashReport = getCrashReport(this.state.error, this.state.reactErrorInfo, this.state.page);
         } catch (ex) {
           console.error(ex);
         }
       }
 
-      return <RecoveryRoot router={this.props.router} softReset={this.props.softReset}
-        errorData={errorData} resetError={() => this.reset()} />;
+      return (
+        <RecoveryRoot softReset={this.props.softReset} crashReport={crashReport} resetError={() => this.reset()} />
+      );
     }
     return this.props.children;
   }
-  static getDerivedStateFromError(error: Error): IState {
-    return { hasError: true, error};
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
   }
 }

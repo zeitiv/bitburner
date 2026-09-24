@@ -4,9 +4,9 @@
 
 ## CrimeStats.defense\_success\_weight property
 
-defense level impact on success change of the crime
+Impact of defense level on success chance of the crime
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 defense_success_weight: number;

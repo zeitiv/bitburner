@@ -1,32 +1,30 @@
+import type { CompletedProgramName } from "@enums";
+import { ProgramFilePath, asProgramFilePath } from "../Paths/ProgramFilePath";
 import { BaseServer } from "../Server/BaseServer";
-import { ITerminal } from "../Terminal/ITerminal";
-import { IPlayer } from "../PersonObjects/IPlayer";
-import { IRouter } from "../ui/Router";
 
 export interface IProgramCreate {
   level: number;
-  req(p: IPlayer): boolean; // Function that indicates whether player meets requirements
+  req(): boolean; // Function that indicates whether player meets requirements
   time: number;
   tooltip: string;
 }
+interface ProgramConstructorParams {
+  name: CompletedProgramName;
+  create: IProgramCreate | null;
+  run: (args: string[], server: BaseServer) => void;
+  nsMethod?: string;
+}
 
 export class Program {
-  name = "";
+  name: ProgramFilePath & CompletedProgramName;
   create: IProgramCreate | null;
-  run: (router: IRouter, terminal: ITerminal, player: IPlayer, server: BaseServer, args: string[]) => void;
+  run: (args: string[], server: BaseServer) => void;
+  nsMethod?: string;
 
-  constructor(
-    name: string,
-    create: IProgramCreate | null,
-    run: (router: IRouter, terminal: ITerminal, player: IPlayer, server: BaseServer, args: string[]) => void,
-  ) {
-    this.name = name;
+  constructor({ name, create, run, nsMethod }: ProgramConstructorParams) {
+    this.name = asProgramFilePath(name);
     this.create = create;
     this.run = run;
-  }
-
-  htmlID(): string {
-    const name = this.name.endsWith(".exe") ? this.name.slice(0, -".exe".length) : this.name;
-    return "create-program-" + name;
+    this.nsMethod = nsMethod ?? "";
   }
 }

@@ -4,7 +4,7 @@
  */
 import * as React from "react";
 
-import { numeralWrapper } from "../numeralFormat";
+import { formatExp, formatThreads } from "../formatNumber";
 
 import Table from "@mui/material/Table";
 import TableCell from "@mui/material/TableCell";
@@ -16,20 +16,19 @@ import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemText from "@mui/material/ListItemText";
-import makeStyles from "@mui/styles/makeStyles";
-
+import { makeStyles } from "tss-react/mui";
 import Collapse from "@mui/material/Collapse";
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
 
 import { convertTimeMsToTimeElapsedString } from "../../utils/StringHelperFunctions";
-import { arrayToString } from "../../utils/helpers/arrayToString";
+import { arrayToString } from "../../utils/helpers/ArrayHelpers";
 import { Money } from "../React/Money";
 import { MoneyRate } from "../React/MoneyRate";
-import { RecentScript } from "../..//Netscript/RecentScripts";
+import { RecentScript } from "../../Netscript/RecentScripts";
 import { LogBoxEvents } from "../React/LogBoxManager";
 
-const useStyles = makeStyles({
+const useStyles = makeStyles()({
   noborder: {
     borderBottom: "none",
   },
@@ -40,7 +39,7 @@ interface IProps {
 }
 
 export function RecentScriptAccordion(props: IProps): React.ReactElement {
-  const classes = useStyles();
+  const { classes } = useStyles();
   const [open, setOpen] = React.useState(false);
   const recentScript = props.recentScript;
 
@@ -57,8 +56,8 @@ export function RecentScriptAccordion(props: IProps): React.ReactElement {
         <ListItemText
           primary={
             <Typography>
-              └ {recentScript.filename} (died{" "}
-              {convertTimeMsToTimeElapsedString(new Date().getTime() - recentScript.timestamp.getTime())} ago)
+              └ {recentScript.runningScript.filename} (died{" "}
+              {convertTimeMsToTimeElapsedString(new Date().getTime() - recentScript.timeOfDeath.getTime())} ago)
             </Typography>
           }
         />
@@ -73,12 +72,14 @@ export function RecentScriptAccordion(props: IProps): React.ReactElement {
                   <Typography>└ Threads:</Typography>
                 </TableCell>
                 <TableCell className={classes.noborder}>
-                  <Typography>{numeralWrapper.formatThreads(recentScript.runningScript.threads)}</Typography>
+                  <Typography>{formatThreads(recentScript.runningScript.threads)}</Typography>
                 </TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className={classes.noborder} colSpan={2}>
-                  <Typography>└ Args: {arrayToString(recentScript.args)}</Typography>
+                  <Typography sx={{ overflowWrap: "anywhere" }}>
+                    └ Args: {arrayToString(recentScript.runningScript.args)}
+                  </Typography>
                 </TableCell>
               </TableRow>
               <TableRow>
@@ -115,7 +116,7 @@ export function RecentScriptAccordion(props: IProps): React.ReactElement {
                 <TableCell className={classes.noborder} colSpan={1} />
                 <TableCell className={classes.noborder} align="left">
                   <Typography>
-                    &nbsp;{numeralWrapper.formatExp(recentScript.runningScript.onlineExpGained) + " hacking exp"}
+                    &nbsp;{formatExp(recentScript.runningScript.onlineExpGained) + " hacking exp"}
                   </Typography>
                 </TableCell>
               </TableRow>
@@ -133,7 +134,7 @@ export function RecentScriptAccordion(props: IProps): React.ReactElement {
               <TableRow>
                 <TableCell className={classes.noborder} colSpan={1} />
                 <TableCell className={classes.noborder} align="left">
-                  <Typography>&nbsp;{numeralWrapper.formatExp(onlineEps) + " hacking exp / sec"}</Typography>
+                  <Typography>&nbsp;{formatExp(onlineEps) + " hacking exp / sec"}</Typography>
                 </TableCell>
               </TableRow>
 
@@ -151,7 +152,7 @@ export function RecentScriptAccordion(props: IProps): React.ReactElement {
                 <TableCell className={classes.noborder} colSpan={1} />
                 <TableCell className={classes.noborder} align="left">
                   <Typography>
-                    &nbsp;{numeralWrapper.formatExp(recentScript.runningScript.offlineExpGained) + " hacking exp"}
+                    &nbsp;{formatExp(recentScript.runningScript.offlineExpGained) + " hacking exp"}
                   </Typography>
                 </TableCell>
               </TableRow>

@@ -4,7 +4,9 @@
 
 ## GangMemberInfo.earnedRespect property
 
-<b>Signature:</b>
+Amount of Respect earned by member since they last Ascended
+
+**Signature:**
 
 ```typescript
 earnedRespect: number;

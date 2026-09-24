@@ -4,22 +4,67 @@
 
 ## Bladeburner.getActionAutolevel() method
 
-Get wether an action is set to autolevel.
+Get whether an action is set to autolevel.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getActionAutolevel(type: string, name: string): boolean;
+getActionAutolevel(type: BladeburnerActionType, name: BladeburnerActionName): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  type | string | Type of action. |
-|  name | string | Name of action. Must be an exact match. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+type
+
+
+</td><td>
+
+[BladeburnerActionType](./bitburner.bladeburneractiontype.md)
+
+
+</td><td>
+
+Type of action.
+
+
+</td></tr>
+<tr><td>
+
+name
+
+
+</td><td>
+
+[BladeburnerActionName](./bitburner.bladeburneractionname.md)
+
+
+</td><td>
+
+Name of action. Must be an exact match.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 boolean
 

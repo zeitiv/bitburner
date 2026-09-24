@@ -1,8 +1,6 @@
-import React, { useState, useEffect } from "react";
-import clsx from "clsx";
+import React, { useMemo, useCallback, useState, useEffect, useRef } from "react";
 import { styled, Theme, CSSObject } from "@mui/material/styles";
-import createStyles from "@mui/styles/createStyles";
-import makeStyles from "@mui/styles/makeStyles";
+import { makeStyles } from "tss-react/mui";
 import MuiDrawer from "@mui/material/Drawer";
 import List from "@mui/material/List";
 import Divider from "@mui/material/Divider";
@@ -13,10 +11,8 @@ import ListItem from "@mui/material/ListItem";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import Typography from "@mui/material/Typography";
-import Collapse from "@mui/material/Collapse";
-import Badge from "@mui/material/Badge";
 
-import ComputerIcon from "@mui/icons-material/Computer";
+import ComputerIcon from "@mui/icons-material/Computer"; // Hacking
 import LastPageIcon from "@mui/icons-material/LastPage"; // Terminal
 import CreateIcon from "@mui/icons-material/Create"; // Create Script
 import StorageIcon from "@mui/icons-material/Storage"; // Active Scripts
@@ -36,27 +32,53 @@ import SportsMmaIcon from "@mui/icons-material/SportsMma"; // Gang
 import CheckIcon from "@mui/icons-material/Check"; // Milestones
 import HelpIcon from "@mui/icons-material/Help"; // Tutorial
 import SettingsIcon from "@mui/icons-material/Settings"; // options
-import DeveloperBoardIcon from "@mui/icons-material/DeveloperBoard"; // Dev
+import DeveloperBoardIcon from "@mui/icons-material/DeveloperBoard"; // Stanek + Dev
 import EmojiEventsIcon from "@mui/icons-material/EmojiEvents"; // Achievements
-import AccountBoxIcon from "@mui/icons-material/AccountBox";
-import PublicIcon from "@mui/icons-material/Public";
-import LiveHelpIcon from "@mui/icons-material/LiveHelp";
-import ExpandLessIcon from "@mui/icons-material/ExpandLess";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
+import AccountBoxIcon from "@mui/icons-material/AccountBox"; // Character
+import PublicIcon from "@mui/icons-material/Public"; // World
+import LiveHelpIcon from "@mui/icons-material/LiveHelp"; // Help
+import BorderInnerSharpIcon from "@mui/icons-material/BorderInnerSharp"; // IPvGO
+import ShareIcon from "@mui/icons-material/Share"; // DarkWeb
+import BiotechIcon from "@mui/icons-material/Biotech"; // Grafting
 
-import { IRouter, Page } from "../../ui/Router";
-import { IPlayer } from "../../PersonObjects/IPlayer";
+import { Router } from "../../ui/GameRoot";
+import { ComplexPage, SimplePage } from "../../ui/Enums";
+import { Page, isSimplePage } from "../../ui/Router";
+import { SidebarAccordion } from "./SidebarAccordion";
+import { Player } from "@player";
 import { CONSTANTS } from "../../Constants";
 import { iTutorialSteps, iTutorialNextStep, ITutorial } from "../../InteractiveTutorial";
 import { getAvailableCreatePrograms } from "../../Programs/ProgramHelpers";
 import { Settings } from "../../Settings/Settings";
-import { redPillFlag } from "../../RedPill";
-import { AugmentationNames } from "../../Augmentation/data/AugmentationNames";
+import { AugmentationName, CityName } from "@enums";
 
-import { KEY } from "../../utils/helpers/keyCodes";
 import { ProgramsSeen } from "../../Programs/ui/ProgramsRoot";
 import { InvitationsSeen } from "../../Faction/ui/FactionsRoot";
-import { hash } from "../../hash/hash";
+import { commitHash } from "../../utils/helpers/commitHash";
+import { useCycleRerender } from "../../ui/React/hooks";
+import { playerHasDiscoveredGo } from "../../Go/effects/effect";
+import { knowAboutBitverse } from "../../BitNode/BitNodeUtils";
+import {
+  convertKeyboardEventToKeyCombination,
+  determineKeyBindingTypes,
+  type GoToPageKeyBindingType,
+  KeyBindingEvents,
+  KeyBindingEventType,
+  ScriptEditorAction,
+  type KeyBindingType,
+  CurrentKeyBindings,
+} from "../../utils/KeyBindingUtils";
+import { throwIfReachable } from "../../utils/helpers/throwIfReachable";
+import { ErrorState } from "../../ErrorHandling/ErrorState";
+
+import { hasDarknetAccess } from "../../DarkNet/utils/darknetAuthUtils";
+
+const RotatedDoubleArrowIcon = React.forwardRef(function RotatedDoubleArrowIcon(
+  props: { color: "primary" | "secondary" | "error" },
+  __ref: React.ForwardedRef<SVGSVGElement>,
+) {
+  return <DoubleArrowIcon {...props} style={{ transform: "rotate(-90deg)" }} ref={__ref} />;
+});
 
 const openedMixin = (theme: Theme): CSSObject => ({
   width: theme.spacing(31),
@@ -93,773 +115,323 @@ const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== "open" 
   }),
 }));
 
-const useStyles = makeStyles((theme: Theme) =>
-  createStyles({
-    active: {
-      borderLeft: "3px solid " + theme.palette.primary.main,
-    },
-    listitem: {},
-  }),
-);
+const useStyles = makeStyles()((theme: Theme) => ({
+  active: {
+    borderLeft: "3px solid " + theme.palette.primary.main,
+  },
+  listitem: {},
+}));
 
-interface IProps {
-  player: IPlayer;
-  router: IRouter;
-  page: Page;
-  opened: boolean;
-  onToggled: (newValue: boolean) => void;
-}
+export function SidebarRoot(props: { page: Page }): React.ReactElement {
+  const isSettingUpKeyBindings = useRef(false);
+  useCycleRerender();
 
-export function SidebarRoot(props: IProps): React.ReactElement {
-  const setRerender = useState(false)[1];
-  function rerender(): void {
-    setRerender((old) => !old);
+  let flash: Page | null = null;
+  switch (ITutorial.currStep) {
+    case iTutorialSteps.CharacterGoToTerminalPage:
+    case iTutorialSteps.ActiveScriptsPage:
+      flash = Page.Terminal;
+      break;
+    case iTutorialSteps.GoToCharacterPage:
+      flash = Page.Stats;
+      break;
+    case iTutorialSteps.TerminalGoToActiveScriptsPage:
+      flash = Page.ActiveScripts;
+      break;
+    case iTutorialSteps.GoToHacknetNodesPage:
+      flash = Page.Hacknet;
+      break;
+    case iTutorialSteps.HacknetNodesGoToWorldPage:
+      flash = Page.City;
+      break;
+    case iTutorialSteps.WorldDescription:
+      flash = Page.Documentation;
+      break;
   }
 
-  useEffect(() => {
-    const id = setInterval(rerender, 200);
-    return () => clearInterval(id);
-  }, []);
-
-  const [hackingOpen, setHackingOpen] = useState(true);
-  const [characterOpen, setCharacterOpen] = useState(true);
-  const [worldOpen, setWorldOpen] = useState(true);
-  const [helpOpen, setHelpOpen] = useState(true);
-
-  const flashTerminal =
-    ITutorial.currStep === iTutorialSteps.CharacterGoToTerminalPage ||
-    ITutorial.currStep === iTutorialSteps.ActiveScriptsPage;
-
-  const flashStats = ITutorial.currStep === iTutorialSteps.GoToCharacterPage;
-
-  const flashActiveScripts = ITutorial.currStep === iTutorialSteps.TerminalGoToActiveScriptsPage;
-
-  const flashHacknet = ITutorial.currStep === iTutorialSteps.GoToHacknetNodesPage;
-
-  const flashCity = ITutorial.currStep === iTutorialSteps.HacknetNodesGoToWorldPage;
-
-  const flashTutorial = ITutorial.currStep === iTutorialSteps.WorldDescription;
-
-  const augmentationCount = props.player.queuedAugmentations.length;
-  const invitationsCount = props.player.factionInvitations.filter((f) => !InvitationsSeen.includes(f)).length;
-  const programCount = getAvailableCreatePrograms(props.player).length - ProgramsSeen.length;
-  const canCreateProgram =
-    getAvailableCreatePrograms(props.player).length > 0 ||
-    props.player.augmentations.length > 0 ||
-    props.player.queuedAugmentations.length > 0 ||
-    props.player.sourceFiles.length > 0;
+  const augmentationCount = Player.queuedAugmentations.length;
+  const invitationsCount = Player.factionInvitations.filter((f) => !InvitationsSeen.has(f)).length;
+  const programCount = getAvailableCreatePrograms().length - ProgramsSeen.size;
+  const errorCount = ErrorState.UnreadErrors;
 
   const canOpenFactions =
-    props.player.factionInvitations.length > 0 ||
-    props.player.factions.length > 0 ||
-    props.player.augmentations.length > 0 ||
-    props.player.queuedAugmentations.length > 0 ||
-    props.player.sourceFiles.length > 0;
+    Player.factionInvitations.length > 0 ||
+    Player.factions.length > 0 ||
+    Player.factionRumors.size > 0 ||
+    Player.augmentations.length > 0 ||
+    Player.queuedAugmentations.length > 0 ||
+    knowAboutBitverse();
 
   const canOpenAugmentations =
-    props.player.augmentations.length > 0 ||
-    props.player.queuedAugmentations.length > 0 ||
-    props.player.sourceFiles.length > 0;
+    Player.augmentations.length > 0 ||
+    Player.queuedAugmentations.length > 0 ||
+    knowAboutBitverse() ||
+    Player.exploits.length > 0;
 
-  const canOpenSleeves = props.player.sleeves.length > 0;
+  const canOpenSleeves = Player.sleeves.length > 0;
+  const canOpenGrafting = Player.canAccessGrafting() && Player.city === CityName.NewTokyo;
 
-  const canCorporation = !!(props.player.corporation as any);
-  const canGang = !!(props.player.gang as any);
-  const canJob = props.player.companyName !== "";
-  const canStockMarket = props.player.hasWseAccount;
-  const canBladeburner = !!(props.player.bladeburner as any);
-  const canStaneksGift = props.player.augmentations.some((aug) => aug.name === AugmentationNames.StaneksGift1);
+  const canCorporation = !!Player.corporation;
+  const canGang = !!Player.gang;
+  const canJob = Object.values(Player.jobs).length > 0;
+  const canStockMarket = Player.hasWseAccount;
+  const canBladeburner = !!Player.bladeburner;
+  const canStaneksGift = Player.augmentations.some((aug) => aug.name === AugmentationName.StaneksGift1);
+  const canIPvGO = playerHasDiscoveredGo();
+  const canDarkNet = hasDarknetAccess();
 
-  function clickTerminal(): void {
-    props.router.toTerminal();
-    if (flashTerminal) iTutorialNextStep();
-  }
+  const clickPage = useCallback(
+    (page: Page) => {
+      if (page == Page.ScriptEditor || page == Page.Documentation || page == Page.Options) {
+        Router.toPage(page, {});
+      } else if (isSimplePage(page)) {
+        Router.toPage(page);
+      } else {
+        throw new Error("Can't handle click on Page " + page);
+      }
+      if (flash === page) {
+        iTutorialNextStep();
+      }
+    },
+    [flash],
+  );
 
-  function clickScriptEditor(): void {
-    props.router.toScriptEditor();
-  }
-
-  function clickStats(): void {
-    props.router.toStats();
-    if (flashStats) iTutorialNextStep();
-  }
-
-  function clickActiveScripts(): void {
-    props.router.toActiveScripts();
-    if (flashActiveScripts) iTutorialNextStep();
-  }
-
-  function clickCreateProgram(): void {
-    props.router.toCreateProgram();
-  }
-
-  function clickStaneksGift(): void {
-    props.router.toStaneksGift();
-  }
-
-  function clickFactions(): void {
-    props.router.toFactions();
-  }
-
-  function clickAugmentations(): void {
-    props.router.toAugmentations();
-  }
-
-  function clickSleeves(): void {
-    props.router.toSleeves();
-  }
-
-  function clickHacknet(): void {
-    props.router.toHacknetNodes();
-    if (flashHacknet) iTutorialNextStep();
-  }
-
-  function clickCity(): void {
-    props.router.toCity();
-    if (flashCity) iTutorialNextStep();
-  }
-
-  function clickTravel(): void {
-    props.router.toTravel();
-  }
-
-  function clickJob(): void {
-    props.router.toJob();
-  }
-
-  function clickStockMarket(): void {
-    props.router.toStockMarket();
-  }
-
-  function clickBladeburner(): void {
-    props.router.toBladeburner();
-  }
-
-  function clickCorp(): void {
-    props.router.toCorporation();
-  }
-
-  function clickGang(): void {
-    props.router.toGang();
-  }
-
-  function clickTutorial(): void {
-    props.router.toTutorial();
-    if (flashTutorial) iTutorialNextStep();
-  }
-
-  function clickMilestones(): void {
-    props.router.toMilestones();
-  }
-  function clickOptions(): void {
-    props.router.toGameOptions();
-  }
-
-  function clickDev(): void {
-    props.router.toDevMenu();
-  }
-
-  function clickAchievements(): void {
-    props.router.toAchievements();
-  }
+  /**
+   * We use "keyBindingType is GoToPageKeyBindingType" to narrow down the type of keyBindingType.
+   */
+  const canGoToPage = useCallback(
+    (keyBindingType: KeyBindingType): keyBindingType is GoToPageKeyBindingType => {
+      switch (keyBindingType) {
+        case SimplePage.Terminal:
+        case ComplexPage.ScriptEditor:
+        case SimplePage.ActiveScripts:
+        case SimplePage.CreateProgram:
+        case SimplePage.Stats:
+        case SimplePage.Hacknet:
+        case SimplePage.City:
+        case SimplePage.Travel:
+        case SimplePage.Milestones:
+        case ComplexPage.Documentation:
+        case SimplePage.Achievements:
+        case ComplexPage.Options:
+          return true;
+        case SimplePage.StaneksGift:
+          return canStaneksGift;
+        case SimplePage.Factions:
+          return canOpenFactions;
+        case SimplePage.Augmentations:
+          return canOpenAugmentations;
+        case SimplePage.Sleeves:
+          return canOpenSleeves;
+        case SimplePage.Grafting:
+          return canOpenGrafting;
+        case SimplePage.Job:
+          return canJob;
+        case SimplePage.StockMarket:
+          return canStockMarket;
+        case SimplePage.Bladeburner:
+          return canBladeburner;
+        case SimplePage.Corporation:
+          return canCorporation;
+        case SimplePage.Gang:
+          return canGang;
+        case SimplePage.Go:
+          return canIPvGO;
+        case SimplePage.DarkNet:
+          return canDarkNet;
+        case ScriptEditorAction.Save:
+        case ScriptEditorAction.GoToTerminal:
+        case ScriptEditorAction.Run:
+          return false;
+        default:
+          throwIfReachable(keyBindingType);
+      }
+      return false;
+    },
+    [
+      canStaneksGift,
+      canOpenFactions,
+      canOpenAugmentations,
+      canOpenSleeves,
+      canOpenGrafting,
+      canJob,
+      canStockMarket,
+      canBladeburner,
+      canCorporation,
+      canGang,
+      canIPvGO,
+      canDarkNet,
+    ],
+  );
 
   useEffect(() => {
-    // Shortcuts to navigate through the game
-    //  Alt-t - Terminal
-    //  Alt-c - Character
-    //  Alt-e - Script editor
-    //  Alt-s - Active scripts
-    //  Alt-h - Hacknet Nodes
-    //  Alt-w - City
-    //  Alt-j - Job
-    //  Alt-r - Travel Agency of current city
-    //  Alt-p - Create program
-    //  Alt-f - Factions
-    //  Alt-a - Augmentations
-    //  Alt-u - Tutorial
-    //  Alt-o - Options
-    function handleShortcuts(this: Document, event: KeyboardEvent): any {
-      if (Settings.DisableHotkeys) return;
-      if ((props.player.isWorking && props.player.focus) || redPillFlag) return;
-      if (event.keyCode == KEY.T && event.altKey) {
-        event.preventDefault();
-        clickTerminal();
-      } else if (event.keyCode === KEY.C && event.altKey) {
-        event.preventDefault();
-        clickStats();
-      } else if (event.keyCode === KEY.E && event.altKey) {
-        event.preventDefault();
-        clickScriptEditor();
-      } else if (event.keyCode === KEY.S && event.altKey) {
-        event.preventDefault();
-        clickActiveScripts();
-      } else if (event.keyCode === KEY.H && event.altKey) {
-        event.preventDefault();
-        clickHacknet();
-      } else if (event.keyCode === KEY.W && event.altKey) {
-        event.preventDefault();
-        clickCity();
-      } else if (event.keyCode === KEY.J && event.altKey && !event.ctrlKey && !event.metaKey && canJob) {
-        // ctrl/cmd + alt + j is shortcut to open Chrome dev tools
-        event.preventDefault();
-        clickJob();
-      } else if (event.keyCode === KEY.R && event.altKey) {
-        event.preventDefault();
-        clickTravel();
-      } else if (event.keyCode === KEY.P && event.altKey) {
-        event.preventDefault();
-        clickCreateProgram();
-      } else if (event.keyCode === KEY.F && event.altKey) {
-        if (props.page == Page.Terminal && Settings.EnableBashHotkeys) {
-          return;
+    const clearSubscription = KeyBindingEvents.subscribe((eventType) => {
+      if (eventType === KeyBindingEventType.StartSettingUp) {
+        isSettingUpKeyBindings.current = true;
+      }
+      if (eventType === KeyBindingEventType.StopSettingUp) {
+        isSettingUpKeyBindings.current = false;
+      }
+    });
+    return clearSubscription;
+  }, []);
+
+  useEffect(() => {
+    function handleShortcuts(this: Document, event: KeyboardEvent): void {
+      if (Settings.DisableHotkeys) {
+        return;
+      }
+      if (event.getModifierState(event.key)) {
+        return;
+      }
+      if (isSettingUpKeyBindings.current) {
+        return;
+      }
+      if ((Player.currentWork && Player.focus) || Router.page() === Page.BitVerse) {
+        return;
+      }
+      const keyBindingTypes = determineKeyBindingTypes(CurrentKeyBindings, convertKeyboardEventToKeyCombination(event));
+      for (const keyBindingType of keyBindingTypes) {
+        if (!canGoToPage(keyBindingType)) {
+          continue;
         }
         event.preventDefault();
-        clickFactions();
-      } else if (event.keyCode === KEY.A && event.altKey) {
-        event.preventDefault();
-        clickAugmentations();
-      } else if (event.keyCode === KEY.U && event.altKey) {
-        event.preventDefault();
-        clickTutorial();
-      } else if (event.keyCode === KEY.B && event.altKey && props.player.bladeburner) {
-        event.preventDefault();
-        clickBladeburner();
-      } else if (event.keyCode === KEY.G && event.altKey && props.player.gang) {
-        event.preventDefault();
-        clickGang();
+        clickPage(keyBindingType);
       }
-      // if (event.keyCode === KEY.O && event.altKey) {
-      //   event.preventDefault();
-      //   gameOptionsBoxOpen();
-      // }
     }
 
     document.addEventListener("keydown", handleShortcuts);
     return () => document.removeEventListener("keydown", handleShortcuts);
-  }, []);
+  }, [canGoToPage, clickPage, props.page]);
 
-  const classes = useStyles();
-  const [open, setOpen] = useState(props.opened);
-  const toggleDrawer = (): void => setOpen((old) => !old);
+  const { classes } = useStyles();
+  const [open, setOpen] = useState(Settings.IsSidebarOpened);
+  const toggleDrawer = (): void =>
+    setOpen((old) => {
+      Settings.IsSidebarOpened = !old;
+      return !old;
+    });
+  const li_classes = useMemo(() => ({ root: classes.listitem }), [classes.listitem]);
+  const ChevronOpenClose = open ? ChevronLeftIcon : ChevronRightIcon;
 
-  useEffect(() => {
-    props.onToggled(open);
-  }, [open]);
-
+  // Explicitly useMemo() to save rerendering deep chunks of this tree.
+  // memo() can't be (easily) used on components like <List>, because the
+  // props.children array will be a different object every time.
   return (
     <Drawer open={open} anchor="left" variant="permanent">
-      <ListItem classes={{ root: classes.listitem }} button onClick={toggleDrawer}>
-        <ListItemIcon>
-          {!open ? <ChevronRightIcon color="primary" /> : <ChevronLeftIcon color="primary" />}
-        </ListItemIcon>
-        <ListItemText
-          primary={
-            <Tooltip title={hash()}>
-              <Typography>Bitburner v{CONSTANTS.VersionString}</Typography>
-            </Tooltip>
-          }
-        />
-      </ListItem>
+      {useMemo(
+        () => (
+          <ListItem classes={li_classes} button onClick={toggleDrawer}>
+            <ListItemIcon>
+              <ChevronOpenClose color={"primary"} />
+            </ListItemIcon>
+            <ListItemText
+              primary={
+                <Tooltip title={commitHash()}>
+                  <Typography>Bitburner v{CONSTANTS.VersionString}</Typography>
+                </Tooltip>
+              }
+            />
+          </ListItem>
+        ),
+        [ChevronOpenClose, li_classes],
+      )}
       <Divider />
       <List>
-        <ListItem classes={{ root: classes.listitem }} button onClick={() => setHackingOpen((old) => !old)}>
-          <ListItemIcon>
-            <Tooltip title={!open ? "Hacking" : ""}>
-              <ComputerIcon color="primary" />
-            </Tooltip>
-          </ListItemIcon>
-          <ListItemText primary={<Typography>Hacking</Typography>} />
-          {hackingOpen ? <ExpandLessIcon color="primary" /> : <ExpandMoreIcon color="primary" />}
-        </ListItem>
-        <Collapse in={hackingOpen} timeout="auto" unmountOnExit>
-          <List>
-            <ListItem
-              classes={{ root: classes.listitem }}
-              button
-              key={"Terminal"}
-              className={clsx({
-                [classes.active]: props.page === Page.Terminal,
-              })}
-              onClick={clickTerminal}
-            >
-              <ListItemIcon>
-                <Tooltip title={!open ? "Terminal" : ""}>
-                  <LastPageIcon
-                    color={flashTerminal ? "error" : props.page !== Page.Terminal ? "secondary" : "primary"}
-                  />
-                </Tooltip>
-              </ListItemIcon>
-              <ListItemText>
-                <Typography color={flashTerminal ? "error" : props.page !== Page.Terminal ? "secondary" : "primary"}>
-                  Terminal
-                </Typography>
-              </ListItemText>
-            </ListItem>
-            <ListItem
-              classes={{ root: classes.listitem }}
-              button
-              key={"Script Editor"}
-              className={clsx({
-                [classes.active]: props.page === Page.ScriptEditor,
-              })}
-              onClick={clickScriptEditor}
-            >
-              <ListItemIcon>
-                <Tooltip title={!open ? "Script Editor" : ""}>
-                  <CreateIcon color={props.page !== Page.ScriptEditor ? "secondary" : "primary"} />
-                </Tooltip>
-              </ListItemIcon>
-              <ListItemText>
-                <Typography color={props.page !== Page.ScriptEditor ? "secondary" : "primary"}>
-                  Script Editor
-                </Typography>
-              </ListItemText>
-            </ListItem>
-            <ListItem
-              classes={{ root: classes.listitem }}
-              button
-              key={"Active Scripts"}
-              className={clsx({
-                [classes.active]: props.page === Page.ActiveScripts,
-              })}
-              onClick={clickActiveScripts}
-            >
-              <ListItemIcon>
-                <Tooltip title={!open ? "Active Scripts" : ""}>
-                  <StorageIcon
-                    color={flashActiveScripts ? "error" : props.page !== Page.ActiveScripts ? "secondary" : "primary"}
-                  />
-                </Tooltip>
-              </ListItemIcon>
-              <ListItemText>
-                <Typography
-                  color={flashActiveScripts ? "error" : props.page !== Page.ActiveScripts ? "secondary" : "primary"}
-                >
-                  Active Scripts
-                </Typography>
-              </ListItemText>
-            </ListItem>
-            {canCreateProgram && (
-              <ListItem
-                button
-                key={"Create Program"}
-                className={clsx({
-                  [classes.active]: props.page === Page.CreateProgram,
-                })}
-                onClick={clickCreateProgram}
-              >
-                <ListItemIcon>
-                  <Badge badgeContent={programCount > 0 ? programCount : undefined} color="error">
-                    <Tooltip title={!open ? "Create Program" : ""}>
-                      <BugReportIcon color={props.page !== Page.CreateProgram ? "secondary" : "primary"} />
-                    </Tooltip>
-                  </Badge>
-                </ListItemIcon>
-                <ListItemText>
-                  <Typography color={props.page !== Page.CreateProgram ? "secondary" : "primary"}>
-                    Create Program
-                  </Typography>
-                </ListItemText>
-              </ListItem>
-            )}
-            {canStaneksGift && (
-              <ListItem
-                button
-                key={"Staneks Gift"}
-                className={clsx({
-                  [classes.active]: props.page === Page.StaneksGift,
-                })}
-                onClick={clickStaneksGift}
-              >
-                <ListItemIcon>
-                  <Tooltip title={!open ? "Stanek's Gift" : ""}>
-                    <DeveloperBoardIcon color={props.page !== Page.StaneksGift ? "secondary" : "primary"} />
-                  </Tooltip>
-                </ListItemIcon>
-                <ListItemText>
-                  <Typography color={props.page !== Page.StaneksGift ? "secondary" : "primary"}>
-                    Stanek's Gift
-                  </Typography>
-                </ListItemText>
-              </ListItem>
-            )}
-          </List>
-        </Collapse>
-
+        <SidebarAccordion
+          key_="Hacking"
+          page={props.page}
+          clickPage={clickPage}
+          flash={flash}
+          icon={ComputerIcon}
+          sidebarOpen={open}
+          classes={classes}
+          items={[
+            { key_: Page.Terminal, icon: LastPageIcon },
+            { key_: Page.ScriptEditor, icon: CreateIcon },
+            {
+              key_: Page.ActiveScripts,
+              icon: StorageIcon,
+              count: errorCount,
+              alternateKeys: [Page.RecentErrors, Page.RecentlyKilledScripts],
+            },
+            { key_: Page.CreateProgram, icon: BugReportIcon, count: programCount },
+            canStaneksGift && { key_: Page.StaneksGift, icon: DeveloperBoardIcon },
+          ]}
+        />
+        <Typography id="sidebar-extra-hook-0"></Typography>
         <Divider />
-        <ListItem classes={{ root: classes.listitem }} button onClick={() => setCharacterOpen((old) => !old)}>
-          <ListItemIcon>
-            <Tooltip title={!open ? "Character" : ""}>
-              <AccountBoxIcon color="primary" />
-            </Tooltip>
-          </ListItemIcon>
-          <ListItemText primary={<Typography>Character</Typography>} />
-          {characterOpen ? <ExpandLessIcon color="primary" /> : <ExpandMoreIcon color="primary" />}
-        </ListItem>
-        <Collapse in={characterOpen} timeout="auto" unmountOnExit>
-          <ListItem
-            button
-            key={"Stats"}
-            className={clsx({
-              [classes.active]: props.page === Page.Stats,
-            })}
-            onClick={clickStats}
-          >
-            <ListItemIcon>
-              <Tooltip title={!open ? "Stats" : ""}>
-                <EqualizerIcon color={flashStats ? "error" : props.page !== Page.Stats ? "secondary" : "primary"} />
-              </Tooltip>
-            </ListItemIcon>
-            <ListItemText>
-              <Typography color={flashStats ? "error" : props.page !== Page.Stats ? "secondary" : "primary"}>
-                Stats
-              </Typography>
-            </ListItemText>
-          </ListItem>
-          {canOpenFactions && (
-            <ListItem
-              classes={{ root: classes.listitem }}
-              button
-              key={"Factions"}
-              className={clsx({
-                [classes.active]: [Page.Factions, Page.Faction].includes(props.page),
-              })}
-              onClick={clickFactions}
-            >
-              <ListItemIcon>
-                <Badge badgeContent={invitationsCount !== 0 ? invitationsCount : undefined} color="error">
-                  <Tooltip title={!open ? "Factions" : ""}>
-                    <ContactsIcon color={![Page.Factions, Page.Faction].includes(props.page) ? "secondary" : "primary"} />
-                  </Tooltip>
-                </Badge>
-              </ListItemIcon>
-              <ListItemText>
-                <Typography color={![Page.Factions, Page.Faction].includes(props.page) ? "secondary" : "primary"}>
-                  Factions
-                </Typography>
-              </ListItemText>
-            </ListItem>
-          )}
-          {canOpenAugmentations && (
-            <ListItem
-              classes={{ root: classes.listitem }}
-              button
-              key={"Augmentations"}
-              className={clsx({
-                [classes.active]: props.page === Page.Augmentations,
-              })}
-              onClick={clickAugmentations}
-            >
-              <ListItemIcon>
-                <Badge badgeContent={augmentationCount !== 0 ? augmentationCount : undefined} color="error">
-                  <Tooltip title={!open ? "Augmentations" : ""}>
-                    <DoubleArrowIcon
-                      style={{ transform: "rotate(-90deg)" }}
-                      color={props.page !== Page.Augmentations ? "secondary" : "primary"}
-                    />
-                  </Tooltip>
-                </Badge>
-              </ListItemIcon>
-              <ListItemText>
-                <Typography color={props.page !== Page.Augmentations ? "secondary" : "primary"}>
-                  Augmentations
-                </Typography>
-              </ListItemText>
-            </ListItem>
-          )}
-          <ListItem
-            button
-            key={"Hacknet"}
-            className={clsx({
-              [classes.active]: props.page === Page.Hacknet,
-            })}
-            onClick={clickHacknet}
-          >
-            <ListItemIcon>
-              <Tooltip title={!open ? "Hacknet" : ""}>
-                <AccountTreeIcon color={flashHacknet ? "error" : props.page !== Page.Hacknet ? "secondary" : "primary"} />
-              </Tooltip>
-            </ListItemIcon>
-            <ListItemText>
-              <Typography color={flashHacknet ? "error" : props.page !== Page.Hacknet ? "secondary" : "primary"}>
-                Hacknet
-              </Typography>
-            </ListItemText>
-          </ListItem>
-          {canOpenSleeves && (
-            <ListItem
-              classes={{ root: classes.listitem }}
-              button
-              key={"Sleeves"}
-              className={clsx({
-                [classes.active]: props.page === Page.Sleeves,
-              })}
-              onClick={clickSleeves}
-            >
-              <ListItemIcon>
-                <Tooltip title={!open ? "Sleeves" : ""}>
-                  <PeopleAltIcon color={props.page !== Page.Sleeves ? "secondary" : "primary"} />
-                </Tooltip>
-              </ListItemIcon>
-              <ListItemText>
-                <Typography color={props.page !== Page.Sleeves ? "secondary" : "primary"}>Sleeves</Typography>
-              </ListItemText>
-            </ListItem>
-          )}
-        </Collapse>
-
+        <SidebarAccordion
+          key_="Character"
+          page={props.page}
+          clickPage={clickPage}
+          flash={flash}
+          icon={AccountBoxIcon}
+          sidebarOpen={open}
+          classes={classes}
+          items={[
+            { key_: Page.Stats, icon: EqualizerIcon },
+            canOpenFactions && {
+              key_: Page.Factions,
+              icon: ContactsIcon,
+              active: [Page.Factions, Page.Faction].includes(props.page),
+              count: invitationsCount,
+            },
+            canOpenAugmentations && {
+              key_: Page.Augmentations,
+              icon: RotatedDoubleArrowIcon,
+              count: augmentationCount,
+            },
+            { key_: Page.Hacknet, icon: AccountTreeIcon },
+            canOpenSleeves && { key_: Page.Sleeves, icon: PeopleAltIcon },
+            canOpenGrafting && { key_: Page.Grafting, icon: BiotechIcon },
+          ]}
+        />
+        <Typography id="sidebar-extra-hook-1"></Typography>
         <Divider />
-        <ListItem classes={{ root: classes.listitem }} button onClick={() => setWorldOpen((old) => !old)}>
-          <ListItemIcon>
-            <Tooltip title={!open ? "World" : ""}>
-              <PublicIcon color="primary" />
-            </Tooltip>
-          </ListItemIcon>
-          <ListItemText primary={<Typography>World</Typography>} />
-          {worldOpen ? <ExpandLessIcon color="primary" /> : <ExpandMoreIcon color="primary" />}
-        </ListItem>
-        <Collapse in={worldOpen} timeout="auto" unmountOnExit>
-          <ListItem
-            button
-            key={"City"}
-            className={clsx({
-              [classes.active]:
-                props.page === Page.City || props.page === Page.Resleeves || props.page === Page.Location,
-            })}
-            onClick={clickCity}
-          >
-            <ListItemIcon>
-              <Tooltip title={!open ? "City" : ""}>
-                <LocationCityIcon color={flashCity ? "error" : props.page !== Page.City ? "secondary" : "primary"} />
-              </Tooltip>
-            </ListItemIcon>
-            <ListItemText>
-              <Typography color={flashCity ? "error" : props.page !== Page.City ? "secondary" : "primary"}>
-                City
-              </Typography>
-            </ListItemText>
-          </ListItem>
-          <ListItem
-            button
-            key={"Travel"}
-            className={clsx({
-              [classes.active]: props.page === Page.Travel,
-            })}
-            onClick={clickTravel}
-          >
-            <ListItemIcon>
-              <Tooltip title={!open ? "Travel" : ""}>
-                <AirplanemodeActiveIcon color={props.page !== Page.Travel ? "secondary" : "primary"} />
-              </Tooltip>
-            </ListItemIcon>
-            <ListItemText>
-              <Typography color={props.page !== Page.Travel ? "secondary" : "primary"}>Travel</Typography>
-            </ListItemText>
-          </ListItem>
-          {canJob && (
-            <ListItem
-              classes={{ root: classes.listitem }}
-              button
-              key={"Job"}
-              className={clsx({
-                [classes.active]: props.page === Page.Job,
-              })}
-              onClick={clickJob}
-            >
-              <ListItemIcon>
-                <Tooltip title={!open ? "Job" : ""}>
-                  <WorkIcon color={props.page !== Page.Job ? "secondary" : "primary"} />
-                </Tooltip>
-              </ListItemIcon>
-              <ListItemText>
-                <Typography color={props.page !== Page.Job ? "secondary" : "primary"}>Job</Typography>
-              </ListItemText>
-            </ListItem>
-          )}
-          {canStockMarket && (
-            <ListItem
-              classes={{ root: classes.listitem }}
-              button
-              key={"Stock Market"}
-              className={clsx({
-                [classes.active]: props.page === Page.StockMarket,
-              })}
-              onClick={clickStockMarket}
-            >
-              <ListItemIcon>
-                <Tooltip title={!open ? "Stock Market" : ""}>
-                  <TrendingUpIcon color={props.page !== Page.StockMarket ? "secondary" : "primary"} />
-                </Tooltip>
-              </ListItemIcon>
-              <ListItemText>
-                <Typography color={props.page !== Page.StockMarket ? "secondary" : "primary"}>Stock Market</Typography>
-              </ListItemText>
-            </ListItem>
-          )}
-          {canBladeburner && (
-            <ListItem
-              classes={{ root: classes.listitem }}
-              button
-              key={"Bladeburner"}
-              className={clsx({
-                [classes.active]: props.page === Page.Bladeburner,
-              })}
-              onClick={clickBladeburner}
-            >
-              <ListItemIcon>
-                <Tooltip title={!open ? "Bladeburner" : ""}>
-                  <FormatBoldIcon color={props.page !== Page.Bladeburner ? "secondary" : "primary"} />
-                </Tooltip>
-              </ListItemIcon>
-              <ListItemText>
-                <Typography color={props.page !== Page.Bladeburner ? "secondary" : "primary"}>Bladeburner</Typography>
-              </ListItemText>
-            </ListItem>
-          )}
-          {canCorporation && (
-            <ListItem
-              classes={{ root: classes.listitem }}
-              button
-              key={"Corp"}
-              className={clsx({
-                [classes.active]: props.page === Page.Corporation,
-              })}
-              onClick={clickCorp}
-            >
-              <ListItemIcon>
-                <Tooltip title={!open ? "Corp" : ""}>
-                  <BusinessIcon color={props.page !== Page.Corporation ? "secondary" : "primary"} />
-                </Tooltip>
-              </ListItemIcon>
-              <ListItemText>
-                <Typography color={props.page !== Page.Corporation ? "secondary" : "primary"}>Corp</Typography>
-              </ListItemText>
-            </ListItem>
-          )}
-          {canGang && (
-            <ListItem
-              classes={{ root: classes.listitem }}
-              button
-              key={"Gang"}
-              className={clsx({
-                [classes.active]: props.page === Page.Gang,
-              })}
-              onClick={clickGang}
-            >
-              <ListItemIcon>
-                <Tooltip title={!open ? "Gang" : ""}>
-                  <SportsMmaIcon color={props.page !== Page.Gang ? "secondary" : "primary"} />
-                </Tooltip>
-              </ListItemIcon>
-              <ListItemText>
-                <Typography color={props.page !== Page.Gang ? "secondary" : "primary"}>Gang</Typography>
-              </ListItemText>
-            </ListItem>
-          )}
-        </Collapse>
-
+        <SidebarAccordion
+          key_="World"
+          page={props.page}
+          clickPage={clickPage}
+          flash={flash}
+          icon={PublicIcon}
+          sidebarOpen={open}
+          classes={classes}
+          items={[
+            {
+              key_: Page.City,
+              icon: LocationCityIcon,
+              active: [Page.City, Page.Location].includes(props.page),
+            },
+            { key_: Page.Travel, icon: AirplanemodeActiveIcon },
+            canJob && { key_: Page.Job, icon: WorkIcon },
+            canStockMarket && { key_: Page.StockMarket, icon: TrendingUpIcon },
+            canBladeburner && { key_: Page.Bladeburner, icon: FormatBoldIcon },
+            canCorporation && { key_: Page.Corporation, icon: BusinessIcon },
+            canGang && { key_: Page.Gang, icon: SportsMmaIcon },
+            canIPvGO && { key_: Page.Go, icon: BorderInnerSharpIcon },
+            canDarkNet && { key_: Page.DarkNet, icon: ShareIcon },
+          ]}
+        />
+        <Typography id="sidebar-extra-hook-2"></Typography>
         <Divider />
-        <ListItem classes={{ root: classes.listitem }} button onClick={() => setHelpOpen((old) => !old)}>
-          <ListItemIcon>
-            <Tooltip title={!open ? "Help" : ""}>
-              <LiveHelpIcon color="primary" />
-            </Tooltip>
-          </ListItemIcon>
-          <ListItemText primary={<Typography>Help</Typography>} />
-          {helpOpen ? <ExpandLessIcon color="primary" /> : <ExpandMoreIcon color="primary" />}
-        </ListItem>
-        <Collapse in={helpOpen} timeout="auto" unmountOnExit>
-          <ListItem
-            button
-            key={"Milestones"}
-            className={clsx({
-              [classes.active]: props.page === Page.Milestones,
-            })}
-            onClick={clickMilestones}
-          >
-            <ListItemIcon>
-              <Tooltip title={!open ? "Milestones" : ""}>
-                <CheckIcon color={props.page !== Page.Milestones ? "secondary" : "primary"} />
-              </Tooltip>
-            </ListItemIcon>
-            <ListItemText>
-              <Typography color={props.page !== Page.Milestones ? "secondary" : "primary"}>Milestones</Typography>
-            </ListItemText>
-          </ListItem>
-          <ListItem
-            button
-            key={"Tutorial"}
-            className={clsx({
-              [classes.active]: props.page === Page.Tutorial,
-            })}
-            onClick={clickTutorial}
-          >
-            <ListItemIcon>
-              <Tooltip title={!open ? "Tutorial" : ""}>
-                <HelpIcon color={flashTutorial ? "error" : props.page !== Page.Tutorial ? "secondary" : "primary"} />
-              </Tooltip>
-            </ListItemIcon>
-            <ListItemText>
-              <Typography color={flashTutorial ? "error" : props.page !== Page.Tutorial ? "secondary" : "primary"}>
-                Tutorial
-              </Typography>
-            </ListItemText>
-          </ListItem>
-          <ListItem
-            button
-            key={"Achievements"}
-            className={clsx({
-              [classes.active]: props.page === Page.Achievements,
-            })}
-            onClick={clickAchievements}
-          >
-            <ListItemIcon>
-              <Tooltip title={!open ? "Achievements" : ""}>
-                <EmojiEventsIcon color={props.page !== Page.Achievements ? "secondary" : "primary"} />
-              </Tooltip>
-            </ListItemIcon>
-            <ListItemText>
-              <Typography color={props.page !== Page.Achievements ? "secondary" : "primary"}>Achievements</Typography>
-            </ListItemText>
-          </ListItem>
-          <ListItem
-            button
-            key={"Options"}
-            className={clsx({
-              [classes.active]: props.page === Page.Options,
-            })}
-            onClick={clickOptions}
-          >
-            <ListItemIcon>
-              <Tooltip title={!open ? "Options" : ""}>
-                <SettingsIcon color={props.page !== Page.Options ? "secondary" : "primary"} />
-              </Tooltip>
-            </ListItemIcon>
-            <ListItemText>
-              <Typography color={props.page !== Page.Options ? "secondary" : "primary"}>Options</Typography>
-            </ListItemText>
-          </ListItem>
-          {process.env.NODE_ENV === "development" && (
-            <ListItem
-              classes={{ root: classes.listitem }}
-              button
-              key={"Dev"}
-              className={clsx({
-                [classes.active]: props.page === Page.DevMenu,
-              })}
-              onClick={clickDev}
-            >
-              <ListItemIcon>
-                <Tooltip title={!open ? "Dev" : ""}>
-                  <DeveloperBoardIcon color={props.page !== Page.DevMenu ? "secondary" : "primary"} />
-                </Tooltip>
-              </ListItemIcon>
-              <ListItemText>
-                <Typography color={props.page !== Page.DevMenu ? "secondary" : "primary"}>Dev</Typography>
-              </ListItemText>
-            </ListItem>
-          )}
-        </Collapse>
+        <SidebarAccordion
+          key_="Help"
+          page={props.page}
+          clickPage={clickPage}
+          flash={flash}
+          icon={LiveHelpIcon}
+          sidebarOpen={open}
+          classes={classes}
+          items={[
+            { key_: Page.Milestones, icon: CheckIcon },
+            { key_: Page.Documentation, icon: HelpIcon },
+            { key_: Page.Achievements, icon: EmojiEventsIcon },
+            { key_: Page.Options, icon: SettingsIcon },
+            process.env.NODE_ENV === "development" && { key_: Page.DevMenu, icon: DeveloperBoardIcon },
+          ]}
+        />
+        <Typography id="sidebar-extra-hook-3"></Typography>
       </List>
     </Drawer>
   );

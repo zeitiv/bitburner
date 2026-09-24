@@ -4,25 +4,79 @@
 
 ## Corporation.bribe() method
 
-Bribe a faction
+Bribe a faction. You must satisfy these conditions:
 
-<b>Signature:</b>
+- The corporation valuation must be greater than or equal to a threshold. You can use [getCorporation](./bitburner.corporation.getcorporation.md) and [getConstants](./bitburner.corporation.getconstants.md) to get this information.
+
+- You must be a member of the specified faction.
+
+- The specified faction must offer at least 1 type of work. You can use [getFactionWorkTypes](./bitburner.singularity.getfactionworktypes.md) to get the list of work types of a faction.
+
+**Signature:**
 
 ```typescript
-bribe(factionName: string, amountCash: number, amountShares: number): boolean;
+bribe(factionName: FactionName, amountCash: number): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  factionName | string | Faction name |
-|  amountCash | number | Amount of money to bribe |
-|  amountShares | number | Amount of shares to bribe |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+factionName
+
+
+</td><td>
+
+[FactionName](./bitburner.factionname.md)
+
+
+</td><td>
+
+Faction name
+
+
+</td></tr>
+<tr><td>
+
+amountCash
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Amount of money to bribe
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 boolean
 
-True if successful, false if not
+true if successful, false if not
+
+## Remarks
+
+RAM cost: 20 GB
 

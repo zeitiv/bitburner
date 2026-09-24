@@ -1,215 +1,264 @@
-import React, { useState } from "react";
-
-import { Sleeve } from "../Sleeve";
-import { SleeveTaskType } from "../SleeveTaskTypesEnum";
-
+import { Box, Button, Paper, Tooltip, Typography } from "@mui/material";
+import React, { useEffect, useState } from "react";
+import { BladeburnerActionType, FactionWorkType, GymType, SpecialBladeburnerActionTypeForSleeve } from "@enums";
 import { CONSTANTS } from "../../../Constants";
-
-import { Crimes } from "../../../Crime/Crimes";
-
-import { numeralWrapper } from "../../../ui/numeralFormat";
-
-import { createProgressBarText } from "../../../utils/helpers/createProgressBarText";
-
-import { SleeveAugmentationsModal } from "./SleeveAugmentationsModal";
-import { TravelModal } from "./TravelModal";
-import { Money } from "../../../ui/React/Money";
-import { MoneyRate } from "../../../ui/React/MoneyRate";
-import { use } from "../../../ui/Context";
-import { ReputationRate } from "../../../ui/React/ReputationRate";
-import { StatsElement } from "../ui/StatsElement";
+import { Player } from "@player";
+import { formatPercent, formatInt } from "../../../ui/formatNumber";
+import { ProgressBar } from "../../../ui/React/Progress";
+import { Sleeve } from "../Sleeve";
 import { MoreStatsModal } from "./MoreStatsModal";
-import { MoreEarningsModal } from "../ui/MoreEarningsModal";
-import { TaskSelector } from "../ui/TaskSelector";
-import { FactionWorkType } from "../../../Faction/FactionWorkTypeEnum";
-import { StatsTable } from "../../../ui/React/StatsTable";
+import { SleeveAugmentationsModal } from "./SleeveAugmentationsModal";
+import { EarningsElement, StatsElement } from "./StatsElement";
+import { TaskSelector } from "./TaskSelector";
+import { TravelModal } from "./TravelModal";
+import { type SleeveWork, SleeveWorkType } from "../Work/Work";
+import { getEnumHelper } from "../../../utils/EnumHelper";
+import { getRecordEntries } from "../../../Types/Record";
 
-import Typography from "@mui/material/Typography";
-import Paper from "@mui/material/Paper";
-import Grid from "@mui/material/Grid";
-import Button from "@mui/material/Button";
-import Tooltip from "@mui/material/Tooltip";
+const factionWorkTypeDescriptions = {
+  [FactionWorkType.field]: "Field Work",
+  [FactionWorkType.hacking]: "Hacking Contracts",
+  [FactionWorkType.security]: "Security Work",
+};
 
-interface IProps {
+const gymTypeDescriptions: Record<GymType, string> = {
+  [GymType.strength]: "Train Strength",
+  [GymType.defense]: "Train Defense",
+  [GymType.dexterity]: "Train Dexterity",
+  [GymType.agility]: "Train Agility",
+};
+
+function getWorkDescription(sleeve: Sleeve, progress: number): string {
+  const work = sleeve.currentWork;
+  if (!work) return "This sleeve is currently idle.";
+  switch (work.type) {
+    case SleeveWorkType.COMPANY:
+      return `This sleeve is currently working your job at ${work.companyName}`;
+    case SleeveWorkType.SUPPORT:
+      return "This sleeve is currently supporting you in your bladeburner activities.";
+    case SleeveWorkType.CLASS:
+      return `This sleeve is currently ${work.isGym() ? "working out" : "studying"} at ${work.location}`;
+    case SleeveWorkType.RECOVERY:
+      return "This sleeve is currently set to focus on shock recovery. This causes the Sleeve's shock to decrease at a faster rate.";
+    case SleeveWorkType.SYNCHRO:
+      return "This sleeve is currently set to synchronize with the original consciousness. This causes the Sleeve's synchronization to increase.";
+    case SleeveWorkType.BLADEBURNER: {
+      const bladeburner = Player.bladeburner;
+      let estimatedSuccessChance;
+      if (bladeburner) {
+        const action = bladeburner.getActionFromTypeAndName(work.actionId.type, work.actionId.name);
+        if (action) {
+          const [minChance, maxChance] = action.getSuccessRange(bladeburner, sleeve);
+          estimatedSuccessChance =
+            formatPercent(minChance, 1) + (minChance === maxChance ? "" : ` ~ ${formatPercent(maxChance, 1)}`);
+        }
+      }
+      return (
+        `This sleeve is currently attempting to perform ${work.actionId.name}.\n\n` +
+        (estimatedSuccessChance ? `Estimated success chance: ${estimatedSuccessChance}\n\n` : "") +
+        `Tasks Completed: ${formatInt(work.tasksCompleted)}\n \n` +
+        `Progress: ${formatPercent(progress)}`
+      );
+    }
+    case SleeveWorkType.CRIME: {
+      const crime = work.getCrime();
+      return (
+        `This sleeve is currently attempting ${crime.workName} (Success Rate: ${formatPercent(
+          crime.successRate(sleeve),
+        )}).\n\nTasks Completed: ${formatInt(work.tasksCompleted)} 
+		\n` + `Progress: ${formatPercent(progress)}`
+      );
+    }
+    case SleeveWorkType.FACTION: {
+      return `This sleeve is currently doing ${factionWorkTypeDescriptions[work.factionWorkType]} for ${
+        work.factionName
+      }.`;
+    }
+    case SleeveWorkType.INFILTRATE:
+      return (
+        "This sleeve is currently attempting to infiltrate synthoid communities to generate additional contracts and operations.\nThis activity is less efficient the more sleeves are assigned to it.\n\n" +
+        `Progress: ${formatPercent(progress)}`
+      );
+  }
+}
+
+function calculateABC(work: SleeveWork | null): [string, string, string] {
+  if (work === null) {
+    return ["Idle", "------", "------"];
+  }
+  switch (work.type) {
+    case SleeveWorkType.COMPANY:
+      return ["Work for Company", work.companyName, "------"];
+    case SleeveWorkType.FACTION: {
+      return ["Work for Faction", work.factionName, factionWorkTypeDescriptions[work.factionWorkType]];
+    }
+    case SleeveWorkType.BLADEBURNER:
+      if (work.actionId.type === BladeburnerActionType.Contract) {
+        return [
+          "Perform Bladeburner Actions",
+          SpecialBladeburnerActionTypeForSleeve.TakeOnContracts,
+          work.actionId.name,
+        ];
+      }
+      return ["Perform Bladeburner Actions", work.actionId.name, "------"];
+    case SleeveWorkType.CLASS: {
+      if (!work.isGym()) {
+        return ["Take University Course", work.classType, work.location];
+      }
+      return ["Workout at Gym", gymTypeDescriptions[work.classType as GymType], work.location];
+    }
+    case SleeveWorkType.CRIME:
+      return ["Commit Crime", getEnumHelper("CrimeType").getMember(work.crimeType, { alwaysMatch: true }), "------"];
+    case SleeveWorkType.SUPPORT:
+      return ["Perform Bladeburner Actions", SpecialBladeburnerActionTypeForSleeve.SupportMainSleeve, "------"];
+    case SleeveWorkType.INFILTRATE:
+      return ["Perform Bladeburner Actions", SpecialBladeburnerActionTypeForSleeve.InfiltrateSynthoids, "------"];
+    case SleeveWorkType.RECOVERY:
+      return ["Shock Recovery", "------", "------"];
+    case SleeveWorkType.SYNCHRO:
+      return ["Synchronize", "------", "------"];
+  }
+}
+
+interface SleeveElemProps {
   sleeve: Sleeve;
   rerender: () => void;
 }
-
-export function SleeveElem(props: IProps): React.ReactElement {
-  const player = use.Player();
+export function SleeveElem(props: SleeveElemProps): React.ReactElement {
   const [statsOpen, setStatsOpen] = useState(false);
-  const [earningsOpen, setEarningsOpen] = useState(false);
   const [travelOpen, setTravelOpen] = useState(false);
   const [augmentationsOpen, setAugmentationsOpen] = useState(false);
 
-  const [abc, setABC] = useState(["------", "------", "------"]);
+  /**
+   * "abc" contains values of 3 dropdown inputs. It will be set when:
+   * - The player selects a task and its options.
+   * - The sleeve's current task is set by non-UI things (e.g., NS API).
+   */
+  const [abc, setABC] = useState(calculateABC(props.sleeve.currentWork));
+
+  /**
+   * Update abc if the sleeve's current task is set by non-UI things.
+   */
+  useEffect(() => {
+    setABC(calculateABC(props.sleeve.currentWork));
+  }, [props.sleeve.currentWork]);
 
   function setTask(): void {
-    props.sleeve.resetTaskStatus(); // sets to idle
     switch (abc[0]) {
-      case "------":
+      case "Idle":
+        props.sleeve.stopWork();
         break;
       case "Work for Company":
-        props.sleeve.workForCompany(player, abc[1]);
+        if (getEnumHelper("CompanyName").isMember(abc[1])) {
+          props.sleeve.workForCompany(abc[1]);
+        } else {
+          console.error(`Invalid company name in setSleeveTask: ${abc[1]}`);
+        }
         break;
       case "Work for Faction":
-        props.sleeve.workForFaction(player, abc[1], abc[2]);
+        if (getEnumHelper("FactionName").isMember(abc[1])) {
+          for (const [factionWorkType, description] of getRecordEntries(factionWorkTypeDescriptions)) {
+            if (description === abc[2]) {
+              props.sleeve.workForFaction(abc[1], factionWorkType);
+              break;
+            }
+          }
+        } else {
+          console.error(`Invalid faction name in setSleeveTask: ${abc[1]}`);
+        }
         break;
       case "Commit Crime":
-        props.sleeve.commitCrime(player, abc[1]);
+        if (getEnumHelper("CrimeType").isMember(abc[1])) {
+          props.sleeve.commitCrime(abc[1]);
+        }
         break;
       case "Take University Course":
-        props.sleeve.takeUniversityCourse(player, abc[2], abc[1]);
+        if (getEnumHelper("UniversityClassType").isMember(abc[1])) {
+          props.sleeve.takeUniversityCourse(abc[2], abc[1]);
+        }
         break;
       case "Workout at Gym":
-        props.sleeve.workoutAtGym(player, abc[2], abc[1]);
+        for (const [gymType, description] of getRecordEntries(gymTypeDescriptions)) {
+          if (description === abc[1]) {
+            props.sleeve.workoutAtGym(abc[2], gymType);
+            break;
+          }
+        }
+        break;
+      case "Perform Bladeburner Actions":
+        props.sleeve.bladeburner(abc[1], abc[2]);
         break;
       case "Shock Recovery":
-        props.sleeve.shockRecovery(player);
+        props.sleeve.shockRecovery();
         break;
       case "Synchronize":
-        props.sleeve.synchronize(player);
+        props.sleeve.synchronize();
         break;
       default:
         console.error(`Invalid/Unrecognized taskValue in setSleeveTask(): ${abc[0]}`);
     }
     props.rerender();
   }
-
-  let desc = <></>;
-  switch (props.sleeve.currentTask) {
-    case SleeveTaskType.Idle:
-      desc = <>This sleeve is currently idle</>;
-      break;
-    case SleeveTaskType.Company:
-      desc = <>This sleeve is currently working your job at {props.sleeve.currentTaskLocation}.</>;
-      break;
-    case SleeveTaskType.Faction: {
-      let doing = "nothing";
-      switch (props.sleeve.factionWorkType) {
-        case FactionWorkType.Field:
-          doing = "Field work";
-          break;
-        case FactionWorkType.Hacking:
-          doing = "Hacking contracts";
-          break;
-        case FactionWorkType.Security:
-          doing = "Security work";
-          break;
-      }
-      desc = (
-        <>
-          This sleeve is currently doing {doing} for {props.sleeve.currentTaskLocation}.
-        </>
-      );
-      break;
-    }
-    case SleeveTaskType.Crime: {
-      const crime = Object.values(Crimes).find((crime) => crime.name === props.sleeve.crimeType);
-      if (!crime) throw new Error("crime should not be undefined");
-      desc = (
-        <>
-          This sleeve is currently attempting to {crime.type} (Success Rate:{" "}
-          {numeralWrapper.formatPercentage(crime.successRate(props.sleeve))}).
-        </>
-      );
-      break;
-    }
-    case SleeveTaskType.Class:
-      desc = <>This sleeve is currently studying/taking a course at {props.sleeve.currentTaskLocation}.</>;
-      break;
-    case SleeveTaskType.Gym:
-      desc = <>This sleeve is currently working out at {props.sleeve.currentTaskLocation}.</>;
-      break;
-    case SleeveTaskType.Recovery:
-      desc = (
-        <>
-          This sleeve is currently set to focus on shock recovery. This causes the Sleeve's shock to decrease at a
-          faster rate.
-        </>
-      );
-      break;
-    case SleeveTaskType.Synchro:
-      desc = (
-        <>
-          This sleeve is currently set to synchronize with the original consciousness. This causes the Sleeve's
-          synchronization to increase.
-        </>
-      );
-      break;
-    default:
-      console.error(`Invalid/Unrecognized taskValue in updateSleeveTaskDescription(): ${abc[0]}`);
-  }
-
-  let data: any[][] = [];
-  if (props.sleeve.currentTask === SleeveTaskType.Crime) {
-    data = [
-      [`Money`, <Money money={parseFloat(props.sleeve.currentTaskLocation)} />, `(on success)`],
-      [`Hacking Exp`, numeralWrapper.formatExp(props.sleeve.gainRatesForTask.hack), `(2x on success)`],
-      [`Strength Exp`, numeralWrapper.formatExp(props.sleeve.gainRatesForTask.str), `(2x on success)`],
-      [`Defense Exp`, numeralWrapper.formatExp(props.sleeve.gainRatesForTask.def), `(2x on success)`],
-      [`Dexterity Exp`, numeralWrapper.formatExp(props.sleeve.gainRatesForTask.dex), `(2x on success)`],
-      [`Agility Exp`, numeralWrapper.formatExp(props.sleeve.gainRatesForTask.agi), `(2x on success)`],
-      [`Charisma Exp`, numeralWrapper.formatExp(props.sleeve.gainRatesForTask.cha), `(2x on success)`],
-    ];
-  } else {
-    data = [
-      [`Money:`, <MoneyRate money={5 * props.sleeve.gainRatesForTask.money} />],
-      [`Hacking Exp:`, `${numeralWrapper.formatExp(5 * props.sleeve.gainRatesForTask.hack)} / s`],
-      [`Strength Exp:`, `${numeralWrapper.formatExp(5 * props.sleeve.gainRatesForTask.str)} / s`],
-      [`Defense Exp:`, `${numeralWrapper.formatExp(5 * props.sleeve.gainRatesForTask.def)} / s`],
-      [`Dexterity Exp:`, `${numeralWrapper.formatExp(5 * props.sleeve.gainRatesForTask.dex)} / s`],
-      [`Agility Exp:`, `${numeralWrapper.formatExp(5 * props.sleeve.gainRatesForTask.agi)} / s`],
-      [`Charisma Exp:`, `${numeralWrapper.formatExp(5 * props.sleeve.gainRatesForTask.cha)} / s`],
-    ];
-    if (props.sleeve.currentTask === SleeveTaskType.Company || props.sleeve.currentTask === SleeveTaskType.Faction) {
-      const repGain: number = props.sleeve.getRepGain(player);
-      data.push([`Reputation:`, <ReputationRate reputation={5 * repGain} />]);
+  let progress = 0;
+  let percentBar = <></>;
+  const work = props.sleeve.currentWork;
+  if (work) {
+    switch (work.type) {
+      case SleeveWorkType.BLADEBURNER:
+      case SleeveWorkType.CRIME:
+      case SleeveWorkType.INFILTRATE:
+        progress = work.cyclesWorked / work.cyclesNeeded(props.sleeve);
+        percentBar = <ProgressBar variant="determinate" value={progress * 100} color="primary" />;
     }
   }
-
+  const desc = getWorkDescription(props.sleeve, progress);
+  const checkingPreconditionsResult = props.sleeve.checkPreconditionsOfPurchasingAugmentations();
   return (
     <>
-      <Grid container component={Paper}>
-        <Grid item xs={3}>
+      <Paper sx={{ p: 1, display: "grid", gridTemplateColumns: "1fr 1fr", width: "auto", gap: 1 }}>
+        <span>
           <StatsElement sleeve={props.sleeve} />
-          <Button onClick={() => setStatsOpen(true)}>More Stats</Button>
-          <Tooltip title={player.money < CONSTANTS.TravelCost ? <Typography>Insufficient funds</Typography> : ""}>
-            <span>
-              <Button onClick={() => setTravelOpen(true)} disabled={player.money < CONSTANTS.TravelCost}>
-                Travel
-              </Button>
-            </span>
-          </Tooltip>
-          <Tooltip
-            title={props.sleeve.shock < 100 ? <Typography>Unlocked when sleeve has fully recovered</Typography> : ""}
-          >
-            <span>
-              <Button onClick={() => setAugmentationsOpen(true)} disabled={props.sleeve.shock < 100}>
-                Manage Augmentations
-              </Button>
-            </span>
-          </Tooltip>
-        </Grid>
-        <Grid item xs={5}>
-          <TaskSelector player={player} sleeve={props.sleeve} setABC={setABC} />
-          <Typography>{desc}</Typography>
-          <Typography>
-            {props.sleeve.currentTask === SleeveTaskType.Crime &&
-              createProgressBarText({
-                progress: props.sleeve.currentTaskTime / props.sleeve.currentTaskMaxTime,
-                totalTicks: 25,
-              })}
-          </Typography>
-          <Button onClick={setTask}>Set Task</Button>
-        </Grid>
-        <Grid item xs={4}>
-          <StatsTable title="Earnings (Pre-Synchronization)" rows={data} />
-          <Button onClick={() => setEarningsOpen(true)}>More Earnings Info</Button>
-        </Grid>
-      </Grid>
+          <Box display="grid" sx={{ gridTemplateColumns: "1fr 1fr", width: "100%" }}>
+            <Button onClick={() => setStatsOpen(true)}>More Stats</Button>
+            <Tooltip title={Player.money < CONSTANTS.TravelCost ? <Typography>Insufficient funds</Typography> : ""}>
+              <span>
+                <Button
+                  onClick={() => setTravelOpen(true)}
+                  disabled={Player.money < CONSTANTS.TravelCost}
+                  sx={{ width: "100%", height: "100%" }}
+                >
+                  Travel
+                </Button>
+              </span>
+            </Tooltip>
+            <Tooltip
+              title={
+                !checkingPreconditionsResult.success && <Typography>{checkingPreconditionsResult.message}</Typography>
+              }
+            >
+              <span>
+                <Button
+                  onClick={() => setAugmentationsOpen(true)}
+                  disabled={!checkingPreconditionsResult.success}
+                  sx={{ width: "100%", height: "100%" }}
+                >
+                  Manage Augmentations
+                </Button>
+              </span>
+            </Tooltip>
+          </Box>
+        </span>
+        <span>
+          <EarningsElement sleeve={props.sleeve} />
+          <TaskSelector sleeve={props.sleeve} abc={abc} setABC={setABC} />
+          <Button onClick={setTask} sx={{ width: "100%" }}>
+            Set Task
+          </Button>
+          <Typography whiteSpace={"pre-wrap"}>{desc}</Typography>
+          {percentBar}
+        </span>
+      </Paper>
       <MoreStatsModal open={statsOpen} onClose={() => setStatsOpen(false)} sleeve={props.sleeve} />
-      <MoreEarningsModal open={earningsOpen} onClose={() => setEarningsOpen(false)} sleeve={props.sleeve} />
       <TravelModal
         open={travelOpen}
         onClose={() => setTravelOpen(false)}

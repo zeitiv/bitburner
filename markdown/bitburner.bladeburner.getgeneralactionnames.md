@@ -6,20 +6,20 @@
 
 List all general actions.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getGeneralActionNames(): string[];
+getGeneralActionNames(): BladeburnerGeneralActionName[];
 ```
-<b>Returns:</b>
+**Returns:**
 
-string\[\]
+[BladeburnerGeneralActionName](./bitburner.bladeburnergeneralactionname.md)<!-- -->\[\]
 
 Array of strings containing the names of all general Bladeburner actions.
 
 ## Remarks
 
-RAM cost: 0.4 GB
+RAM cost: 0 GB
 
 Returns an array of strings containing the names of all general Bladeburner actions.
 

@@ -4,7 +4,9 @@
 
 ## GangMemberInfo.upgrades property
 
-<b>Signature:</b>
+List of all non-Augmentation Equipment owned by gang member
+
+**Signature:**
 
 ```typescript
 upgrades: string[];

@@ -6,19 +6,49 @@
 
 Attempt to write data to the port.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-tryWrite(value: string | number): boolean;
+tryWrite(value: any): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  value | string \| number |  |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+value
+
+
+</td><td>
+
+any
+
+
+</td><td>
+
+Data to write, it's cloned with structuredClone().
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 boolean
 

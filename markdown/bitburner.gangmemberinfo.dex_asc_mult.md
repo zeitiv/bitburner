@@ -4,7 +4,9 @@
 
 ## GangMemberInfo.dex\_asc\_mult property
 
-<b>Signature:</b>
+Dexterity multiplier from ascensions
+
+**Signature:**
 
 ```typescript
 dex_asc_mult: number;

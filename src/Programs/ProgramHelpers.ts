@@ -1,23 +1,23 @@
-import { Programs } from "./Programs";
+import { Player } from "@player";
 import { Program } from "./Program";
-
-import { IPlayer } from "../PersonObjects/IPlayer";
+import { Programs } from "./Programs";
+import { getRecordEntries } from "../Types/Record";
 
 //Returns the programs this player can create.
-export function getAvailableCreatePrograms(player: IPlayer): Program[] {
+export function getAvailableCreatePrograms(): Program[] {
   const programs: Program[] = [];
-  for (const key of Object.keys(Programs)) {
+  for (const [programName, program] of getRecordEntries(Programs)) {
+    const create = program.create;
     // Non-creatable program
-    const create = Programs[key].create;
     if (create == null) continue;
 
     // Already has program
-    if (player.hasProgram(Programs[key].name)) continue;
+    if (Player.hasProgram(programName)) continue;
 
     // Does not meet requirements
-    if (!create.req(player)) continue;
+    if (!create.req()) continue;
 
-    programs.push(Programs[key]);
+    programs.push(program);
   }
 
   return programs;

@@ -6,29 +6,93 @@
 
 Set a sleeve to work for a faction.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-setToFactionWork(sleeveNumber: number, factionName: string, factionWorkType: string): boolean;
+setToFactionWork(
+    sleeveNumber: number,
+    factionName: FactionName,
+    factionWorkType: FactionWorkType,
+  ): boolean | undefined;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  sleeveNumber | number | Index of the sleeve to work for the faction. |
-|  factionName | string | Name of the faction to work for. |
-|  factionWorkType | string | Name of the action to perform for this faction. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
 
-boolean
 
-True if the sleeve started working on this faction, false otherwise.
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+sleeveNumber
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Index of the sleeve to work for the faction.
+
+
+</td></tr>
+<tr><td>
+
+factionName
+
+
+</td><td>
+
+[FactionName](./bitburner.factionname.md)
+
+
+</td><td>
+
+Name of the faction to work for.
+
+
+</td></tr>
+<tr><td>
+
+factionWorkType
+
+
+</td><td>
+
+[FactionWorkType](./bitburner.factionworktype.md)
+
+
+</td><td>
+
+Name of the action to perform for this faction.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
+
+boolean \| undefined
+
+True if the sleeve started working for this faction, false otherwise. Can also throw on errors.
 
 ## Remarks
 
 RAM cost: 4 GB
 
-Return a boolean indicating whether or not the sleeve started working or this faction.
+Return a boolean indicating whether or not the sleeve started working for a faction.
 

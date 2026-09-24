@@ -1,111 +1,66 @@
-import { ITerminal } from "../ITerminal";
-import { IRouter } from "../../ui/Router";
-import { IPlayer } from "../../PersonObjects/IPlayer";
+import { Terminal } from "../../Terminal";
 import { BaseServer } from "../../Server/BaseServer";
-import { GetServer } from "../../Server/AllServers";
-import { isScriptFilename } from "../../Script/isScriptFilename";
+import { GetReachableServer } from "../../Server/AllServers";
+import { hasScriptExtension } from "../../Paths/ScriptFilePath";
+import { hasTextExtension } from "../../Paths/TextFilePath";
+import { isMember } from "../../utils/EnumHelper";
+import { LiteratureName } from "@enums";
+import { ContentFile } from "../../Paths/ContentFile";
 
-export function scp(
-  terminal: ITerminal,
-  router: IRouter,
-  player: IPlayer,
-  server: BaseServer,
-  args: (string | number | boolean)[],
-): void {
-  try {
-    if (args.length !== 2) {
-      terminal.error("Incorrect usage of scp command. Usage: scp [file] [destination hostname]");
-      return;
-    }
-    const scriptname = terminal.getFilepath(args[0] + "");
-    if (!scriptname.endsWith(".lit") && !isScriptFilename(scriptname) && !scriptname.endsWith(".txt")) {
-      terminal.error("scp only works for scripts, text files (.txt), and literature files (.lit)");
-      return;
-    }
+export function scp(args: (string | number | boolean)[], server: BaseServer): void {
+  if (args.length < 2) {
+    return Terminal.error("Incorrect usage of scp command. Usage: scp [source filename] [destination hostname]");
+  }
 
-    const destServer = GetServer(args[1] + "");
-    if (destServer == null) {
-      terminal.error(`Invalid destination. ${args[1]} not found`);
-      return;
-    }
+  // Validate destination server
+  const destHostname = String(args.pop());
+  const destServer = GetReachableServer(destHostname);
+  if (!destServer) return Terminal.error(`Invalid destination server: ${destHostname}`);
 
-    // Scp for lit files
-    if (scriptname.endsWith(".lit")) {
-      let found = false;
-      for (let i = 0; i < server.messages.length; ++i) {
-        if (server.messages[i] == scriptname) {
-          found = true;
-          break;
-        }
+  // Validate filepaths
+  const filenames = args.map(String);
+  const files: (LiteratureName | ContentFile)[] = [];
+
+  // File validation loop, handle all errors before copying any files
+  for (const filename of filenames) {
+    const path = Terminal.getFilepath(filename);
+    if (!path) return Terminal.error(`Invalid file path: ${filename}`);
+    // Validate .lit files
+    if (path.endsWith(".lit")) {
+      if (!isMember("LiteratureName", path) || !server.messages.includes(path)) {
+        return Terminal.error(`scp failed: ${path} does not exist on server ${server.hostname}`);
       }
+      files.push(path);
+      continue;
+    }
+    // Error for invalid filetype
+    if (!hasScriptExtension(path) && !hasTextExtension(path)) {
+      return Terminal.error(
+        `scp failed: ${path} has invalid extension. scp only works for scripts (.js, .jsx, .ts, .tsx), text files (.txt, .json, .css), and literature files (.lit)`,
+      );
+    }
+    const sourceContentFile = server.getContentFile(path);
+    if (!sourceContentFile) return Terminal.error(`scp failed: ${path} does not exist on server ${server.hostname}`);
+    files.push(sourceContentFile);
+  }
 
-      if (!found) {
-        return terminal.error("No such file exists!");
+  // Actually copy the files (no more errors possible)
+  for (const file of files) {
+    // Lit files, entire "file" is just the name
+    if (isMember("LiteratureName", file)) {
+      if (destServer.messages.includes(file)) {
+        Terminal.print(`${file} was already on ${destHostname}, file skipped`);
+        continue;
       }
-
-      for (let i = 0; i < destServer.messages.length; ++i) {
-        if (destServer.messages[i] === scriptname) {
-          terminal.print(scriptname + " copied over to " + destServer.hostname);
-          return; // Already exists
-        }
-      }
-      destServer.messages.push(scriptname);
-      return terminal.print(scriptname + " copied over to " + destServer.hostname);
+      destServer.messages.push(file);
+      Terminal.print(`${file} copied to ${destHostname}`);
+      continue;
     }
 
-    // Scp for txt files
-    if (scriptname.endsWith(".txt")) {
-      let txtFile = null;
-      for (let i = 0; i < server.textFiles.length; ++i) {
-        if (server.textFiles[i].fn === scriptname) {
-          txtFile = server.textFiles[i];
-          break;
-        }
-      }
-
-      if (txtFile === null) {
-        return terminal.error("No such file exists!");
-      }
-
-      const tRes = destServer.writeToTextFile(txtFile.fn, txtFile.text);
-      if (!tRes.success) {
-        terminal.error("scp failed");
-        return;
-      }
-      if (tRes.overwritten) {
-        terminal.print(`WARNING: ${scriptname} already exists on ${destServer.hostname} and will be overwriten`);
-        terminal.print(`${scriptname} overwritten on ${destServer.hostname}`);
-        return;
-      }
-      terminal.print(`${scriptname} copied over to ${destServer.hostname}`);
-      return;
-    }
-
-    // Get the current script
-    let sourceScript = null;
-    for (let i = 0; i < server.scripts.length; ++i) {
-      if (scriptname == server.scripts[i].filename) {
-        sourceScript = server.scripts[i];
-        break;
-      }
-    }
-    if (sourceScript == null) {
-      terminal.error("scp failed. No such script exists");
-      return;
-    }
-
-    const sRes = destServer.writeToScriptFile(player, scriptname, sourceScript.code);
-    if (!sRes.success) {
-      terminal.error(`scp failed`);
-      return;
-    }
-    if (sRes.overwritten) {
-      terminal.print(`WARNING: ${scriptname} already exists on ${destServer.hostname} and will be overwritten`);
-      terminal.print(`${scriptname} overwritten on ${destServer.hostname}`);
-      return;
-    }
-    terminal.print(`${scriptname} copied over to ${destServer.hostname}`);
-  } catch (e) {
-    terminal.error(e + "");
+    // Content files (script and txt)
+    const { filename, content } = file;
+    const { overwritten } = destServer.writeToContentFile(filename, content);
+    if (overwritten) Terminal.warn(`${filename} already existed on ${destHostname} and was overwritten`);
+    else Terminal.print(`${filename} copied to ${destHostname}`);
   }
 }

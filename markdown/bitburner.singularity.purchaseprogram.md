@@ -6,23 +6,53 @@
 
 Purchase a program from the dark web.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-purchaseProgram(programName: string): boolean;
+purchaseProgram(programName: ProgramName): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  programName | string | Name of program to purchase. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+programName
+
+
+</td><td>
+
+[ProgramName](./bitburner.programname.md)
+
+
+</td><td>
+
+Name of program to purchase.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 boolean
 
-True if the specified program is purchased, and false otherwise.
+True if the specified program is purchased or if you already own it, and false otherwise.
 
 ## Remarks
 
@@ -30,19 +60,12 @@ RAM cost: 2 GB \* 16/4/1
 
 This function allows you to automatically purchase programs. You MUST have a TOR router in order to use this function. The cost of purchasing programs using this function is the same as if you were purchasing them through the Dark Web using the Terminal buy command.
 
-## Example 1
+## Example
 
 
-```ts
-// NS1
-purchaseProgram("brutessh.exe");
-```
-
-## Example 2
-
-
-```ts
-// NS2
-ns.purchaseProgram("brutessh.exe");
+```js
+const programName = ns.enums.ProgramName.bruteSsh;
+const success = ns.singularity.purchaseProgram(programName);
+if (!success) ns.tprint(`ERROR: Failed to purchase ${programName}`);
 ```
 

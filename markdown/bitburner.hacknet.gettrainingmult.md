@@ -4,14 +4,14 @@
 
 ## Hacknet.getTrainingMult() method
 
-Get the multipler to training.
+Get the multiplier to training.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 getTrainingMult(): number;
 ```
-<b>Returns:</b>
+**Returns:**
 
 number
 
@@ -19,7 +19,7 @@ Multiplier.
 
 ## Remarks
 
-RAM cost: 0 GB
+RAM cost: 0.5 GB
 
 This function is only applicable for Hacknet Servers (the upgraded version of a Hacknet Node).
 

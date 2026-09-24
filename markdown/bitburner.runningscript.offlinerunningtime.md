@@ -4,7 +4,9 @@
 
 ## RunningScript.offlineRunningTime property
 
-<b>Signature:</b>
+Number of seconds that the script has been running offline
+
+**Signature:**
 
 ```typescript
 offlineRunningTime: number;

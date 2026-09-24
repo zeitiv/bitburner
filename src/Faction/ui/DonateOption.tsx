@@ -1,77 +1,55 @@
-/**
- * React component for a donate option on the Faction UI
- */
 import React, { useState } from "react";
 
-import { CONSTANTS } from "../../Constants";
-import { Faction } from "../../Faction/Faction";
-import { IPlayer } from "../../PersonObjects/IPlayer";
-import { repFromDonation } from "../formulas/donation";
+import { Faction } from "../Faction";
+import { Player } from "@player";
+import { canDonate, donate, repFromDonation } from "../formulas/donation";
 import { Favor } from "../../ui/React/Favor";
 
 import { Money } from "../../ui/React/Money";
 import { Reputation } from "../../ui/React/Reputation";
 
-import { numeralWrapper } from "../../ui/numeralFormat";
-
 import { dialogBoxCreate } from "../../ui/React/DialogBox";
-import { MathJaxWrapper } from "../../MathJaxWrapper";
 
 import Typography from "@mui/material/Typography";
 import Paper from "@mui/material/Paper";
 import Button from "@mui/material/Button";
-import TextField from "@mui/material/TextField";
+import { NumberInput } from "../../ui/React/NumberInput";
+import MathNotation from "../../Documentation/data/MathNotation.json";
+import { MathNotationOutput } from "../../Documentation/ui/MathNotationOutput";
 
-type IProps = {
+type DonateOptionProps = {
   faction: Faction;
   disabled: boolean;
   favorToDonate: number;
-  p: IPlayer;
   rerender: () => void;
 };
 
-export function DonateOption(props: IProps): React.ReactElement {
-  const [donateAmt, setDonateAmt] = useState<number | null>(null);
-  const digits = (CONSTANTS.DonateMoneyToRepDivisor + "").length - 1;
+/** React component for a donate option on the Faction UI */
+export function DonateOption({ faction, favorToDonate, disabled, rerender }: DonateOptionProps): React.ReactElement {
+  const [donateAmt, setDonateAmt] = useState<number>(NaN);
 
-  function canDonate(): boolean {
-    if (donateAmt === null) return false;
-    if (isNaN(donateAmt) || donateAmt <= 0) return false;
-    if (props.p.money < donateAmt) return false;
-    return true;
-  }
-
-  function onChange(event: React.ChangeEvent<HTMLInputElement>): void {
-    const amt = numeralWrapper.parseMoney(event.target.value);
-    if (event.target.value === "" || isNaN(amt)) setDonateAmt(null);
-    else setDonateAmt(amt);
-  }
-
-  function donate(): void {
-    const fac = props.faction;
-    const amt = donateAmt;
-    if (amt === null) return;
-    if (!canDonate()) return;
-    props.p.loseMoney(amt, "other");
-    const repGain = repFromDonation(amt, props.p);
-    props.faction.playerReputation += repGain;
-    dialogBoxCreate(
-      <>
-        You just donated <Money money={amt} /> to {fac.name} to gain <Reputation reputation={repGain} /> reputation.
-      </>,
-    );
-    props.rerender();
+  function onDonate(): void {
+    const repGain = donate(donateAmt, faction);
+    if (repGain > 0) {
+      dialogBoxCreate(
+        <>
+          You just donated <Money money={donateAmt} /> to {faction.name} to gain <Reputation reputation={repGain} />{" "}
+          reputation.
+        </>,
+      );
+      rerender();
+    }
   }
 
   function Status(): React.ReactElement {
-    if (donateAmt === null) return <></>;
-    if (!canDonate()) {
-      if (props.p.money < donateAmt) return <Typography>Insufficient funds</Typography>;
+    if (isNaN(donateAmt)) return <></>;
+    if (!canDonate(donateAmt)) {
+      if (Player.money < donateAmt) return <Typography>Insufficient funds</Typography>;
       return <Typography>Invalid donate amount entered!</Typography>;
     }
     return (
       <Typography>
-        This donation will result in <Reputation reputation={repFromDonation(donateAmt, props.p)} /> reputation gain
+        This donation will result in <Reputation reputation={repFromDonation(donateAmt, Player)} /> reputation gain
       </Typography>
     );
   }
@@ -79,27 +57,25 @@ export function DonateOption(props: IProps): React.ReactElement {
   return (
     <Paper sx={{ my: 1, p: 1 }}>
       <Status />
-      {props.disabled ? (
+      {disabled ? (
         <Typography>
-          Unlock donations at <Favor favor={props.favorToDonate} /> favor with {props.faction.name}
+          Unlock donations at <Favor favor={favorToDonate} /> favor with {faction.name}
         </Typography>
       ) : (
         <>
-          <TextField
-            onChange={onChange}
+          <NumberInput
+            onChange={setDonateAmt}
             placeholder={"Donation amount"}
-            disabled={props.disabled}
+            disabled={disabled}
             InputProps={{
               endAdornment: (
-                <Button onClick={donate} disabled={props.disabled || !canDonate()}>
+                <Button onClick={onDonate} disabled={disabled || !canDonate(donateAmt)}>
                   donate
                 </Button>
               ),
             }}
           />
-          <Typography>
-            <MathJaxWrapper>{`\\(reputation = \\frac{\\text{donation amount} \\cdot \\text{reputation multiplier}}{10^{${digits}}}\\)`}</MathJaxWrapper>
-          </Typography>
+          <MathNotationOutput notation={MathNotation.RepDonation} />
         </>
       )}
     </Paper>

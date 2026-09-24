@@ -3,17 +3,14 @@
 // Each Node in the Research Trees only holds the name(s) of Research,
 // not an actual Research object. The name can be used to obtain a reference
 // to the corresponding Research object using the ResearchMap
+import { CorpResearchName } from "@nsdefs";
 import { Research } from "./Research";
 import { ResearchMap } from "./ResearchMap";
-
-import { IMap } from "../types";
-
-import { numeralWrapper } from "../ui/numeralFormat";
 
 interface IConstructorParams {
   children?: Node[];
   cost: number;
-  text: string;
+  researchName: CorpResearchName;
   parent?: Node | null;
 }
 
@@ -36,14 +33,10 @@ export class Node {
   parent: Node | null = null;
 
   // Name of the Research held in this Node
-  text = "";
+  researchName: CorpResearchName;
 
-  constructor(p: IConstructorParams = { cost: 0, text: "" }) {
-    if (ResearchMap[p.text] == null) {
-      throw new Error(`Invalid Research name used when constructing ResearchTree Node: ${p.text}`);
-    }
-
-    this.text = p.text;
+  constructor(p: IConstructorParams) {
+    this.researchName = p.researchName;
     this.cost = p.cost;
 
     if (p.children && p.children.length > 0) {
@@ -60,51 +53,17 @@ export class Node {
     n.parent = this;
   }
 
-  // Return an object that describes a TreantJS-compatible markup/config for this Node
-  // See: http://fperucic.github.io/treant-js/
-  createTreantMarkup(): any {
-    const childrenArray = [];
-    for (let i = 0; i < this.children.length; ++i) {
-      childrenArray.push(this.children[i].createTreantMarkup());
-    }
-
-    // Determine what css class this Node should have in the diagram
-    let htmlClass = "tooltip";
-    if (this.researched) {
-      htmlClass += " researched";
-    } else if (this.parent && this.parent.researched === false) {
-      htmlClass += " locked";
-    } else {
-      htmlClass += " unlocked";
-    }
-
-    const research: Research | null = ResearchMap[this.text];
-    const sanitizedName: string = this.text.replace(/\s/g, "");
-    return {
-      children: childrenArray,
-      HTMLclass: htmlClass,
-      innerHTML:
-        `<div id="${sanitizedName}-corp-research-click-listener">` +
-        `${this.text}<br>${numeralWrapper.format(this.cost, "0,0")} Scientific Research` +
-        `<span class="tooltiptext">` +
-        `${research.desc}` +
-        `</span>` +
-        `</div>`,
-      text: { name: this.text },
-    };
-  }
-
   // Recursive function for finding a Node with the specified text
-  findNode(text: string): Node | null {
+  findNode(name: CorpResearchName): Node | null {
     // Is this the Node?
-    if (this.text === text) {
+    if (this.researchName === name) {
       return this;
     }
 
-    // Recursively search chilren
+    // Recursively search children
     let res = null;
     for (let i = 0; i < this.children.length; ++i) {
-      res = this.children[i].findNode(text);
+      res = this.children[i].findNode(name);
       if (res != null) {
         return res;
       }
@@ -122,31 +81,14 @@ export class Node {
 // The root node in a Research Tree must always be the "Hi-Tech R&D Laboratory"
 export class ResearchTree {
   // Object containing names of all acquired Research by name
-  researched: IMap<boolean> = {};
+  researched = new Set<CorpResearchName>();
 
   // Root Node
   root: Node | null = null;
 
-  // Return an object that contains a Tree markup for TreantJS (using the JSON approach)
-  // See: http://fperucic.github.io/treant-js/
-  createTreantMarkup(): any {
-    if (this.root == null) {
-      return {};
-    }
-
-    const treeMarkup = this.root.createTreantMarkup();
-
-    return {
-      chart: {
-        container: "",
-      },
-      nodeStructure: treeMarkup,
-    };
-  }
-
   // Gets an array with the 'text' values of ALL Nodes in the Research Tree
-  getAllNodes(): string[] {
-    const res: string[] = [];
+  getAllNodes(): CorpResearchName[] {
+    const res: CorpResearchName[] = [];
     const queue: Node[] = [];
 
     if (this.root == null) {
@@ -160,7 +102,7 @@ export class ResearchTree {
         continue;
       }
 
-      res.push(node.text);
+      res.push(node.researchName);
       for (let i = 0; i < node.children.length; ++i) {
         queue.push(node.children[i]);
       }
@@ -228,16 +170,29 @@ export class ResearchTree {
         continue;
       }
 
-      const research: Research | null = ResearchMap[node.text];
+      const research: Research | null = ResearchMap[node.researchName];
 
       // Safety checks
       if (research == null) {
-        console.warn(`Invalid Research name in node: ${node.text}`);
+        console.warn(`Invalid Research name in node: ${node.researchName}`);
         continue;
       }
 
-      const mult: any = (research as any)[propName];
-      if (mult == null) {
+      const mult =
+        {
+          advertisingMult: research.advertisingMult,
+          employeeChaMult: research.employeeChaMult,
+          employeeCreMult: research.employeeCreMult,
+          employeeEffMult: research.employeeEffMult,
+          employeeIntMult: research.employeeIntMult,
+          productionMult: research.productionMult,
+          productProductionMult: research.productProductionMult,
+          salesMult: research.salesMult,
+          sciResearchMult: research.sciResearchMult,
+          storageMult: research.storageMult,
+        }[propName] ?? null;
+
+      if (mult === null) {
         console.warn(`Invalid propName specified in ResearchTree.getMultiplierHelper: ${propName}`);
         continue;
       }
@@ -253,7 +208,7 @@ export class ResearchTree {
 
   // Search for a Node with the given name ('text' property on the Node)
   // Returns 'null' if it cannot be found
-  findNode(name: string): Node | null {
+  findNode(name: CorpResearchName): Node | null {
     if (this.root == null) {
       return null;
     }
@@ -261,28 +216,22 @@ export class ResearchTree {
   }
 
   // Marks a Node as researched
-  research(name: string): void {
-    if (this.root == null) {
-      return;
-    }
+  research(name: CorpResearchName): void {
+    if (!this.root || this.researched.has(name)) return;
 
     const queue: Node[] = [];
     queue.push(this.root);
     while (queue.length !== 0) {
       const node: Node | undefined = queue.shift();
-      if (node == null) {
-        continue;
-      }
+      if (!node) continue;
 
-      if (node.text === name) {
+      if (node.researchName === name) {
         node.researched = true;
-        this.researched[name] = true;
+        this.researched.add(name);
         return;
       }
 
-      for (let i = 0; i < node.children.length; ++i) {
-        queue.push(node.children[i]);
-      }
+      queue.push(...node.children);
     }
 
     console.warn(`ResearchTree.research() did not find the specified Research node for: ${name}`);

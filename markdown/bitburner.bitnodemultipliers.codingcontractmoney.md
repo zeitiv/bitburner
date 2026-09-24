@@ -4,9 +4,9 @@
 
 ## BitNodeMultipliers.CodingContractMoney property
 
-Influences the amount of money gained from completing Coding Contracts
+Influences the amount of money gained from completing Coding Contracts.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 CodingContractMoney: number;

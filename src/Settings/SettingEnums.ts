@@ -1,8 +1,5 @@
-// Enums that defined allowed values for setting configuration
-
-/**
- * Allowed values for the 'OwnedAugmentationsOrder' setting
- */
+// Numeric enum
+/** Allowed values for the 'OwnedAugmentationsOrder' setting */
 export enum PurchaseAugmentationsOrderSetting {
   Cost,
   Default,
@@ -10,9 +7,8 @@ export enum PurchaseAugmentationsOrderSetting {
   Purchasable,
 }
 
-/**
- * Allowed values for the 'OwnedAugmentationsOrder' setting
- */
+// Numeric enum
+/** Allowed values for the 'OwnedAugmentationsOrder' setting */
 export enum OwnedAugmentationsOrderSetting {
   Alphabetically,
   AcquirementTime,

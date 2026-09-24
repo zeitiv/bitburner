@@ -1,33 +1,35 @@
+import type { Bladeburner } from "../Bladeburner";
+import type { Action } from "../Types";
+
 import React from "react";
-import { formatNumber } from "../../utils/StringHelperFunctions";
+
+import { Player } from "@player";
+import { formatPercent } from "../../ui/formatNumber";
 import { StealthIcon } from "./StealthIcon";
 import { KillIcon } from "./KillIcon";
-import { IAction } from "../IAction";
-import { IBladeburner } from "../IBladeburner";
+import InfoIcon from "@mui/icons-material/Info";
+import { Tooltip, Typography } from "@mui/material";
 
-interface IProps {
-  bladeburner: IBladeburner;
-  action: IAction;
+interface SuccessChanceProps {
+  bladeburner: Bladeburner;
+  action: Action;
 }
 
-export function SuccessChance(props: IProps): React.ReactElement {
-  const estimatedSuccessChance = props.action.getEstSuccessChance(props.bladeburner);
+export function SuccessChance({ bladeburner, action }: SuccessChanceProps): React.ReactElement {
+  const [minChance, maxChance] = action.getSuccessRange(bladeburner, Player);
 
-  let chance = <></>;
-  if (estimatedSuccessChance[0] === estimatedSuccessChance[1]) {
-    chance = <>{formatNumber(estimatedSuccessChance[0] * 100, 1)}%</>;
-  } else {
-    chance = (
-      <>
-        {formatNumber(estimatedSuccessChance[0] * 100, 1)}% ~ {formatNumber(estimatedSuccessChance[1] * 100, 1)}%
-      </>
-    );
-  }
+  const chance = formatPercent(minChance, 1) + (minChance === maxChance ? "" : ` ~ ${formatPercent(maxChance, 1)}`);
 
   return (
     <>
-      Estimated success chance: {chance} {props.action.isStealth ? <StealthIcon /> : <></>}
-      {props.action.isKill ? <KillIcon /> : <></>}
+      <Tooltip title={action.successScaling ? <Typography>{action.successScaling}</Typography> : ""}>
+        <Typography component="span" sx={{ marginRight: "15px" }}>
+          Estimated success chance: {chance}
+          {action.successScaling && <InfoIcon sx={{ fontSize: "1.1em", marginLeft: "10px" }} />}
+        </Typography>
+      </Tooltip>
+      {action.isStealth ? <StealthIcon /> : <></>}
+      {action.isKill ? <KillIcon /> : <></>}
     </>
   );
 }

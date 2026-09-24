@@ -6,7 +6,7 @@
 
 Product in a warehouse
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 interface Product 
@@ -14,13 +14,349 @@ interface Product
 
 ## Properties
 
-|  Property | Type | Description |
-|  --- | --- | --- |
-|  [cityData](./bitburner.product.citydata.md) | { \[key: string\]: number\[\] } | Data refers to the production, sale, and quantity of the products These values are specific to a city For each city, the data is \[qty, prod, sell\] |
-|  [cmp](./bitburner.product.cmp.md) | number | Competition for the product |
-|  [developmentProgress](./bitburner.product.developmentprogress.md) | number | Creation progress - A number between 0-100 representing percentage |
-|  [dmd](./bitburner.product.dmd.md) | number | Demand for the product |
-|  [name](./bitburner.product.name.md) | string | Name of the product |
-|  [pCost](./bitburner.product.pcost.md) | number | Production cost |
-|  [sCost](./bitburner.product.scost.md) | string \| number | Sell cost, can be "MP+5" |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[actualSellAmount](./bitburner.product.actualsellamount.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Amount of product sold last cycle
+
+
+</td></tr>
+<tr><td>
+
+[advertisingInvestment](./bitburner.product.advertisinginvestment.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Funds that were spent on advertising the product
+
+
+</td></tr>
+<tr><td>
+
+[competition](./bitburner.product.competition.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number \| undefined
+
+
+</td><td>
+
+Competition for the product, only present if "Market Research - Competition" unlocked
+
+
+</td></tr>
+<tr><td>
+
+[demand](./bitburner.product.demand.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number \| undefined
+
+
+</td><td>
+
+Demand for the product, only present if "Market Research - Demand" unlocked
+
+
+</td></tr>
+<tr><td>
+
+[designInvestment](./bitburner.product.designinvestment.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Funds that were spent on designing the product
+
+
+</td></tr>
+<tr><td>
+
+[desiredSellAmount](./bitburner.product.desiredsellamount.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string \| number
+
+
+</td><td>
+
+Desired sell amount, e.g. "PROD/2"
+
+
+</td></tr>
+<tr><td>
+
+[desiredSellPrice](./bitburner.product.desiredsellprice.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string \| number
+
+
+</td><td>
+
+Desired sell price, can be "MP+5"
+
+
+</td></tr>
+<tr><td>
+
+[developmentProgress](./bitburner.product.developmentprogress.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+A number between 0-100 representing percentage completion
+
+
+</td></tr>
+<tr><td>
+
+[effectiveRating](./bitburner.product.effectiverating.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Effective rating in the specific city
+
+
+</td></tr>
+<tr><td>
+
+[name](./bitburner.product.name.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the product
+
+
+</td></tr>
+<tr><td>
+
+[productionAmount](./bitburner.product.productionamount.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Amount of product produced last cycle
+
+
+</td></tr>
+<tr><td>
+
+[productionCost](./bitburner.product.productioncost.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Production cost
+
+
+</td></tr>
+<tr><td>
+
+[productionLimit](./bitburner.product.productionlimit.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number \| null
+
+
+</td><td>
+
+A limit on the maximum amount to produce per second
+
+
+</td></tr>
+<tr><td>
+
+[rating](./bitburner.product.rating.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Rating based on stats
+
+
+</td></tr>
+<tr><td>
+
+[size](./bitburner.product.size.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+How much warehouse space is occupied per unit of this product
+
+
+</td></tr>
+<tr><td>
+
+[stats](./bitburner.product.stats.md)
+
+
+</td><td>
+
+
+</td><td>
+
+{ quality: number; performance: number; durability: number; reliability: number; aesthetics: number; features: number; }
+
+
+</td><td>
+
+Product stats
+
+
+</td></tr>
+<tr><td>
+
+[stored](./bitburner.product.stored.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Amount of product stored in warehouse
+
+
+</td></tr>
+</tbody></table>
 

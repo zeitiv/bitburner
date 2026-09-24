@@ -1,45 +1,35 @@
-import { ITerminal } from "../ITerminal";
-import { IRouter } from "../../ui/Router";
-import { IPlayer } from "../../PersonObjects/IPlayer";
+import { Terminal } from "../../Terminal";
 import { BaseServer } from "../../Server/BaseServer";
-import { isScriptFilename } from "../../Script/isScriptFilename";
+import { hasScriptExtension } from "../../Paths/ScriptFilePath";
+import { hasTextExtension } from "../../Paths/TextFilePath";
 
-export function wget(
-  terminal: ITerminal,
-  router: IRouter,
-  player: IPlayer,
-  server: BaseServer,
-  args: (string | number | boolean)[],
-): void {
-  if (args.length !== 2) {
-    terminal.error("Incorrect usage of wget command. Usage: wget [url] [target file]");
+export function wget(args: (string | number | boolean)[], server: BaseServer): void {
+  if (args.length !== 2 || typeof args[0] !== "string" || typeof args[1] !== "string") {
+    Terminal.error("Incorrect usage of wget command. Usage: wget [url] [target file]");
     return;
   }
 
-  const url = args[0] + "";
-  const target = terminal.getFilepath(args[1] + "");
-  if (!isScriptFilename(target) && !target.endsWith(".txt")) {
-    return terminal.error(`wget failed: Invalid target file. Target file must be script or text file`);
+  const target = Terminal.getFilepath(args[1]);
+  if (!target || (!hasScriptExtension(target) && !hasTextExtension(target))) {
+    Terminal.error(`wget failed: Invalid target file. Target file must be a script file or a text file.`);
+    return;
   }
-  $.get(
-    url,
-    function (data: any) {
-      let res;
-      if (isScriptFilename(target)) {
-        res = server.writeToScriptFile(player, target, data);
+
+  fetch(args[0])
+    .then(async (response) => {
+      if (response.status !== 200) {
+        Terminal.error(`wget failed. HTTP code: ${response.status}.`);
+        return;
+      }
+      const writeResult = server.writeToContentFile(target, await response.text());
+      if (writeResult.overwritten) {
+        Terminal.print(`wget successfully retrieved content and overwrote ${target}`);
       } else {
-        res = server.writeToTextFile(target, data);
+        Terminal.print(`wget successfully retrieved content to new file ${target}`);
       }
-      if (!res.success) {
-        return terminal.error("wget failed");
-      }
-      if (res.overwritten) {
-        return terminal.print(`wget successfully retrieved content and overwrote ${target}`);
-      }
-      return terminal.print(`wget successfully retrieved content to new file ${target}`);
-    },
-    "text",
-  ).fail(function (e) {
-    return terminal.error("wget failed: " + JSON.stringify(e));
-  });
+    })
+    .catch((reason) => {
+      // Check the comment in wget of src\NetscriptFunctions.ts to see why we use Object.getOwnPropertyNames.
+      Terminal.error(`wget failed: ${JSON.stringify(reason, Object.getOwnPropertyNames(reason))}`);
+    });
 }

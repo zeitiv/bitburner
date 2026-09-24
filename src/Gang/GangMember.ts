@@ -3,9 +3,10 @@ import { GangMemberTasks } from "./GangMemberTasks";
 import { GangMemberUpgrade } from "./GangMemberUpgrade";
 import { GangMemberUpgrades } from "./GangMemberUpgrades";
 import { IAscensionResult } from "./IAscensionResult";
-import { IPlayer } from "../PersonObjects/IPlayer";
-import { IGang } from "./IGang";
-import { Generic_fromJSON, Generic_toJSON, Reviver } from "../utils/JSONReviver";
+import { Player } from "@player";
+import { Gang } from "./Gang";
+import { GangConstants } from "./data/Constants";
+import { Generic_fromJSON, Generic_toJSON, IReviverValue, constructorsForReviver } from "../utils/JSONReviver";
 import {
   calculateRespectGain,
   calculateMoneyGain,
@@ -13,6 +14,8 @@ import {
   calculateAscensionMult,
   calculateAscensionPointsGain,
 } from "./formulas/formulas";
+import { GangMemberExpGain } from "@nsdefs";
+import { convertV2GangEquipmentNames } from "../utils/APIBreaks/3.0.0";
 
 interface IMults {
   hack: number;
@@ -86,7 +89,7 @@ export class GangMember {
   }
 
   assignToTask(taskName: string): boolean {
-    if (!GangMemberTasks.hasOwnProperty(taskName)) {
+    if (!Object.hasOwn(GangMemberTasks, taskName)) {
       this.task = "Unassigned";
       return false;
     }
@@ -99,19 +102,13 @@ export class GangMember {
   }
 
   getTask(): GangMemberTask {
-    // TODO(hydroflame): transfer that to a save file migration function
-    // Backwards compatibility
-    if ((this.task as any) instanceof GangMemberTask) {
-      this.task = (this.task as any).name;
-    }
-
-    if (GangMemberTasks.hasOwnProperty(this.task)) {
+    if (Object.hasOwn(GangMemberTasks, this.task)) {
       return GangMemberTasks[this.task];
     }
-    return GangMemberTasks["Unassigned"];
+    return GangMemberTasks.Unassigned;
   }
 
-  calculateRespectGain(gang: IGang): number {
+  calculateRespectGain(gang: Gang): number {
     const task = this.getTask();
     const g = {
       respect: gang.respect,
@@ -121,7 +118,7 @@ export class GangMember {
     return calculateRespectGain(g, this, task);
   }
 
-  calculateWantedLevelGain(gang: IGang): number {
+  calculateWantedLevelGain(gang: Gang): number {
     const task = this.getTask();
     const g = {
       respect: gang.respect,
@@ -131,7 +128,7 @@ export class GangMember {
     return calculateWantedLevelGain(g, this, task);
   }
 
-  calculateMoneyGain(gang: IGang): number {
+  calculateMoneyGain(gang: Gang): number {
     const task = this.getTask();
     const g = {
       respect: gang.respect,
@@ -152,47 +149,86 @@ export class GangMember {
     };
   }
 
-  gainExperience(numCycles = 1): void {
+  // Calculate our gain for each stat based on each modifier of member
+  // if no task is assigned to that member we return null, other wise we
+  // return an object containing our per-cycle gains for each stat.
+  calculateExpGain(numCycles = 1): GangMemberExpGain | null {
     const task = this.getTask();
-    if (task === GangMemberTasks["Unassigned"]) return;
+    if (task === GangMemberTasks.Unassigned) return null;
+
+    const expValues = {
+      hack_exp: 0,
+      str_exp: 0,
+      def_exp: 0,
+      dex_exp: 0,
+      agi_exp: 0,
+      cha_exp: 0,
+    };
+
     const difficultyMult = Math.pow(task.difficulty, 0.9);
     const difficultyPerCycles = difficultyMult * numCycles;
     const weightDivisor = 1500;
     const expMult = this.expMult();
-    this.hack_exp +=
+
+    expValues.hack_exp +=
       (task.hackWeight / weightDivisor) *
       difficultyPerCycles *
       expMult.hack *
       this.calculateAscensionMult(this.hack_asc_points);
-    this.str_exp +=
+
+    expValues.str_exp +=
       (task.strWeight / weightDivisor) *
       difficultyPerCycles *
       expMult.str *
       this.calculateAscensionMult(this.str_asc_points);
-    this.def_exp +=
+
+    expValues.def_exp +=
       (task.defWeight / weightDivisor) *
       difficultyPerCycles *
       expMult.def *
       this.calculateAscensionMult(this.def_asc_points);
-    this.dex_exp +=
+
+    expValues.dex_exp +=
       (task.dexWeight / weightDivisor) *
       difficultyPerCycles *
       expMult.dex *
       this.calculateAscensionMult(this.dex_asc_points);
-    this.agi_exp +=
+
+    expValues.agi_exp +=
       (task.agiWeight / weightDivisor) *
       difficultyPerCycles *
       expMult.agi *
       this.calculateAscensionMult(this.agi_asc_points);
-    this.cha_exp +=
+
+    expValues.cha_exp +=
       (task.chaWeight / weightDivisor) *
       difficultyPerCycles *
       expMult.cha *
       this.calculateAscensionMult(this.cha_asc_points);
+
+    return expValues;
   }
 
-  recordEarnedRespect(numCycles = 1, gang: IGang): void {
-    this.earnedRespect += this.calculateRespectGain(gang) * numCycles;
+  gainExperience(numCycles: number): void {
+    // Do the calculations if our function returns null meaning no task is assigned
+    // then we return otherwise we add our exp gains to our total values
+    const gains = this.calculateExpGain(numCycles);
+    if (gains === null) {
+      return;
+    }
+
+    this.hack_exp += gains.hack_exp;
+    this.str_exp += gains.str_exp;
+    this.def_exp += gains.def_exp;
+    this.dex_exp += gains.dex_exp;
+    this.agi_exp += gains.agi_exp;
+    this.cha_exp += gains.cha_exp;
+  }
+
+  earnRespect(numCycles = 1, gang: Gang): number {
+    const earnedRespect = this.calculateRespectGain(gang) * numCycles;
+    this.earnedRespect += earnedRespect;
+    return earnedRespect;
   }
 
   getGainedAscensionPoints(): IMults {
@@ -245,6 +281,17 @@ export class GangMember {
       dex: postAscend.dex / preAscend.dex,
       agi: postAscend.agi / preAscend.agi,
       cha: postAscend.cha / preAscend.cha,
+    };
+  }
+
+  getPostInstallPoints(): IMults {
+    return {
+      hack: this.hack_asc_points * GangConstants.InstallAscensionPenalty,
+      str: this.str_asc_points * GangConstants.InstallAscensionPenalty,
+      def: this.def_asc_points * GangConstants.InstallAscensionPenalty,
+      dex: this.dex_asc_points * GangConstants.InstallAscensionPenalty,
+      agi: this.agi_asc_points * GangConstants.InstallAscensionPenalty,
+      cha: this.cha_asc_points * GangConstants.InstallAscensionPenalty,
     };
   }
 
@@ -302,12 +349,14 @@ export class GangMember {
     if (upg.mults.hack != null) this.hack_mult *= upg.mults.hack;
   }
 
-  buyUpgrade(upg: GangMemberUpgrade, player: IPlayer, gang: IGang): boolean {
+  buyUpgrade(upg: GangMemberUpgrade): boolean {
+    if (!Player.gang) throw new Error("Tried to buy a gang member upgrade when no gang was present");
+
     // Prevent purchasing of already-owned upgrades
     if (this.augmentations.includes(upg.name) || this.upgrades.includes(upg.name)) return false;
 
-    if (player.money < gang.getUpgradeCost(upg)) return false;
-    player.loseMoney(gang.getUpgradeCost(upg), "gang");
+    if (Player.money < Player.gang.getUpgradeCost(upg)) return false;
+    Player.loseMoney(Player.gang.getUpgradeCost(upg), "gang_expenses");
     if (upg.type === "g") {
       this.augmentations.push(upg.name);
     } else {
@@ -317,20 +366,19 @@ export class GangMember {
     return true;
   }
 
-  /**
-   * Serialize the current object to a JSON save state.
-   */
-  toJSON(): any {
+  /** Serialize the current object to a JSON save state. */
+  toJSON(): IReviverValue {
     return Generic_toJSON("GangMember", this);
   }
 
-  /**
-   * Initiatizes a GangMember object from a JSON save state.
-   */
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-  static fromJSON(value: any): GangMember {
-    return Generic_fromJSON(GangMember, value.data);
+  /** Initializes a GangMember object from a JSON save state. */
+  static fromJSON(value: IReviverValue): GangMember {
+    const member = Generic_fromJSON(GangMember, value.data);
+    for (let i = 0; i < member.upgrades.length; ++i) {
+      member.upgrades[i] = convertV2GangEquipmentNames(member.upgrades[i]);
+    }
+    return member;
   }
 }
 
-Reviver.constructors.GangMember = GangMember;
+constructorsForReviver.GangMember = GangMember;

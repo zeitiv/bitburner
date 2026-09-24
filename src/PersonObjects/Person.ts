@@ -1,243 +1,265 @@
-// Base class representing a person-like object
-import { Augmentation } from "../Augmentation/Augmentation";
-import { IPlayerOwnedAugmentation } from "../Augmentation/PlayerOwnedAugmentation";
-import { BitNodeMultipliers } from "../BitNode/BitNodeMultipliers";
-import { CityName } from "../Locations/data/CityNames";
+import type { Person as IPerson, WorkStats } from "@nsdefs";
+import type { PlayerOwnedAugmentation } from "../Augmentation/PlayerOwnedAugmentation";
+import type { IReviverValue } from "../utils/JSONReviver";
+import type { MoneySource } from "../utils/MoneySourceTracker";
+import type { HP } from "./HP";
+import type { Skills } from "./Skills";
+
+import { CityName } from "@enums";
+import { currentNodeMults } from "../BitNode/BitNodeMultipliers";
 import { CONSTANTS } from "../Constants";
-import { calculateSkill } from "./formulas/skill";
-import { calculateIntelligenceBonus } from "./formulas/intelligence";
+import { Player } from "../Player";
+import { defaultMultipliers } from "./Multipliers";
+import { calculateExp, calculateSkill } from "./formulas/skill";
 
-// Interface that defines a generic object used to track experience/money
-// earnings for tasks
-export interface ITaskTracker {
-  hack: number;
-  str: number;
-  def: number;
-  dex: number;
-  agi: number;
-  cha: number;
-  money: number;
-}
-
-export function createTaskTracker(): ITaskTracker {
-  return {
-    hack: 0,
-    str: 0,
-    def: 0,
-    dex: 0,
-    agi: 0,
-    cha: 0,
-    money: 0,
+// Base class representing a person-like object
+export abstract class Person implements IPerson {
+  hp: HP = { current: 10, max: 10 };
+  skills: Skills = {
+    hacking: 1,
+    strength: 1,
+    defense: 1,
+    dexterity: 1,
+    agility: 1,
+    charisma: 1,
+    intelligence: 0,
   };
-}
+  exp: Skills = {
+    hacking: 0,
+    strength: 0,
+    defense: 0,
+    dexterity: 0,
+    agility: 0,
+    charisma: 0,
+    intelligence: 0,
+  };
 
-export abstract class Person {
-  /**
-   * Stats
-   */
-  hacking = 1;
-  strength = 1;
-  defense = 1;
-  dexterity = 1;
-  agility = 1;
-  charisma = 1;
-  intelligence = 1;
-  hp = 10;
-  max_hp = 10;
+  persistentIntelligenceData = {
+    exp: 0,
+  };
 
-  /**
-   * Experience
-   */
-  hacking_exp = 0;
-  strength_exp = 0;
-  defense_exp = 0;
-  dexterity_exp = 0;
-  agility_exp = 0;
-  charisma_exp = 0;
-  intelligence_exp = 0;
+  mults = defaultMultipliers();
 
-  /**
-   * Multipliers
-   */
-  hacking_mult = 1;
-  strength_mult = 1;
-  defense_mult = 1;
-  dexterity_mult = 1;
-  agility_mult = 1;
-  charisma_mult = 1;
+  /** Augmentations */
+  augmentations: PlayerOwnedAugmentation[] = [];
+  queuedAugmentations: PlayerOwnedAugmentation[] = [];
 
-  hacking_exp_mult = 1;
-  strength_exp_mult = 1;
-  defense_exp_mult = 1;
-  dexterity_exp_mult = 1;
-  agility_exp_mult = 1;
-  charisma_exp_mult = 1;
-
-  hacking_chance_mult = 1;
-  hacking_speed_mult = 1;
-  hacking_money_mult = 1;
-  hacking_grow_mult = 1;
-
-  company_rep_mult = 1;
-  faction_rep_mult = 1;
-
-  crime_money_mult = 1;
-  crime_success_mult = 1;
-
-  work_money_mult = 1;
-
-  hacknet_node_money_mult = 1;
-  hacknet_node_purchase_cost_mult = 1;
-  hacknet_node_ram_cost_mult = 1;
-  hacknet_node_core_cost_mult = 1;
-  hacknet_node_level_cost_mult = 1;
-
-  bladeburner_max_stamina_mult = 1;
-  bladeburner_stamina_gain_mult = 1;
-  bladeburner_analysis_mult = 1;
-  bladeburner_success_chance_mult = 1;
-
-  /**
-   * Augmentations
-   */
-  augmentations: IPlayerOwnedAugmentation[] = [];
-  queuedAugmentations: IPlayerOwnedAugmentation[] = [];
-
-  /**
-   * City that the person is in
-   */
+  /** City that the person is in */
   city: CityName = CityName.Sector12;
 
-  /**
-   * Updates this object's multipliers for the given augmentation
-   */
-  applyAugmentation(aug: Augmentation): void {
-    for (const mult of Object.keys(aug.mults)) {
-      if ((this as any)[mult] == null) {
-        console.warn(`Augmentation has unrecognized multiplier property: ${mult}`);
-      } else {
-        (this as any)[mult] *= aug.mults[mult];
-      }
+  gainHackingExp(exp: number): void {
+    if (isNaN(exp)) {
+      console.error("ERR: NaN passed into Player.gainHackingExp()");
+      return;
+    }
+    this.exp.hacking += exp;
+    if (this.exp.hacking < 0) {
+      this.exp.hacking = 0;
+    }
+
+    this.skills.hacking = calculateSkill(
+      this.exp.hacking,
+      this.mults.hacking * currentNodeMults.HackingLevelMultiplier,
+    );
+  }
+
+  gainStrengthExp(exp: number): void {
+    if (isNaN(exp)) {
+      console.error("ERR: NaN passed into Player.gainStrengthExp()");
+      return;
+    }
+    this.exp.strength += exp;
+    if (this.exp.strength < 0) {
+      this.exp.strength = 0;
+    }
+
+    this.skills.strength = calculateSkill(
+      this.exp.strength,
+      this.mults.strength * currentNodeMults.StrengthLevelMultiplier,
+    );
+  }
+
+  gainDefenseExp(exp: number): void {
+    if (isNaN(exp)) {
+      console.error("ERR: NaN passed into player.gainDefenseExp()");
+      return;
+    }
+    this.exp.defense += exp;
+    if (this.exp.defense < 0) {
+      this.exp.defense = 0;
+    }
+
+    this.skills.defense = calculateSkill(
+      this.exp.defense,
+      this.mults.defense * currentNodeMults.DefenseLevelMultiplier,
+    );
+    const ratio = this.hp.current / this.hp.max;
+    this.hp.max = Math.floor(10 + this.skills.defense / 10);
+    this.hp.current = Math.round(this.hp.max * ratio);
+  }
+
+  gainDexterityExp(exp: number): void {
+    if (isNaN(exp)) {
+      console.error("ERR: NaN passed into Player.gainDexterityExp()");
+      return;
+    }
+    this.exp.dexterity += exp;
+    if (this.exp.dexterity < 0) {
+      this.exp.dexterity = 0;
+    }
+
+    this.skills.dexterity = calculateSkill(
+      this.exp.dexterity,
+      this.mults.dexterity * currentNodeMults.DexterityLevelMultiplier,
+    );
+  }
+
+  gainAgilityExp(exp: number): void {
+    if (isNaN(exp)) {
+      console.error("ERR: NaN passed into Player.gainAgilityExp()");
+      return;
+    }
+    this.exp.agility += exp;
+    if (this.exp.agility < 0) {
+      this.exp.agility = 0;
+    }
+
+    this.skills.agility = calculateSkill(
+      this.exp.agility,
+      this.mults.agility * currentNodeMults.AgilityLevelMultiplier,
+    );
+  }
+
+  gainCharismaExp(exp: number): void {
+    if (isNaN(exp)) {
+      console.error("ERR: NaN passed into Player.gainCharismaExp()");
+      return;
+    }
+    this.exp.charisma += exp;
+    if (this.exp.charisma < 0) {
+      this.exp.charisma = 0;
+    }
+
+    this.skills.charisma = calculateSkill(
+      this.exp.charisma,
+      this.mults.charisma * currentNodeMults.CharismaLevelMultiplier,
+    );
+  }
+
+  overrideIntelligence(): void {
+    // Reset intelligence data if the player has not unlocked Intelligence.
+    // Note that this check cannot reset intelligence data in some edge cases (e.g., bitflume from non-BN5 to BN5). This
+    // is an accepted limitation.
+    // For more information, please check https://github.com/bitburner-official/bitburner-src/pull/2666
+    if (Player.sourceFileLvl(5) === 0 && Player.bitNodeN !== 5) {
+      this.skills.intelligence = 0;
+      this.exp.intelligence = 0;
+      this.persistentIntelligenceData.exp = 0;
+      return;
+    }
+    const persistentIntelligenceSkill = this.calculateSkill(this.persistentIntelligenceData.exp, 1);
+    // Reset exp and skill to the persistent values if there is no limit (intelligenceOverride) or the limit is greater
+    // than or equal to the persistent skill.
+    if (
+      Player.bitNodeOptions.intelligenceOverride === undefined ||
+      Player.bitNodeOptions.intelligenceOverride >= persistentIntelligenceSkill
+    ) {
+      this.exp.intelligence = this.persistentIntelligenceData.exp;
+      this.skills.intelligence = persistentIntelligenceSkill;
+      return;
+    }
+    // Limit exp and skill based on intelligenceOverride only if it's smaller than the persistent skill.
+    this.exp.intelligence = calculateExp(Player.bitNodeOptions.intelligenceOverride, 1);
+    this.skills.intelligence = Player.bitNodeOptions.intelligenceOverride;
+  }
+
+  gainIntelligenceExp(exp: number): void {
+    if (isNaN(exp)) {
+      console.error("ERROR: NaN passed into Player.gainIntelligenceExp()");
+      return;
+    }
+    /**
+     * Don't change sourceFileLvl to activeSourceFileLvl. When the player has int level, the ability to gain more int is
+     * a permanent benefit.
+     */
+    if (Player.sourceFileLvl(5) > 0 || Player.bitNodeN === 5) {
+      this.exp.intelligence += exp;
+      this.skills.intelligence = Math.floor(this.calculateSkill(this.exp.intelligence, 1));
+      this.persistentIntelligenceData.exp += exp;
     }
   }
 
-  /**
-   * Given an experience amount and stat multiplier, calculates the
-   * stat level. Stat-agnostic (same formula for every stat)
-   */
-  calculateStat(exp: number, mult = 1): number {
-    return calculateSkill(exp, mult);
+  gainStats(retValue: WorkStats): void {
+    this.gainHackingExp(retValue.hackExp * this.mults.hacking_exp);
+    this.gainStrengthExp(retValue.strExp * this.mults.strength_exp);
+    this.gainDefenseExp(retValue.defExp * this.mults.defense_exp);
+    this.gainDexterityExp(retValue.dexExp * this.mults.dexterity_exp);
+    this.gainAgilityExp(retValue.agiExp * this.mults.agility_exp);
+    this.gainCharismaExp(retValue.chaExp * this.mults.charisma_exp);
+    this.gainIntelligenceExp(retValue.intExp);
   }
 
-  /**
-   * Calculate and return the amount of faction reputation earned per cycle
-   * when doing Field Work for a faction
-   */
-  getFactionFieldWorkRepGain(): number {
-    const t =
-      (0.9 *
-        (this.hacking / CONSTANTS.MaxSkillLevel +
-          this.strength / CONSTANTS.MaxSkillLevel +
-          this.defense / CONSTANTS.MaxSkillLevel +
-          this.dexterity / CONSTANTS.MaxSkillLevel +
-          this.agility / CONSTANTS.MaxSkillLevel +
-          this.charisma / CONSTANTS.MaxSkillLevel)) /
-      5.5;
-    return t * this.faction_rep_mult;
+  regenerateHp(amt: number): void {
+    if (typeof amt !== "number") {
+      console.warn(`Player.regenerateHp() called without a numeric argument: ${amt}`);
+      return;
+    }
+    this.hp.current += amt;
+    if (this.hp.current > this.hp.max) {
+      this.hp.current = this.hp.max;
+    }
   }
 
-  /**
-   * Calculate and return the amount of faction reputation earned per cycle
-   * when doing Hacking Work for a faction
-   */
-  getFactionHackingWorkRepGain(): number {
-    return (this.hacking / CONSTANTS.MaxSkillLevel) * this.faction_rep_mult;
+  updateSkillLevels(this: Person): void {
+    for (const [skill, bnMult] of [
+      ["hacking", "HackingLevelMultiplier"],
+      ["strength", "StrengthLevelMultiplier"],
+      ["defense", "DefenseLevelMultiplier"],
+      ["dexterity", "DexterityLevelMultiplier"],
+      ["agility", "AgilityLevelMultiplier"],
+      ["charisma", "CharismaLevelMultiplier"],
+    ] as const) {
+      this.skills[skill] = Math.max(
+        1,
+        Math.floor(this.calculateSkill(this.exp[skill], this.mults[skill] * currentNodeMults[bnMult])),
+      );
+    }
+
+    const ratio: number = Math.min(this.hp.current / this.hp.max, 1);
+    this.hp.max = Math.floor(10 + this.skills.defense / 10);
+    this.hp.current = Math.round(this.hp.max * ratio);
   }
 
-  /**
-   * Calculate and return the amount of faction reputation earned per cycle
-   * when doing Security Work for a faction
-   */
-  getFactionSecurityWorkRepGain(): number {
-    const t =
-      (0.9 *
-        (this.hacking / CONSTANTS.MaxSkillLevel +
-          this.strength / CONSTANTS.MaxSkillLevel +
-          this.defense / CONSTANTS.MaxSkillLevel +
-          this.dexterity / CONSTANTS.MaxSkillLevel +
-          this.agility / CONSTANTS.MaxSkillLevel)) /
-      4.5;
-    return t * this.faction_rep_mult;
+  hasAugmentation(augName: string, ignoreQueued = false) {
+    if (this.augmentations.some((a) => a.name === augName)) {
+      return true;
+    }
+    if (!ignoreQueued && this.queuedAugmentations.some((a) => a.name === augName)) {
+      return true;
+    }
+    return false;
   }
 
-  /**
-   * Reset all multipliers to 1
-   */
-  resetMultipliers(): void {
-    this.hacking_mult = 1;
-    this.strength_mult = 1;
-    this.defense_mult = 1;
-    this.dexterity_mult = 1;
-    this.agility_mult = 1;
-    this.charisma_mult = 1;
+  travel(cityName: CityName): boolean {
+    if (!Player.canAfford(CONSTANTS.TravelCost)) {
+      return false;
+    }
 
-    this.hacking_exp_mult = 1;
-    this.strength_exp_mult = 1;
-    this.defense_exp_mult = 1;
-    this.dexterity_exp_mult = 1;
-    this.agility_exp_mult = 1;
-    this.charisma_exp_mult = 1;
+    Player.loseMoney(CONSTANTS.TravelCost, this.travelCostMoneySource());
+    this.city = cityName;
 
-    this.company_rep_mult = 1;
-    this.faction_rep_mult = 1;
-
-    this.crime_money_mult = 1;
-    this.crime_success_mult = 1;
-
-    this.work_money_mult = 1;
+    return true;
   }
 
-  /**
-   * Update all stat levels
-   */
-  updateStatLevels(): void {
-    this.hacking = Math.max(
-      1,
-      Math.floor(this.calculateStat(this.hacking_exp, this.hacking_mult * BitNodeMultipliers.HackingLevelMultiplier)),
-    );
-    this.strength = Math.max(
-      1,
-      Math.floor(
-        this.calculateStat(this.strength_exp, this.strength_mult * BitNodeMultipliers.StrengthLevelMultiplier),
-      ),
-    );
-    this.defense = Math.max(
-      1,
-      Math.floor(this.calculateStat(this.defense_exp, this.defense_mult * BitNodeMultipliers.DefenseLevelMultiplier)),
-    );
-    this.dexterity = Math.max(
-      1,
-      Math.floor(
-        this.calculateStat(this.dexterity_exp, this.dexterity_mult * BitNodeMultipliers.DexterityLevelMultiplier),
-      ),
-    );
-    this.agility = Math.max(
-      1,
-      Math.floor(this.calculateStat(this.agility_exp, this.agility_mult * BitNodeMultipliers.AgilityLevelMultiplier)),
-    );
-    this.charisma = Math.max(
-      1,
-      Math.floor(
-        this.calculateStat(this.charisma_exp, this.charisma_mult * BitNodeMultipliers.CharismaLevelMultiplier),
-      ),
-    );
+  calculateSkill = calculateSkill; //Class version is equal to imported version
 
-    const ratio: number = this.hp / this.max_hp;
-    this.max_hp = Math.floor(10 + this.defense / 10);
-    this.hp = Math.round(this.max_hp * ratio);
+  /** Reset all multipliers to 1 */
+  resetMultipliers() {
+    this.mults = defaultMultipliers();
   }
 
-  getIntelligenceBonus(weight: number): number {
-    return calculateIntelligenceBonus(this.intelligence, weight);
-  }
+  abstract travelCostMoneySource(): MoneySource;
+  abstract takeDamage(amt: number): boolean;
+  abstract whoAmI(): string;
+  abstract toJSON(): IReviverValue;
 }

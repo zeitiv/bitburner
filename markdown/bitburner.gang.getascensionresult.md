@@ -6,7 +6,7 @@
 
 Get the result of an ascension without ascending.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 getAscensionResult(memberName: string): GangMemberAscension | undefined;
@@ -14,19 +14,49 @@ getAscensionResult(memberName: string): GangMemberAscension | undefined;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  memberName | string | Name of member. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+memberName
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of member.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 [GangMemberAscension](./bitburner.gangmemberascension.md) \| undefined
 
-Object with info about the ascension results. undefined if ascension is impossible.
+Object with info about the ascension results, or undefined if ascension is not possible.
 
 ## Remarks
 
 RAM cost: 2 GB
 
-Get the result of an ascension without ascending.
+Get a [GangMemberAscension](./bitburner.gangmemberascension.md) result for ascending a gang member without performing the ascension.
 

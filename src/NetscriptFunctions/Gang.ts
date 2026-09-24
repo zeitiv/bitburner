@@ -1,87 +1,90 @@
-import { INetscriptHelper } from "./INetscriptHelper";
-import { IPlayer } from "../PersonObjects/IPlayer";
-import { getRamCost } from "../Netscript/RamCostGenerator";
-import { Gang } from "../Gang/Gang";
+import type { Gang as IGang, EquipmentStats, GangOtherInfoObject } from "@nsdefs";
+import type { Gang } from "../Gang/Gang";
+import type { GangMember } from "../Gang/GangMember";
+import type { GangMemberTask } from "../Gang/GangMemberTask";
+import { type InternalAPI, type NetscriptContext, setRemovedFunctions } from "../Netscript/APIWrapper";
+
+import { GangPromise, RecruitmentResult } from "../Gang/Gang";
+import { Player } from "@player";
+import { FactionName } from "@enums";
 import { AllGangs } from "../Gang/AllGangs";
 import { GangMemberTasks } from "../Gang/GangMemberTasks";
 import { GangMemberUpgrades } from "../Gang/GangMemberUpgrades";
-import { WorkerScript } from "../Netscript/WorkerScript";
-import { GangMember } from "../Gang/GangMember";
-import { GangMemberTask } from "../Gang/GangMemberTask";
+import { helpers } from "../Netscript/NetscriptHelpers";
+import { getEnumHelper } from "../utils/EnumHelper";
+import { CONSTANTS } from "../Constants";
+import { canCreateGang } from "../Gang/helpers";
 
-import {
-  Gang as IGang,
-  GangGenInfo,
-  GangOtherInfo,
-  GangMemberInfo,
-  GangMemberAscension,
-  EquipmentStats,
-  GangTaskStats,
-} from "../ScriptEditor/NetscriptDefinitions";
-
-export function NetscriptGang(player: IPlayer, workerScript: WorkerScript, helper: INetscriptHelper): IGang {
-  const checkGangApiAccess = function (func: string): void {
-    const gang = player.gang;
-    if (gang === null) throw new Error("Must have joined gang");
-    const hasAccess = gang instanceof Gang;
-    if (!hasAccess) {
-      throw helper.makeRuntimeErrorMsg(`gang.${func}`, `You do not currently have a Gang`);
-    }
+export function NetscriptGang(): InternalAPI<IGang> {
+  /** Functions as an API check and also returns the gang object */
+  const getGang = function (ctx: NetscriptContext): Gang {
+    if (!Player.gang) throw helpers.errorMessage(ctx, "Must have joined gang", "API ACCESS");
+    return Player.gang;
   };
 
-  const getGangMember = function (func: string, name: string): GangMember {
-    const gang = player.gang;
-    if (gang === null) throw new Error("Must have joined gang");
+  const getGangMember = function (ctx: NetscriptContext, name: string): GangMember {
+    const gang = getGang(ctx);
     for (const member of gang.members) if (member.name === name) return member;
-    throw helper.makeRuntimeErrorMsg(`gang.${func}`, `Invalid gang member: '${name}'`);
+    throw helpers.errorMessage(ctx, `Invalid gang member: '${name}'`);
   };
 
-  const getGangTask = function (func: string, name: string): GangMemberTask {
+  const getGangTask = function (ctx: NetscriptContext, name: string): GangMemberTask {
     const task = GangMemberTasks[name];
     if (!task) {
-      throw helper.makeRuntimeErrorMsg(`gang.${func}`, `Invalid task: '${name}'`);
+      throw helpers.errorMessage(ctx, `Invalid task: '${name}'`);
     }
 
     return task;
   };
 
-  return {
-    createGang: function (faction: string): boolean {
-      helper.updateDynamicRam("createGang", getRamCost(player, "gang", "createGang"));
-      // this list is copied from Faction/ui/Root.tsx
-      const GangNames = [
-        "Slum Snakes",
-        "Tetrads",
-        "The Syndicate",
-        "The Dark Army",
-        "Speakers for the Dead",
-        "NiteSec",
-        "The Black Hand",
-      ];
-      if (!player.canAccessGang() || !GangNames.includes(faction)) return false;
-      if (player.inGang()) return false;
-      if (!player.factions.includes(faction)) return false;
+  const gangFunctions: InternalAPI<IGang> = {
+    createGang: (ctx) => (_faction) => {
+      const faction = getEnumHelper("FactionName").nsGetMember(ctx, _faction);
+      const checkResult = canCreateGang(faction);
+      if (!checkResult.success) {
+        helpers.log(ctx, () => checkResult.message);
+        return false;
+      }
 
-      const isHacking = faction === "NiteSec" || faction === "The Black Hand";
-      player.startGang(faction, isHacking);
+      const isHacking = faction === FactionName.NiteSec || faction === FactionName.TheBlackHand;
+      Player.startGang(faction, isHacking);
       return true;
     },
-    inGang: function (): boolean {
-      helper.updateDynamicRam("inGang", getRamCost(player, "gang", "inGang"));
-      return player.inGang();
+    inGang: () => () => {
+      return Player.gang ? true : false;
     },
-    getMemberNames: function (): string[] {
-      helper.updateDynamicRam("getMemberNames", getRamCost(player, "gang", "getMemberNames"));
-      checkGangApiAccess("getMemberNames");
-      const gang = player.gang;
-      if (gang === null) throw new Error("Should not be called without Gang");
+    getMemberNames: (ctx) => () => {
+      const gang = getGang(ctx);
       return gang.members.map((member) => member.name);
     },
-    getGangInformation: function (): GangGenInfo {
-      helper.updateDynamicRam("getGangInformation", getRamCost(player, "gang", "getGangInformation"));
-      checkGangApiAccess("getGangInformation");
-      const gang = player.gang;
-      if (gang === null) throw new Error("Should not be called without Gang");
+    renameMember: (ctx) => (_memberName, _newName) => {
+      const gang = getGang(ctx);
+      const memberName = helpers.string(ctx, "memberName", _memberName);
+      const newName = helpers.string(ctx, "newName", _newName);
+      const member = gang.members.find((m) => m.name === memberName);
+      if (!memberName) {
+        throw helpers.errorMessage(ctx, `Invalid memberName: "" (empty string)`);
+      }
+      if (!newName) {
+        throw helpers.errorMessage(ctx, `Invalid newName: "" (empty string)`);
+      }
+      if (newName === memberName) {
+        throw helpers.errorMessage(ctx, `newName and memberName must be different, but both were: ${newName}`);
+      }
+      if (!member) {
+        helpers.log(ctx, () => `Failed to rename member: No member exists with memberName: ${memberName}`);
+        return false;
+      }
+      if (gang.members.map((m) => m.name).includes(newName)) {
+        helpers.log(ctx, () => `Failed to rename member: A different member already has the newName: ${newName}`);
+        return false;
+      }
+      member.name = newName;
+      helpers.log(ctx, () => `Renamed member from memberName: ${memberName} to newName: ${newName}`);
+      return true;
+    },
+    getGangInformation: (ctx) => () => {
+      const gang = getGang(ctx);
       return {
         faction: gang.facName,
         isHacking: gang.isHackingGang,
@@ -89,30 +92,29 @@ export function NetscriptGang(player: IPlayer, workerScript: WorkerScript, helpe
         power: gang.getPower(),
         respect: gang.respect,
         respectGainRate: gang.respectGainRate,
+        respectForNextRecruit: gang.respectForNextRecruit(),
         territory: gang.getTerritory(),
         territoryClashChance: gang.territoryClashChance,
         territoryWarfareEngaged: gang.territoryWarfareEngaged,
         wantedLevel: gang.wanted,
         wantedLevelGainRate: gang.wantedGainRate,
         wantedPenalty: gang.getWantedPenalty(),
+        equipmentCostMult: 1 / gang.getDiscount(),
       };
     },
-    getOtherGangInformation: function (): GangOtherInfo {
-      helper.updateDynamicRam("getOtherGangInformation", getRamCost(player, "gang", "getOtherGangInformation"));
-      checkGangApiAccess("getOtherGangInformation");
-      const cpy: any = {};
+    getAllGangInformation: (ctx) => () => {
+      getGang(ctx);
+      const cpy: Record<string, GangOtherInfoObject> = {};
       for (const gang of Object.keys(AllGangs)) {
         cpy[gang] = Object.assign({}, AllGangs[gang]);
       }
 
       return cpy;
     },
-    getMemberInformation: function (name: any): GangMemberInfo {
-      helper.updateDynamicRam("getMemberInformation", getRamCost(player, "gang", "getMemberInformation"));
-      checkGangApiAccess("getMemberInformation");
-      const gang = player.gang;
-      if (gang === null) throw new Error("Should not be called without Gang");
-      const member = getGangMember("getMemberInformation", name);
+    getMemberInformation: (ctx) => (_memberName) => {
+      const memberName = helpers.string(ctx, "memberName", _memberName);
+      const gang = getGang(ctx);
+      const member = getGangMember(ctx, memberName);
       return {
         name: member.name,
         task: member.task,
@@ -158,59 +160,59 @@ export function NetscriptGang(player: IPlayer, workerScript: WorkerScript, helpe
         respectGain: member.calculateRespectGain(gang),
         wantedLevelGain: member.calculateWantedLevelGain(gang),
         moneyGain: member.calculateMoneyGain(gang),
+        expGain: member.calculateExpGain(),
       };
     },
-    canRecruitMember: function (): boolean {
-      helper.updateDynamicRam("canRecruitMember", getRamCost(player, "gang", "canRecruitMember"));
-      checkGangApiAccess("canRecruitMember");
-      const gang = player.gang;
-      if (gang === null) throw new Error("Should not be called without Gang");
-      return gang.canRecruitMember();
+    canRecruitMember: (ctx) => () => {
+      const gang = getGang(ctx);
+      return gang.canRecruitMember() === RecruitmentResult.Success;
     },
-    recruitMember: function (name: any): boolean {
-      helper.updateDynamicRam("recruitMember", getRamCost(player, "gang", "recruitMember"));
-      checkGangApiAccess("recruitMember");
-      const gang = player.gang;
-      if (gang === null) throw new Error("Should not be called without Gang");
-      const recruited = gang.recruitMember(name);
-      if (recruited) {
-        workerScript.log("gang.recruitMember", () => `Successfully recruited Gang Member '${name}'`);
-      } else {
-        workerScript.log("gang.recruitMember", () => `Failed to recruit Gang Member '${name}'`);
+    getRecruitsAvailable: (ctx) => () => {
+      const gang = getGang(ctx);
+      return gang.getRecruitsAvailable();
+    },
+    respectForNextRecruit: (ctx) => () => {
+      const gang = getGang(ctx);
+      return gang.respectForNextRecruit();
+    },
+    recruitMember: (ctx) => (_memberName) => {
+      const memberName = helpers.string(ctx, "memberName", _memberName);
+      const gang = getGang(ctx);
+      const result = gang.recruitMember(memberName);
+      if (result !== RecruitmentResult.Success) {
+        ctx.workerScript.log("gang.recruitMember", () => `Failed to recruit gang member '${memberName}'. ${result}.`);
+        return false;
       }
-
-      return recruited;
+      ctx.workerScript.log("gang.recruitMember", () => `Successfully recruited gang member '${memberName}'`);
+      return true;
     },
-    getTaskNames: function (): string[] {
-      helper.updateDynamicRam("getTaskNames", getRamCost(player, "gang", "getTaskNames"));
-      checkGangApiAccess("getTaskNames");
-      const gang = player.gang;
-      if (gang === null) throw new Error("Should not be called without Gang");
+    getTaskNames: (ctx) => () => {
+      const gang = getGang(ctx);
       const tasks = gang.getAllTaskNames();
       tasks.unshift("Unassigned");
       return tasks;
     },
-    setMemberTask: function (memberName: any, taskName: any): boolean {
-      helper.updateDynamicRam("setMemberTask", getRamCost(player, "gang", "setMemberTask"));
-      checkGangApiAccess("setMemberTask");
-      const member = getGangMember("setMemberTask", memberName);
-      const gang = player.gang;
-      if (gang === null) throw new Error("Should not be called without Gang");
+    setMemberTask: (ctx) => (_memberName, _taskName) => {
+      const memberName = helpers.string(ctx, "memberName", _memberName);
+      const taskName = helpers.string(ctx, "taskName", _taskName);
+      const gang = getGang(ctx);
+      const member = getGangMember(ctx, memberName);
       if (!gang.getAllTaskNames().includes(taskName)) {
-        workerScript.log(
+        ctx.workerScript.log(
           "gang.setMemberTask",
-          () => `Failed to assign Gang Member '${memberName}' to Invalid task '${taskName}'. '${memberName}' is now Unassigned`,
+          () =>
+            `Failed to assign Gang Member '${memberName}' to Invalid task '${taskName}'. '${memberName}' is now Unassigned`,
         );
-        return member.assignToTask('Unassigned');
+        return member.assignToTask("Unassigned");
       }
       const success = member.assignToTask(taskName);
       if (success) {
-        workerScript.log(
+        ctx.workerScript.log(
           "gang.setMemberTask",
           () => `Successfully assigned Gang Member '${memberName}' to '${taskName}' task`,
         );
       } else {
-        workerScript.log(
+        ctx.workerScript.log(
           "gang.setMemberTask",
           () => `Failed to assign Gang Member '${memberName}' to '${taskName}' task. '${memberName}' is now Unassigned`,
         );
@@ -218,58 +220,60 @@ export function NetscriptGang(player: IPlayer, workerScript: WorkerScript, helpe
 
       return success;
     },
-    getTaskStats: function (taskName: any): GangTaskStats {
-      helper.updateDynamicRam("getTaskStats", getRamCost(player, "gang", "getTaskStats"));
-      checkGangApiAccess("getTaskStats");
-      const task = getGangTask("getTaskStats", taskName);
+    getTaskStats: (ctx) => (_taskName) => {
+      const taskName = helpers.string(ctx, "taskName", _taskName);
+      getGang(ctx);
+      const task = getGangTask(ctx, taskName);
       const copy = Object.assign({}, task);
       copy.territory = Object.assign({}, task.territory);
       return copy;
     },
-    getEquipmentNames: function (): string[] {
-      helper.updateDynamicRam("getEquipmentNames", getRamCost(player, "gang", "getEquipmentNames"));
-      checkGangApiAccess("getEquipmentNames");
+    getEquipmentNames: (ctx) => () => {
+      getGang(ctx);
       return Object.keys(GangMemberUpgrades);
     },
-    getEquipmentCost: function (equipName: any): number {
-      helper.updateDynamicRam("getEquipmentCost", getRamCost(player, "gang", "getEquipmentCost"));
-      checkGangApiAccess("getEquipmentCost");
-      const gang = player.gang;
-      if (gang === null) throw new Error("Should not be called without Gang");
+    getEquipmentCost: (ctx) => (_equipName) => {
+      const equipName = helpers.string(ctx, "equipName", _equipName);
+      const gang = getGang(ctx);
       const upg = GangMemberUpgrades[equipName];
       if (upg === null) return Infinity;
       return gang.getUpgradeCost(upg);
     },
-    getEquipmentType: function (equipName: any): string {
-      helper.updateDynamicRam("getEquipmentType", getRamCost(player, "gang", "getEquipmentType"));
-      checkGangApiAccess("getEquipmentType");
+    getEquipmentType: (ctx) => (_equipName) => {
+      const equipName = helpers.string(ctx, "equipName", _equipName);
+      getGang(ctx);
       const upg = GangMemberUpgrades[equipName];
       if (upg == null) return "";
       return upg.getType();
     },
-    getEquipmentStats: function (equipName: any): EquipmentStats {
-      helper.updateDynamicRam("getEquipmentStats", getRamCost(player, "gang", "getEquipmentStats"));
-      checkGangApiAccess("getEquipmentStats");
+    getEquipmentStats: (ctx) => (_equipName) => {
+      const equipName = helpers.string(ctx, "equipName", _equipName);
+      getGang(ctx);
       const equipment = GangMemberUpgrades[equipName];
       if (!equipment) {
-        throw helper.makeRuntimeErrorMsg("getEquipmentStats", `Invalid equipment: ${equipName}`);
+        throw helpers.errorMessage(ctx, `Invalid equipment: ${equipName}`);
       }
       const typecheck: EquipmentStats = equipment.mults;
-      return Object.assign({}, typecheck) as any;
+      return Object.assign({}, typecheck);
     },
-    purchaseEquipment: function (memberName: any, equipName: any): boolean {
-      helper.updateDynamicRam("purchaseEquipment", getRamCost(player, "gang", "purchaseEquipment"));
-      checkGangApiAccess("purchaseEquipment");
-      const gang = player.gang;
-      if (gang === null) throw new Error("Should not be called without Gang");
-      const member = getGangMember("purchaseEquipment", memberName);
+    purchaseEquipment: (ctx) => (_memberName, _equipName) => {
+      const memberName = helpers.string(ctx, "memberName", _memberName);
+      const equipName = helpers.string(ctx, "equipName", _equipName);
+      getGang(ctx);
+      const member = getGangMember(ctx, memberName);
       const equipment = GangMemberUpgrades[equipName];
-      if (!equipment) return false;
-      const res = member.buyUpgrade(equipment, player, gang);
+      if (!equipment) {
+        ctx.workerScript.log("gang.purchaseEquipment", () => `'${equipName}' is not a valid equipment`);
+        return false;
+      }
+      const res = member.buyUpgrade(equipment);
       if (res) {
-        workerScript.log("gang.purchaseEquipment", () => `Purchased '${equipName}' for Gang member '${memberName}'`);
+        ctx.workerScript.log(
+          "gang.purchaseEquipment",
+          () => `Purchased '${equipName}' for Gang member '${memberName}'`,
+        );
       } else {
-        workerScript.log(
+        ctx.workerScript.log(
           "gang.purchaseEquipment",
           () => `Failed to purchase '${equipName}' for Gang member '${memberName}'`,
         );
@@ -277,47 +281,55 @@ export function NetscriptGang(player: IPlayer, workerScript: WorkerScript, helpe
 
       return res;
     },
-    ascendMember: function (name: any): GangMemberAscension | undefined {
-      helper.updateDynamicRam("ascendMember", getRamCost(player, "gang", "ascendMember"));
-      checkGangApiAccess("ascendMember");
-      const gang = player.gang;
-      if (gang === null) throw new Error("Should not be called without Gang");
-      const member = getGangMember("ascendMember", name);
+    ascendMember: (ctx) => (_memberName) => {
+      const memberName = helpers.string(ctx, "memberName", _memberName);
+      const gang = getGang(ctx);
+      const member = getGangMember(ctx, memberName);
       if (!member.canAscend()) return;
-      return gang.ascendMember(member, workerScript);
+      return gang.ascendMember(member, ctx.workerScript);
     },
-    getAscensionResult: function (name: any): GangMemberAscension | undefined {
-      helper.updateDynamicRam("getAscensionResult", getRamCost(player, "gang", "getAscensionResult"));
-      checkGangApiAccess("getAscensionResult");
-      const gang = player.gang;
-      if (gang === null) throw new Error("Should not be called without Gang");
-      const member = getGangMember("getAscensionResult", name);
+    getAscensionResult: (ctx) => (_memberName) => {
+      const memberName = helpers.string(ctx, "memberName", _memberName);
+      getGang(ctx);
+      const member = getGangMember(ctx, memberName);
       if (!member.canAscend()) return;
       return {
         respect: member.earnedRespect,
         ...member.getAscensionResults(),
       };
     },
-    setTerritoryWarfare: function (engage: any): void {
-      helper.updateDynamicRam("setTerritoryWarfare", getRamCost(player, "gang", "setTerritoryWarfare"));
-      checkGangApiAccess("setTerritoryWarfare");
-      const gang = player.gang;
-      if (gang === null) throw new Error("Should not be called without Gang");
+    getInstallResult: (ctx) => (_memberName) => {
+      const memberName = helpers.string(ctx, "memberName", _memberName);
+      getGang(ctx);
+      const member = getGangMember(ctx, memberName);
+      if (!member.canAscend()) return;
+      const preInstall = member.getCurrentAscensionMults();
+      const postInstall = member.getPostInstallPoints();
+      return {
+        hack: member.calculateAscensionMult(postInstall.hack) / preInstall.hack,
+        str: member.calculateAscensionMult(postInstall.str) / preInstall.str,
+        def: member.calculateAscensionMult(postInstall.def) / preInstall.def,
+        dex: member.calculateAscensionMult(postInstall.dex) / preInstall.dex,
+        agi: member.calculateAscensionMult(postInstall.agi) / preInstall.agi,
+        cha: member.calculateAscensionMult(postInstall.cha) / preInstall.cha,
+      };
+    },
+    setTerritoryWarfare: (ctx) => (_engage) => {
+      const engage = !!_engage;
+      const gang = getGang(ctx);
       if (engage) {
         gang.territoryWarfareEngaged = true;
-        workerScript.log("gang.setTerritoryWarfare", () => "Engaging in Gang Territory Warfare");
+        ctx.workerScript.log("gang.setTerritoryWarfare", () => "Engaging in Gang Territory Warfare");
       } else {
         gang.territoryWarfareEngaged = false;
-        workerScript.log("gang.setTerritoryWarfare", () => "Disengaging in Gang Territory Warfare");
+        ctx.workerScript.log("gang.setTerritoryWarfare", () => "Disengaging in Gang Territory Warfare");
       }
     },
-    getChanceToWinClash: function (otherGang: any): number {
-      helper.updateDynamicRam("getChanceToWinClash", getRamCost(player, "gang", "getChanceToWinClash"));
-      checkGangApiAccess("getChanceToWinClash");
-      const gang = player.gang;
-      if (gang === null) throw new Error("Should not be called without Gang");
+    getChanceToWinClash: (ctx) => (_otherGang) => {
+      const otherGang = helpers.string(ctx, "otherGang", _otherGang);
+      const gang = getGang(ctx);
       if (AllGangs[otherGang] == null) {
-        throw helper.makeRuntimeErrorMsg(`gang.getChanceToWinClash`, `Invalid gang: ${otherGang}`);
+        throw helpers.errorMessage(ctx, `Invalid gang: ${otherGang}`);
       }
 
       const playerPower = AllGangs[gang.facName].power;
@@ -325,12 +337,20 @@ export function NetscriptGang(player: IPlayer, workerScript: WorkerScript, helpe
 
       return playerPower / (otherPower + playerPower);
     },
-    getBonusTime: function (): number {
-      helper.updateDynamicRam("getBonusTime", getRamCost(player, "gang", "getBonusTime"));
-      checkGangApiAccess("getBonusTime");
-      const gang = player.gang;
-      if (gang === null) throw new Error("Should not be called without Gang");
-      return Math.round(gang.storedCycles / 5);
+    getBonusTime: (ctx) => () => {
+      const gang = getGang(ctx);
+      return gang.storedCycles * CONSTANTS.MilliPerCycle;
+    },
+    nextUpdate: (ctx) => () => {
+      getGang(ctx);
+      if (!GangPromise.promise) GangPromise.promise = new Promise<number>((res) => (GangPromise.resolve = res));
+      return GangPromise.promise;
     },
   };
+
+  // Removed functions
+  setRemovedFunctions(gangFunctions, {
+    getOtherGangInformation: { version: "3.0.0", replacement: "gang.getAllGangInformation" },
+  });
+  return gangFunctions;
 }

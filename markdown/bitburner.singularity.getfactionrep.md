@@ -6,19 +6,49 @@
 
 Get faction reputation.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getFactionRep(faction: string): number;
+getFactionRep(faction: FactionName): number;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  faction | string | Name of faction to work for. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+faction
+
+
+</td><td>
+
+[FactionName](./bitburner.factionname.md)
+
+
+</td><td>
+
+Name of faction to work for.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 

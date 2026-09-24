@@ -6,20 +6,65 @@
 
 Work for a company.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-workForCompany(companyName?: string, focus?: boolean): boolean;
+workForCompany(companyName: CompanyName, focus?: boolean): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  companyName | string | Name of company to work for. Must be an exact match. Optional. If not specified, this argument defaults to the last job that you worked |
-|  focus | boolean | Acquire player focus on this work operation. Optional. Defaults to true. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+companyName
+
+
+</td><td>
+
+[CompanyName](./bitburner.companyname.md)
+
+
+</td><td>
+
+Name of company to work for. Must be an exact match.
+
+
+</td></tr>
+<tr><td>
+
+focus
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+_(Optional)_ Acquire player focus on this work operation. Optional. Defaults to true.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 boolean
 
@@ -29,35 +74,16 @@ True if the player starts working, and false otherwise.
 
 RAM cost: 3 GB \* 16/4/1
 
-This function will automatically set you to start working at the company at which you are employed. If you are already in the middle of some “working” action (such as working for a faction, training at a gym, or creating a program), then running this function will automatically cancel that action and give you your earnings.
+This function will set you to start working at your current job at a specified company at which you are employed. If you are already in the middle of some “working” action (such as working for a faction, training at a gym, or creating a program), then running this function will cancel that action.
 
 This function will return true if the player starts working, and false otherwise.
 
-Note that when you are working for a company, you will not actually receive your earnings (reputation, money, experience) until you FINISH the action.
-
-## Example 1
+## Example
 
 
-```ts
-// NS1:
-//If you only want to work until you get 100,000 company reputation. One small hack to get around this is to continuously restart the action to receive your earnings:
-while (getCompanyRep(COMPANY HERE) < VALUE) {
-   workForCompany();
-   sleep(60000);
-}
-//This way, your company reputation will be updated every minute.
-```
-
-## Example 2
-
-
-```ts
-// NS2:
-//If you only want to work until you get 100,000 company reputation. One small hack to get around this is to continuously restart the action to receive your earnings:
-while (ns.getCompanyRep(COMPANY HERE) < VALUE) {
-   ns.workForCompany();
-   await ns.sleep(60000);
-}
-//This way, your company reputation will be updated every minute.
+```js
+const companyName = "Noodle Bar";
+const success = ns.singularity.workForCompany(companyName);
+if (!success) ns.tprint(`ERROR: Failed to start work at ${companyName}.`);
 ```
 

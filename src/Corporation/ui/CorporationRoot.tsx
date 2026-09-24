@@ -1,52 +1,41 @@
 // React Components for the Corporation UI's navigation tabs
 // These are the tabs at the top of the UI that let you switch to different
 // divisions, see an overview of your corporation, or create a new industry
-import React, { useState, useEffect } from "react";
-import { IIndustry } from "../IIndustry";
+import React, { useState } from "react";
 import { MainPanel } from "./MainPanel";
-import { Industries } from "../IndustryData";
-import { ExpandIndustryTab } from "./ExpandIndustryTab";
-import { use } from "../../ui/Context";
+import { NewDivisionTab } from "./NewDivisionTab";
+import { Player } from "@player";
 import { Context } from "./Context";
 import { Overview } from "./Overview";
 
 import Tabs from "@mui/material/Tabs";
 import Tab from "@mui/material/Tab";
+import { useCycleRerender } from "../../ui/React/hooks";
 
 export function CorporationRoot(): React.ReactElement {
-  const player = use.Player();
-  const corporation = player.corporation;
-  if (corporation === null) return <></>;
-  const setRerender = useState(false)[1];
-  function rerender(): void {
-    setRerender((old) => !old);
-  }
+  const rerender = useCycleRerender();
   const [divisionName, setDivisionName] = useState<string | number>("Overview");
-  function handleChange(event: React.SyntheticEvent, tab: string | number): void {
+
+  const corporation = Player.corporation;
+  if (corporation === null) return <></>;
+
+  function handleChange(_event: React.SyntheticEvent, tab: string | number): void {
     setDivisionName(tab);
   }
-  useEffect(() => {
-    const id = setInterval(rerender, 200);
-    return () => clearInterval(id);
-  }, []);
 
-  const canExpand =
-    Object.keys(Industries).filter(
-      (industryType: string) =>
-        corporation.divisions.find((division: IIndustry) => division.type === industryType) === undefined,
-    ).length > 0;
+  const canExpand = corporation.divisions.size < corporation.maxDivisions;
 
   return (
     <Context.Corporation.Provider value={corporation}>
-      <Tabs variant="fullWidth" value={divisionName} onChange={handleChange}>
+      <Tabs variant="scrollable" value={divisionName} onChange={handleChange} scrollButtons>
         <Tab label={corporation.name} value={"Overview"} />
-        {corporation.divisions.map((div) => (
+        {[...corporation.divisions.values()].map((div) => (
           <Tab key={div.name} label={div.name} value={div.name} />
         ))}
         {canExpand && <Tab label={"Expand"} value={-1} />}
       </Tabs>
       {divisionName === "Overview" && <Overview rerender={rerender} />}
-      {divisionName === -1 && <ExpandIndustryTab setDivisionName={setDivisionName} />}
+      {divisionName === -1 && <NewDivisionTab setDivisionName={setDivisionName} />}
       {typeof divisionName === "string" && divisionName !== "Overview" && (
         <MainPanel rerender={rerender} divisionName={divisionName + ""} />
       )}

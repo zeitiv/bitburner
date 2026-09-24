@@ -1,20 +1,19 @@
-/**
- * This is an object that is used to keep track of where all of the player's
- * money is coming from (or going to)
- */
-import { Generic_fromJSON, Generic_toJSON, Reviver } from "./JSONReviver";
+import type { TypedKeys } from "../types";
+
+import { Generic_fromJSON, Generic_toJSON, constructorsForReviver, IReviverValue } from "./JSONReviver";
+
+export type MoneySource = TypedKeys<MoneySourceTracker, number>;
 
 export class MoneySourceTracker {
-  // eslint-disable-next-line @typescript-eslint/ban-types
-  [key: string]: number | Function;
-
   bladeburner = 0;
   casino = 0;
   class = 0;
   codingcontract = 0;
   corporation = 0;
   crime = 0;
+  darknet = 0;
   gang = 0;
+  gang_expenses = 0;
   hacking = 0;
   hacknet = 0;
   hacknet_expenses = 0;
@@ -29,14 +28,8 @@ export class MoneySourceTracker {
   augmentations = 0;
 
   // Record money earned
-  record(amt: number, source: string): void {
-    const sanitizedSource = source.toLowerCase();
-    if (typeof this[sanitizedSource] !== "number") {
-      console.warn(`MoneySourceTracker.record() called with invalid source: ${source}`);
-      return;
-    }
-
-    (this[sanitizedSource] as number) += amt;
+  record(amt: number, source: MoneySource): void {
+    this[source] += amt;
     this.total += amt;
   }
 
@@ -50,15 +43,14 @@ export class MoneySourceTracker {
   }
 
   // Serialize the current object to a JSON save state.
-  toJSON(): any {
+  toJSON(): IReviverValue {
     return Generic_toJSON("MoneySourceTracker", this);
   }
 
-  // Initiatizes a MoneySourceTracker object from a JSON save state.
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-  static fromJSON(value: any): MoneySourceTracker {
+  // Initializes a MoneySourceTracker object from a JSON save state.
+  static fromJSON(value: IReviverValue): MoneySourceTracker {
     return Generic_fromJSON(MoneySourceTracker, value.data);
   }
 }
 
-Reviver.constructors.MoneySourceTracker = MoneySourceTracker;
+constructorsForReviver.MoneySourceTracker = MoneySourceTracker;

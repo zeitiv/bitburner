@@ -4,9 +4,9 @@
 
 ## Gang.setTerritoryWarfare() method
 
-Enable/Disable territory warfare.
+Enable/Disable territory clashes.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 setTerritoryWarfare(engage: boolean): void;
@@ -14,11 +14,41 @@ setTerritoryWarfare(engage: boolean): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  engage | boolean | Whether or not to engage in territory warfare. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+engage
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether or not to engage in territory clashes.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 void
 
@@ -26,5 +56,5 @@ void
 
 RAM cost: 2 GB
 
-Set whether or not the gang should engage in territory warfare
+Set whether or not the gang should engage in territory clashes
 

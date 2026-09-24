@@ -1,29 +1,39 @@
-import React from "react";
+import React, { ReactNode, ReactElement } from "react";
 
 import { Table, TableCell } from "./Table";
-import TableBody from "@mui/material/TableBody";
-import { Table as MuiTable } from "@mui/material";
-import TableRow from "@mui/material/TableRow";
-import Typography from "@mui/material/Typography";
+import { TableBody, TableRow, Table as MuiTable, Typography } from "@mui/material";
+import { makeStyles } from "tss-react/mui";
+import type { Property } from "csstype";
 
-interface IProps {
-  rows: any[][];
+interface StatsTableProps {
+  rows: ReactNode[][];
   title?: string;
   wide?: boolean;
+  textAlign?: Property.TextAlign;
+  paddingLeft?: string;
 }
 
-export function StatsTable({ rows, title, wide }: IProps): React.ReactElement {
+const useStyles = (textAlign: Property.TextAlign, paddingLeft: string) =>
+  makeStyles()({
+    firstCell: { textAlign: "left" },
+    nonFirstCell: { textAlign: textAlign, paddingLeft: paddingLeft },
+  })();
+
+export function StatsTable({ rows, title, wide, textAlign, paddingLeft }: StatsTableProps): ReactElement {
   const T = wide ? MuiTable : Table;
+  const { classes } = useStyles(textAlign ?? "right", paddingLeft ?? "0.5em");
   return (
     <>
       {title && <Typography>{title}</Typography>}
       <T size="small" padding="none">
         <TableBody>
-          {rows.map((row: any[], i: number) => (
-            <TableRow key={i}>
-              {row.map((elem: any, i: number) => (
-                <TableCell key={i} align={i !== 0 ? "right" : "left"}>
-                  <Typography noWrap>{elem}</Typography>
+          {rows.map((row, rowIndex) => (
+            <TableRow key={rowIndex}>
+              {row.map((cell, cellIndex) => (
+                <TableCell key={cellIndex} className={cellIndex === 0 ? classes.firstCell : classes.nonFirstCell}>
+                  <Typography component="div" noWrap>
+                    {cell}
+                  </Typography>
                 </TableCell>
               ))}
             </TableRow>

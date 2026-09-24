@@ -6,63 +6,110 @@
 
 Parse command line flags.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-flags(schema: [string, string | number | boolean | string[]][]): any;
+flags(schema: [string, string | number | boolean | string[]][]): { [key: string]: ScriptArg | string[] };
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  schema | \[string, string \| number \| boolean \| string\[\]\]\[\] |  |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
 
-any
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+schema
+
+
+</td><td>
+
+\[string, string \| number \| boolean \| string\[\]\]\[\]
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
+
+{ \[key: string\]: [ScriptArg](./bitburner.scriptarg.md) \| string\[\] }
 
 ## Remarks
 
 RAM cost: 0 GB
 
-Allows unix like flag parsing.
+Allows Unix-like flag parsing.
+
+We support 2 forms:
+
+- Short form: the flag contains only 1 character, e.g. -v.
+
+- Long form: the flag contains more than 1 character, e.g. --version.
+
+Note that if an argument is given and its default value is nullish, the parsed value will be a string. This may cause subtle issues if you are not careful with type coercion.
 
 ## Example
 
 
-```ts
-// example.script
-var data = flags([
-    ['delay', 0], // a default number means this flag is a number
-    ['server', 'foodnstuff'], //  a default string means this flag is a string
-    ['exclude', []], // a default array means this flag is a default array of string
-    ['help', false], // a default boolean means this flag is a boolean
-]);
-tprint(data);
-
-// example.ns
+```js
 export async function main(ns) {
   const data = ns.flags([
     ['delay', 0], // a default number means this flag is a number
     ['server', 'foodnstuff'], //  a default string means this flag is a string
     ['exclude', []], // a default array means this flag is a default array of string
     ['help', false], // a default boolean means this flag is a boolean
+    ['v', false], // short form
   ]);
   ns.tprint(data);
 }
 
-// [home ~/]> run example.script
-// {"_":[],"delay":0,"server":"foodnstuff","exclude":[],"help":false}
-// [home ~/]> run example.script --delay 3000
-// {"_":[],"server":"foodnstuff","exclude":[],"help":false,"delay":3000}
-// [home ~/]> run example.script --delay 3000 --server harakiri-sushi
-// {"_":[],"exclude":[],"help":false,"delay":3000,"server":"harakiri-sushi"}
-// [home ~/]> run example.script --delay 3000 --server harakiri-sushi hello world
-// {"_":["hello","world"],"exclude":[],"help":false,"delay":3000,"server":"harakiri-sushi"}
-// [home ~/]> run example.script --delay 3000 --server harakiri-sushi hello world --exclude a --exclude b
-// {"_":["hello","world"],"help":false,"delay":3000,"server":"harakiri-sushi","exclude":["a","b"]}
-// [home ~/]> run example.script --help
-// {"_":[],"delay":0,"server":"foodnstuff","exclude":[],"help":true}
+// [home /]> run example.js
+// {"_":[],"delay":0,"server":"foodnstuff","exclude":[],"help":false,"v":false}
+// [home /]> run example.js --delay 3000
+// {"_":[],"delay":3000,"server":"foodnstuff","exclude":[],"help":false,"v":false}
+// [home /]> run example.js --delay 3000 --server harakiri-sushi
+// {"_":[],"delay":3000,"server":"harakiri-sushi","exclude":[],"help":false,"v":false}
+// [home /]> run example.js --delay 3000 --server harakiri-sushi hello world
+// {"_":["hello","world"],"delay":3000,"server":"harakiri-sushi","exclude":[],"help":false,"v":false}
+// [home /]> run example.js --delay 3000 --server harakiri-sushi hello world --exclude a --exclude b
+// {"_":["hello","world"],"delay":3000,"server":"harakiri-sushi","exclude":["a","b"],"help":false,"v":false}
+// [home /]> run example.js --help
+// {"_":[],"delay":0,"server":"foodnstuff","exclude":[],"help":true,"v":false}
+// [home /]> run example.js -v
+// {"_":[],"delay":0,"server":"foodnstuff","exclude":[],"help":false,"v":true}
 ```
+
+```js
+export async function main(ns) {
+  const data = ns.flags([
+    ["foo", null],
+    ["bar", undefined],
+  ]);
+  console.log(data);
+}
+
+// [home /]> run example.js
+// { _: [], foo: null, bar: undefined }
+// [home /]> run example.js --foo 1000
+// { _: [], foo: "1000", bar: undefined }
+// [home /]> run example.js --foo 1000 --bar false
+// { _: [], foo: "1000", bar: "false" }
+```
+`bar` in the last example is `"false"` (a string), not `false` (a boolean). `data.bar` is truthy, not falsy.
 

@@ -4,9 +4,9 @@
 
 ## CrimeStats.strength\_success\_weight property
 
-strength level impact on success change of the crime
+Impact of strength level on success chance of the crime
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 strength_success_weight: number;

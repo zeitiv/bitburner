@@ -1,194 +1,210 @@
-import { Augmentations } from "../Augmentation/Augmentations";
-import { Augmentation } from "../Augmentation/Augmentation";
-import { PlayerOwnedAugmentation } from "../Augmentation/PlayerOwnedAugmentation";
-import { AugmentationNames } from "../Augmentation/data/AugmentationNames";
-import { BitNodeMultipliers } from "../BitNode/BitNodeMultipliers";
-import { CONSTANTS } from "../Constants";
+import type { Augmentation } from "../Augmentation/Augmentation";
+import type { Faction } from "./Faction";
 
-import { Faction } from "./Faction";
+import { Augmentations } from "../Augmentation/Augmentations";
+import { AugmentationName, FactionDiscovery, FactionName } from "@enums";
+import { currentNodeMults } from "../BitNode/BitNodeMultipliers";
+
+import { Player } from "@player";
 import { Factions } from "./Factions";
-import { Player } from "../Player";
 import { Settings } from "../Settings/Settings";
 import {
-  getHackingWorkRepGain,
-  getFactionSecurityWorkRepGain,
   getFactionFieldWorkRepGain,
+  getFactionSecurityWorkRepGain,
+  getHackingWorkRepGain,
 } from "../PersonObjects/formulas/reputation";
-import { SourceFileFlags } from "../SourceFile/SourceFileFlags";
 
 import { dialogBoxCreate } from "../ui/React/DialogBox";
-import { InvitationEvent } from "./ui/InvitationModal";
+import { FactionInvitationEvents } from "./ui/FactionInvitationManager";
+import { SFC32RNG } from "../Casino/RNG";
+import { isFactionWork } from "../Work/FactionWork";
+import { getAugCost } from "../Augmentation/AugmentationHelpers";
+import { getRecordKeys } from "../Types/Record";
+import type { Result } from "@nsdefs";
 
 export function inviteToFaction(faction: Faction): void {
+  if (faction.alreadyInvited || faction.isMember) return;
   Player.receiveInvite(faction.name);
   faction.alreadyInvited = true;
+  faction.discovery = FactionDiscovery.known;
   if (!Settings.SuppressFactionInvites) {
-    InvitationEvent.emit(faction);
+    FactionInvitationEvents.emit({ type: "New", factionName: faction.name });
   }
 }
 
 export function joinFaction(faction: Faction): void {
   if (faction.isMember) return;
   faction.isMember = true;
-  Player.factions.push(faction.name);
-  const factionInfo = faction.getInfo();
+  faction.alreadyInvited = true;
+  faction.discovery = FactionDiscovery.known;
 
-  //Determine what factions you are banned from now that you have joined this faction
-  for (const enemy of factionInfo.enemies) {
-    if (Factions[enemy] instanceof Faction) {
-      Factions[enemy].isBanned = true;
-    }
+  // Add this faction to player's faction list, keeping it in standard order
+  Player.factions = getRecordKeys(Factions).filter((facName) => Factions[facName].isMember);
+
+  // Ban player from joining this faction's enemies
+  for (const enemy of faction.getInfo().enemies) {
+    if (Factions[enemy]) Factions[enemy].isBanned = true;
   }
-  for (let i = 0; i < Player.factionInvitations.length; ++i) {
-    if (Player.factionInvitations[i] == faction.name || Factions[Player.factionInvitations[i]].isBanned) {
-      Player.factionInvitations.splice(i, 1);
-      i--;
-    }
-  }
+  // Remove invalid invites
+  Player.factionInvitations = Player.factionInvitations.filter((factionName) => {
+    return !Factions[factionName].isMember && !Factions[factionName].isBanned;
+  });
 }
 
 //Returns a boolean indicating whether the player has the prerequisites for the
 //specified Augmentation
 export function hasAugmentationPrereqs(aug: Augmentation): boolean {
-  let hasPrereqs = true;
-  if (aug.prereqs && aug.prereqs.length > 0) {
-    for (let i = 0; i < aug.prereqs.length; ++i) {
-      const prereqAug = Augmentations[aug.prereqs[i]];
-      if (prereqAug == null) {
-        console.error(`Invalid prereq Augmentation ${aug.prereqs[i]}`);
-        continue;
-      }
-      if (prereqAug.owned === false) {
-        hasPrereqs = false;
+  return aug.prereqs.every((aug) => Player.hasAugmentation(aug));
+}
 
-        // Check if the aug is purchased
-        for (let j = 0; j < Player.queuedAugmentations.length; ++j) {
-          if (Player.queuedAugmentations[j].name === prereqAug.name) {
-            hasPrereqs = true;
-            break;
-          }
-        }
+function checkIfPlayerCanPurchaseAugmentation(faction: Faction, augmentation: Augmentation): Result {
+  if (!Player.factions.includes(faction.name)) {
+    return {
+      success: false,
+      message: `You can't purchase augmentations from '${faction.name}' because you aren't a member.`,
+    };
+  }
+
+  if (!getFactionAugmentationsFiltered(faction).includes(augmentation.name)) {
+    return {
+      success: false,
+      message: `Faction '${faction.name}' does not have the '${augmentation.name}' augmentation.`,
+    };
+  }
+
+  if (augmentation.name !== AugmentationName.NeuroFluxGovernor) {
+    for (const queuedAugmentation of Player.queuedAugmentations) {
+      if (queuedAugmentation.name === augmentation.name) {
+        return { success: false, message: `You already purchased the '${augmentation.name}' augmentation.` };
+      }
+    }
+    for (const installedAugmentation of Player.augmentations) {
+      if (installedAugmentation.name === augmentation.name) {
+        return { success: false, message: `You already installed the '${augmentation.name}' augmentation.` };
       }
     }
   }
 
-  return hasPrereqs;
+  if (!hasAugmentationPrereqs(augmentation)) {
+    return {
+      success: false,
+      message: `You must first purchase or install ${augmentation.prereqs
+        .filter((req) => !Player.hasAugmentation(req))
+        .join(",")} before you can purchase this one.`,
+    };
+  }
+
+  const augCosts = getAugCost(augmentation);
+  if (augCosts.moneyCost !== 0 && Player.money < augCosts.moneyCost) {
+    return { success: false, message: `You don't have enough money to purchase ${augmentation.name}.` };
+  }
+
+  if (faction.playerReputation < augCosts.repCost) {
+    return { success: false, message: `You don't have enough faction reputation to purchase ${augmentation.name}.` };
+  }
+
+  return { success: true };
 }
 
-export function purchaseAugmentation(aug: Augmentation, fac: Faction, sing = false): string {
-  const factionInfo = fac.getInfo();
-  const hasPrereqs = hasAugmentationPrereqs(aug);
-  if (!hasPrereqs) {
-    const txt =
-      "You must first purchase or install " + aug.prereqs.join(",") + " before you can " + "purchase this one.";
-    if (sing) {
-      return txt;
-    } else {
-      dialogBoxCreate(txt);
+export function purchaseAugmentation(faction: Faction, augmentation: Augmentation, singularity = false): Result {
+  const result = checkIfPlayerCanPurchaseAugmentation(faction, augmentation);
+  if (!result.success) {
+    if (!singularity) {
+      dialogBoxCreate(result.message);
     }
-  } else if (aug.baseCost !== 0 && Player.money < aug.baseCost * factionInfo.augmentationPriceMult) {
-    const txt = "You don't have enough money to purchase " + aug.name;
-    if (sing) {
-      return txt;
-    }
-    dialogBoxCreate(txt);
-  } else if (fac.playerReputation < aug.baseRepRequirement) {
-    const txt = "You don't have enough faction reputation to purchase " + aug.name;
-    if (sing) {
-      return txt;
-    }
-    dialogBoxCreate(txt);
-  } else if (aug.baseCost === 0 || Player.money >= aug.baseCost * factionInfo.augmentationPriceMult) {
-    const queuedAugmentation = new PlayerOwnedAugmentation(aug.name);
-    if (aug.name == AugmentationNames.NeuroFluxGovernor) {
-      queuedAugmentation.level = getNextNeurofluxLevel();
-    }
-    Player.queuedAugmentations.push(queuedAugmentation);
+    return { success: false, message: result.message };
+  }
 
-    Player.loseMoney(aug.baseCost * factionInfo.augmentationPriceMult, "augmentations");
+  const augCosts = getAugCost(augmentation);
+  Player.queueAugmentation(augmentation.name);
+  Player.loseMoney(augCosts.moneyCost, "augmentations");
 
-    // If you just purchased Neuroflux Governor, recalculate the cost
-    if (aug.name == AugmentationNames.NeuroFluxGovernor) {
-      let nextLevel = getNextNeurofluxLevel();
-      --nextLevel;
-      const mult = Math.pow(CONSTANTS.NeuroFluxGovernorLevelMult, nextLevel);
-      aug.baseRepRequirement = 500 * mult * BitNodeMultipliers.AugmentationRepCost;
-      aug.baseCost = 750e3 * mult * BitNodeMultipliers.AugmentationMoneyCost;
-
-      for (let i = 0; i < Player.queuedAugmentations.length - 1; ++i) {
-        aug.baseCost *= CONSTANTS.MultipleAugMultiplier * [1, 0.96, 0.94, 0.93][SourceFileFlags[11]];
-      }
-    }
-
-    for (const name of Object.keys(Augmentations)) {
-      if (Augmentations.hasOwnProperty(name)) {
-        Augmentations[name].baseCost *= CONSTANTS.MultipleAugMultiplier * [1, 0.96, 0.94, 0.93][SourceFileFlags[11]];
-      }
-    }
-
-    if (sing) {
-      return "You purchased " + aug.name;
-    } else {
-      if (!Settings.SuppressBuyAugmentationConfirmation) {
-        dialogBoxCreate(
-          "You purchased " +
-            aug.name +
-            ". Its enhancements will not take " +
-            "effect until they are installed. To install your augmentations, go to the " +
-            "'Augmentations' tab on the left-hand navigation menu. Purchasing additional " +
-            "augmentations will now be more expensive.",
-        );
-      }
-    }
-  } else {
+  if (!singularity && !Settings.SuppressBuyAugmentationConfirmation) {
     dialogBoxCreate(
-      "Hmm, something went wrong when trying to purchase an Augmentation. " +
-        "Please report this to the game developer with an explanation of how to " +
-        "reproduce this.",
+      `You purchased ${augmentation.name}. Its enhancements will not take effect until they are installed. ` +
+        "To install your augmentations, go to the 'Augmentations' tab on the left-hand navigation menu. " +
+        "Purchasing additional augmentations will now be more expensive.",
     );
   }
-  return "";
-}
-
-export function getNextNeurofluxLevel(): number {
-  // Get current Neuroflux level based on Player's augmentations
-  let currLevel = 0;
-  for (let i = 0; i < Player.augmentations.length; ++i) {
-    if (Player.augmentations[i].name === AugmentationNames.NeuroFluxGovernor) {
-      currLevel = Player.augmentations[i].level;
-    }
-  }
-
-  // Account for purchased but uninstalled Augmentations
-  for (let i = 0; i < Player.queuedAugmentations.length; ++i) {
-    if (Player.queuedAugmentations[i].name == AugmentationNames.NeuroFluxGovernor) {
-      ++currLevel;
-    }
-  }
-  return currLevel + 1;
+  return { success: true };
 }
 
 export function processPassiveFactionRepGain(numCycles: number): void {
-  for (const name of Object.keys(Factions)) {
-    if (name === Player.currentWorkFactionName) continue;
-    if (!Factions.hasOwnProperty(name)) continue;
+  // Passive gain is disabled in some BitNodes (e.g., BN2).
+  if (currentNodeMults.FactionPassiveRepGain === 0) {
+    return;
+  }
+  for (const name of getRecordKeys(Factions)) {
+    if (isFactionWork(Player.currentWork) && name === Player.currentWork.factionName) {
+      continue;
+    }
     const faction = Factions[name];
-    if (!faction.isMember) continue;
-    // No passive rep for special factions
+    if (!faction.isMember) {
+      continue;
+    }
+    // No passive rep for special factions.
     const info = faction.getInfo();
-    if (!info.offersWork()) continue;
+    if (info.special) {
+      continue;
+    }
     // No passive rep for gangs.
-    if (Player.getGangName() === name) continue;
+    if (Player.getGangName() === name) {
+      continue;
+    }
     // 0 favor = 1%/s
     // 50 favor = 6%/s
     // 100 favor = 11%/s
     const favorMult = Math.min(0.1, faction.favor / 1000 + 0.01);
     // Find the best of all possible favor gain, minimum 1 rep / 2 minute.
-    const hRep = getHackingWorkRepGain(Player, faction);
-    const sRep = getFactionSecurityWorkRepGain(Player, faction);
-    const fRep = getFactionFieldWorkRepGain(Player, faction);
+    const hRep = getHackingWorkRepGain(Player, faction.favor);
+    const sRep = getFactionSecurityWorkRepGain(Player, faction.favor);
+    const fRep = getFactionFieldWorkRepGain(Player, faction.favor);
     const rate = Math.max(hRep * favorMult, sRep * favorMult, fRep * favorMult, 1 / 120);
 
-    faction.playerReputation += rate * numCycles * Player.faction_rep_mult * BitNodeMultipliers.FactionPassiveRepGain;
+    /**
+     * Do not apply Player.mults.faction_rep here. That multiplier was applied in getHackingWorkRepGain and similar
+     * functions.
+     */
+    faction.playerReputation += rate * numCycles * currentNodeMults.FactionPassiveRepGain;
   }
 }
+
+export const getFactionAugmentationsFiltered = (faction: Faction): AugmentationName[] => {
+  // If player has a gang with this faction, return (almost) all augmentations
+  if (Player.hasGangWith(faction.name)) {
+    let augs = Object.values(Augmentations);
+
+    // Remove special augs
+    augs = augs.filter((a) => !a.isSpecial && a.name !== AugmentationName.CongruityImplant);
+
+    if (Player.bitNodeN === 2) {
+      // TRP is not available outside of BN2 for Gangs
+      augs.push(Augmentations[AugmentationName.TheRedPill]);
+    }
+
+    const rng = SFC32RNG(`BN${Player.bitNodeN}.${Player.activeSourceFileLvl(Player.bitNodeN)}`);
+    // Remove faction-unique augs that don't belong to this faction
+    const uniqueFilter = (a: Augmentation): boolean => {
+      // Keep all the non-unique one
+      if (a.factions.length > 1) {
+        return true;
+      }
+      // Keep all the ones that this faction has anyway.
+      if (faction.augmentations.includes(a.name)) {
+        return true;
+      }
+
+      return rng() >= 1 - currentNodeMults.GangUniqueAugs;
+    };
+    augs = augs.filter(uniqueFilter);
+
+    return augs.map((a) => a.name);
+  }
+
+  // Remove TRP from daedalus in BN15
+  if (Player.bitNodeN === 15 && faction.name == FactionName.Daedalus) {
+    return faction.augmentations.filter((aug) => aug !== AugmentationName.TheRedPill);
+  }
+
+  return faction.augmentations.slice();
+};

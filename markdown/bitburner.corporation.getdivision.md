@@ -4,9 +4,9 @@
 
 ## Corporation.getDivision() method
 
-Get division data
+Get division data.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 getDivision(divisionName: string): Division;
@@ -14,13 +14,47 @@ getDivision(divisionName: string): Division;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  divisionName | string | Name of the division |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+divisionName
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the division
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 [Division](./bitburner.division.md)
 
 Division data
+
+## Remarks
+
+RAM cost: 10 GB
 

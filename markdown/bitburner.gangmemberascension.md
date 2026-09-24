@@ -5,21 +5,167 @@
 ## GangMemberAscension interface
 
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-export interface GangMemberAscension 
+interface GangMemberAscension 
 ```
 
 ## Properties
 
-|  Property | Type | Description |
-|  --- | --- | --- |
-|  [agi](./bitburner.gangmemberascension.agi.md) | number | Agility multiplier gained from ascending |
-|  [cha](./bitburner.gangmemberascension.cha.md) | number | Charisma multiplier gained from ascending |
-|  [def](./bitburner.gangmemberascension.def.md) | number | Defense multiplier gained from ascending |
-|  [dex](./bitburner.gangmemberascension.dex.md) | number | Dexterity multiplier gained from ascending |
-|  [hack](./bitburner.gangmemberascension.hack.md) | number | Hacking multiplier gained from ascending |
-|  [respect](./bitburner.gangmemberascension.respect.md) | number | Amount of respect lost from ascending |
-|  [str](./bitburner.gangmemberascension.str.md) | number | Strength multiplier gained from ascending |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[agi](./bitburner.gangmemberascension.agi.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Factor by which the agility ascension multiplier was increased (newMult / oldMult)
+
+
+</td></tr>
+<tr><td>
+
+[cha](./bitburner.gangmemberascension.cha.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Factor by which the charisma ascension multiplier was increased (newMult / oldMult)
+
+
+</td></tr>
+<tr><td>
+
+[def](./bitburner.gangmemberascension.def.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Factor by which the defense ascension multiplier was increased (newMult / oldMult)
+
+
+</td></tr>
+<tr><td>
+
+[dex](./bitburner.gangmemberascension.dex.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Factor by which the dexterity ascension multiplier was increased (newMult / oldMult)
+
+
+</td></tr>
+<tr><td>
+
+[hack](./bitburner.gangmemberascension.hack.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Factor by which the hacking ascension multiplier was increased (newMult / oldMult)
+
+
+</td></tr>
+<tr><td>
+
+[respect](./bitburner.gangmemberascension.respect.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Amount of respect lost from ascending
+
+
+</td></tr>
+<tr><td>
+
+[str](./bitburner.gangmemberascension.str.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Factor by which the strength ascension multiplier was increased (newMult / oldMult)
+
+
+</td></tr>
+</tbody></table>
 

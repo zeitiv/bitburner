@@ -6,27 +6,57 @@
 
 Get chance to successfully commit a crime.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getCrimeChance(crime: string): number;
+getCrimeChance(crime: CrimeType): number;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  crime | string | Name of crime. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+crime
+
+
+</td><td>
+
+[CrimeType](./bitburner.crimetype.md)
+
+
+</td><td>
+
+Name of crime.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 
-Chance of success at commiting the specified crime.
+Chance of success at committing the specified crime.
 
 ## Remarks
 
 RAM cost: 5 GB \* 16/4/1
 
-This function returns your chance of success at commiting the specified crime.
+This function returns your chance of success at committing the specified crime.
 

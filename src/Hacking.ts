@@ -1,100 +1,94 @@
-import { BitNodeMultipliers } from "./BitNode/BitNodeMultipliers";
-import { IPlayer } from "./PersonObjects/IPlayer";
+import { currentNodeMults } from "./BitNode/BitNodeMultipliers";
+import { Person as IPerson } from "@nsdefs";
 import { calculateIntelligenceBonus } from "./PersonObjects/formulas/intelligence";
-import { Server } from "./Server/Server";
+import { Server as IServer } from "@nsdefs";
+import { clampNumber } from "./utils/helpers/clampNumber";
+import { DarknetServer } from "./Server/DarknetServer";
 
-/**
- * Returns the chance the player has to successfully hack a server
- */
-export function calculateHackingChance(server: Server, player: IPlayer): number {
+/** Returns the chance the person has to successfully hack a server */
+export function calculateHackingChance(server: IServer, person: IPerson): number {
+  const hackDifficulty = server.hackDifficulty ?? 100;
+  const requiredHackingSkill = server.requiredHackingSkill ?? 1e9;
+  // Unrooted or unhackable server
+  if (!server.hasAdminRights || hackDifficulty >= 100) return 0;
   const hackFactor = 1.75;
-  const difficultyMult = (100 - server.hackDifficulty) / 100;
-  const skillMult = hackFactor * player.hacking;
-  const skillChance = (skillMult - server.requiredHackingSkill) / skillMult;
+  const difficultyMult = (100 - hackDifficulty) / 100;
+  const skillMult = clampNumber(hackFactor * person.skills.hacking, 1);
+  const skillChance = (skillMult - requiredHackingSkill) / skillMult;
   const chance =
-    skillChance * difficultyMult * player.hacking_chance_mult * calculateIntelligenceBonus(player.intelligence, 1);
-  if (chance > 1) {
-    return 1;
-  }
-  if (chance < 0) {
-    return 0;
-  }
-
-  return chance;
+    skillChance *
+    difficultyMult *
+    person.mults.hacking_chance *
+    calculateIntelligenceBonus(person.skills.intelligence, 1);
+  return clampNumber(chance, 0, 1);
 }
 
 /**
- * Returns the amount of hacking experience the player will gain upon
+ * Returns the amount of hacking experience the person will gain upon
  * successfully hacking a server
  */
-export function calculateHackingExpGain(server: Server, player: IPlayer): number {
+export function calculateHackingExpGain(server: IServer, person: IPerson): number {
+  const baseDifficulty = server.baseDifficulty;
+  if (!baseDifficulty) return 0;
   const baseExpGain = 3;
   const diffFactor = 0.3;
-  if (server.baseDifficulty == null) {
-    server.baseDifficulty = server.hackDifficulty;
-  }
   let expGain = baseExpGain;
-  expGain += server.baseDifficulty * diffFactor;
-
-  return expGain * player.hacking_exp_mult * BitNodeMultipliers.HackExpGain;
+  expGain += baseDifficulty * diffFactor;
+  return expGain * person.mults.hacking_exp * currentNodeMults.HackExpGain;
 }
 
 /**
  * Returns the percentage of money that will be stolen from a server if
  * it is successfully hacked (returns the decimal form, not the actual percent value)
  */
-export function calculatePercentMoneyHacked(server: Server, player: IPlayer): number {
+export function calculatePercentMoneyHacked(server: IServer, person: IPerson): number {
+  const hackDifficulty = server.hackDifficulty ?? 100;
+  if (hackDifficulty >= 100) return 0;
+  const requiredHackingSkill = server.requiredHackingSkill ?? 1e9;
   // Adjust if needed for balancing. This is the divisor for the final calculation
   const balanceFactor = 240;
 
-  const difficultyMult = (100 - server.hackDifficulty) / 100;
-  const skillMult = (player.hacking - (server.requiredHackingSkill - 1)) / player.hacking;
-  const percentMoneyHacked = (difficultyMult * skillMult * player.hacking_money_mult * BitNodeMultipliers.ScriptHackMoney) / balanceFactor;
-  if (percentMoneyHacked < 0) {
-    return 0;
-  }
-  if (percentMoneyHacked > 1) {
-    return 1;
-  }
+  const difficultyMult = (100 - hackDifficulty) / 100;
+  const skillMult = (person.skills.hacking - (requiredHackingSkill - 1)) / person.skills.hacking;
+  const percentMoneyHacked =
+    (difficultyMult * skillMult * person.mults.hacking_money * currentNodeMults.ScriptHackMoney) / balanceFactor;
 
-  return percentMoneyHacked;
+  return Math.min(1, Math.max(percentMoneyHacked, 0));
 }
 
-/**
- * Returns time it takes to complete a hack on a server, in seconds
- */
-export function calculateHackingTime(server: Server, player: IPlayer): number {
-  const difficultyMult = server.requiredHackingSkill * server.hackDifficulty;
+/** Returns time it takes to complete a hack on a server, in seconds */
+export function calculateHackingTime(server: IServer, person: IPerson): number {
+  if (server instanceof DarknetServer) return 16;
+  const { hackDifficulty, requiredHackingSkill } = server;
+  if (typeof hackDifficulty !== "number" || typeof requiredHackingSkill !== "number") return Infinity;
+  const difficultyMult = requiredHackingSkill * hackDifficulty;
 
   const baseDiff = 500;
   const baseSkill = 50;
   const diffFactor = 2.5;
   let skillFactor = diffFactor * difficultyMult + baseDiff;
-  // tslint:disable-next-line
-  skillFactor /= player.hacking + baseSkill;
+  skillFactor /= person.skills.hacking + baseSkill;
 
   const hackTimeMultiplier = 5;
   const hackingTime =
     (hackTimeMultiplier * skillFactor) /
-    (player.hacking_speed_mult * calculateIntelligenceBonus(player.intelligence, 1));
+    (person.mults.hacking_speed *
+      currentNodeMults.HackingSpeedMultiplier *
+      calculateIntelligenceBonus(person.skills.intelligence, 1));
 
   return hackingTime;
 }
 
-/**
- * Returns time it takes to complete a grow operation on a server, in seconds
- */
-export function calculateGrowTime(server: Server, player: IPlayer): number {
+/** Returns time it takes to complete a grow operation on a server, in seconds */
+export function calculateGrowTime(server: IServer, person: IPerson): number {
   const growTimeMultiplier = 3.2; // Relative to hacking time. 16/5 = 3.2
 
-  return growTimeMultiplier * calculateHackingTime(server, player);
+  return growTimeMultiplier * calculateHackingTime(server, person);
 }
 
-/**
- * Returns time it takes to complete a weaken operation on a server, in seconds
- */
-export function calculateWeakenTime(server: Server, player: IPlayer): number {
+/** Returns time it takes to complete a weaken operation on a server, in seconds */
+export function calculateWeakenTime(server: IServer, person: IPerson): number {
   const weakenTimeMultiplier = 4; // Relative to hacking time
 
-  return weakenTimeMultiplier * calculateHackingTime(server, player);
+  return weakenTimeMultiplier * calculateHackingTime(server, person);
 }

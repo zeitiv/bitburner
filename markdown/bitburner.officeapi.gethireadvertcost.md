@@ -4,9 +4,9 @@
 
 ## OfficeAPI.getHireAdVertCost() method
 
-Get the cost to Hire AdVert
+Get the cost to hire AdVert.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 getHireAdVertCost(divisionName: string): number;
@@ -14,13 +14,47 @@ getHireAdVertCost(divisionName: string): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  divisionName | string | Name of the division |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+divisionName
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the division.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 
-Cost
+The cost to hire AdVert.
+
+## Remarks
+
+RAM cost: 10 GB
 

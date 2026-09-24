@@ -6,20 +6,65 @@
 
 Get team size.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getTeamSize(type: string, name: string): number;
+getTeamSize(type?: BladeburnerActionType, name?: BladeburnerActionName): number;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  type | string | Type of action. |
-|  name | string | Name of action. Must be an exact match. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+type
+
+
+</td><td>
+
+[BladeburnerActionType](./bitburner.bladeburneractiontype.md)
+
+
+</td><td>
+
+_(Optional)_ Type of action.
+
+
+</td></tr>
+<tr><td>
+
+name
+
+
+</td><td>
+
+[BladeburnerActionName](./bitburner.bladeburneractionname.md)
+
+
+</td><td>
+
+_(Optional)_ Name of action. Must be an exact match.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 
@@ -29,7 +74,7 @@ Number of Bladeburner team members that were assigned to the specified action.
 
 RAM cost: 4 GB
 
-Returns the number of Bladeburner team members you have assigned to the specified action.
+Returns the number of available Bladeburner team members. You can also pass the type and name of an action to get the number of Bladeburner team members you have assigned to the specified action.
 
 Setting a team is only applicable for Operations and BlackOps. This function will return 0 for other action types.
 

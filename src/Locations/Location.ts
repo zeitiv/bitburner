@@ -1,9 +1,4 @@
-/**
- * Class representing a visitable location in the world
- */
-import { CityName } from "./data/CityNames";
-import { LocationName } from "./data/LocationNames";
-import { LocationType } from "./LocationTypeEnum";
+import { CityName, LocationName, LocationType } from "@enums";
 
 interface IInfiltrationMetadata {
   maxClearanceLevel: number;
@@ -21,21 +16,18 @@ export interface IConstructorParams {
   techVendorMinRam?: number;
 }
 
+/** Class representing a visitable location in the world */
 export class Location {
   /**
-   * Name of city this location is in. If this property is null, it means this i
+   * Name of city this location is in. If this property is null, it means this
    * is a generic location that is available in all cities
    */
   city: CityName | null = null;
 
-  /**
-   * Cost multiplier that influences how expensive a gym/university is
-   */
+  /** Cost multiplier that influences how expensive a gym/university is */
   costMult = 0;
 
-  /**
-   * Exp multiplier that influences how effective a gym/university is
-   */
+  /** Exp multiplier that influences how effective a gym/university is */
   expMult = 0;
 
   /**
@@ -44,9 +36,7 @@ export class Location {
    */
   infiltrationData?: IInfiltrationMetadata;
 
-  /**
-   * Identifier for location
-   */
+  /** Identifier for location */
   name: LocationName = LocationName.Void;
 
   /**
@@ -63,7 +53,7 @@ export class Location {
 
   /**
    * Tech vendors allow you to purchase servers.
-   * This property defines the max RAM server you can purchase from this vendor
+   * This property defines the min RAM server you can purchase from this vendor
    */
   techVendorMinRam = 0;
 

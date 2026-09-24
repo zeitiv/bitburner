@@ -4,9 +4,9 @@
 
 ## Corporation.goPublic() method
 
-Go public
+Go public.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 goPublic(numShares: number): boolean;
@@ -14,13 +14,47 @@ goPublic(numShares: number): boolean;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  numShares | number | number of shares you would like to issue for your IPO |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+numShares
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Number of shares you would like to issue for your IPO
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 boolean
 
 true if you successfully go public, false if not
+
+## Remarks
+
+RAM cost: 20 GB
 

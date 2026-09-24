@@ -3,21 +3,21 @@ on:
   workflow_dispatch:
     inputs:
       fromCommit:
-        description: 'From Commit SHA (full-length)'
+        description: "From Commit SHA (full-length)"
         required: true
       toCommit:
-        description: 'To Commit SHA (full-length, if omitted will use latest)'
+        description: "To Commit SHA (full-length, if omitted will use latest)"
 
 jobs:
   fetchChangelog:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - name: Use Node v16.13.1
-        uses: actions/setup-node@v2
+      - uses: actions/checkout@v4
+      - name: Use Node 22
+        uses: actions/setup-node@v4
         with:
-          node-version: 16.13.1
-          cache: 'npm'
+          node-version: 24
+          cache: "npm"
       - name: Install NPM dependencies
         working-directory: ./tools/fetch-changelog
         run: npm ci
@@ -38,7 +38,7 @@ jobs:
           echo
           echo "You may want to go to https://gist.github.com/ to upload the final changelog"
           echo "The next step will require an url because we can't easily pass multiline strings to actions"
-      - uses: actions/upload-artifact@v2
+      - uses: actions/upload-artifact@v4
         with:
           name: bitburner_changelog___DRAFT.md
           path: ./tools/fetch-changelog/changes.md

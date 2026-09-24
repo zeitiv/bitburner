@@ -4,33 +4,142 @@
 
 ## WarehouseAPI.exportMaterial() method
 
-Set material export data
+Set material export data.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 exportMaterial(
     sourceDivision: string,
-    sourceCity: string,
+    sourceCity: CityName,
     targetDivision: string,
-    targetCity: string,
-    materialName: string,
-    amt: number,
+    targetCity: CityName,
+    materialName: CorpMaterialName,
+    amt: number | string,
   ): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  sourceDivision | string | Source division |
-|  sourceCity | string | Source city |
-|  targetDivision | string | Target division |
-|  targetCity | string | Target city |
-|  materialName | string | Name of the material |
-|  amt | number | Amount of material to export. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+sourceDivision
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Source division
+
+
+</td></tr>
+<tr><td>
+
+sourceCity
+
+
+</td><td>
+
+[CityName](./bitburner.cityname.md)
+
+
+</td><td>
+
+Source city
+
+
+</td></tr>
+<tr><td>
+
+targetDivision
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Target division
+
+
+</td></tr>
+<tr><td>
+
+targetCity
+
+
+</td><td>
+
+[CityName](./bitburner.cityname.md)
+
+
+</td><td>
+
+Target city
+
+
+</td></tr>
+<tr><td>
+
+materialName
+
+
+</td><td>
+
+[CorpMaterialName](./bitburner.corpmaterialname.md)
+
+
+</td><td>
+
+Name of the material
+
+
+</td></tr>
+<tr><td>
+
+amt
+
+
+</td><td>
+
+number \| string
+
+
+</td><td>
+
+Amount of material to export.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 void
+
+## Remarks
+
+RAM cost: 20 GB
 

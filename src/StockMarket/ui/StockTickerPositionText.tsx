@@ -6,23 +6,21 @@ import * as React from "react";
 
 import { Stock } from "../Stock";
 
-import { IPlayer } from "../../PersonObjects/IPlayer";
-import { numeralWrapper } from "../../ui/numeralFormat";
+import { Player } from "@player";
+import { formatPercent, formatShares } from "../../ui/formatNumber";
 import { Money } from "../../ui/React/Money";
-import { SourceFileFlags } from "../../SourceFile/SourceFileFlags";
 import Typography from "@mui/material/Typography";
 import Tooltip from "@mui/material/Tooltip";
 import Box from "@mui/material/Box";
 
-type IProps = {
-  p: IPlayer;
+interface IProps {
   stock: Stock;
-};
+}
 
 function LongPosition(props: IProps): React.ReactElement {
   const stock = props.stock;
 
-  // Caculate total returns
+  // Calculate total returns
   const totalCost = stock.playerShares * stock.playerAvgPx;
   const gains = (stock.getBidPrice() - stock.playerAvgPx) * stock.playerShares;
   let percentageGains = gains / totalCost;
@@ -45,12 +43,12 @@ function LongPosition(props: IProps): React.ReactElement {
           </Typography>
         </Tooltip>
       </Box>
-      <Typography>Shares: {numeralWrapper.formatShares(stock.playerShares)}</Typography>
+      <Typography>Shares: {formatShares(stock.playerShares)}</Typography>
       <Typography>
         Average Price: <Money money={stock.playerAvgPx} /> (Total Cost: <Money money={totalCost} />)
       </Typography>
       <Typography>
-        Profit: <Money money={gains} /> ({numeralWrapper.formatPercentage(percentageGains)})
+        Profit: <Money money={gains} /> ({formatPercent(percentageGains)})
       </Typography>
     </>
   );
@@ -59,7 +57,7 @@ function LongPosition(props: IProps): React.ReactElement {
 function ShortPosition(props: IProps): React.ReactElement {
   const stock = props.stock;
 
-  // Caculate total returns
+  // Calculate total returns
   const totalCost = stock.playerShortShares * stock.playerAvgShortPx;
   const gains = (stock.playerAvgShortPx - stock.getAskPrice()) * stock.playerShortShares;
   let percentageGains = gains / totalCost;
@@ -67,7 +65,7 @@ function ShortPosition(props: IProps): React.ReactElement {
     percentageGains = 0;
   }
 
-  if (props.p.bitNodeN === 8 || SourceFileFlags[8] >= 2) {
+  if (Player.bitNodeN === 8 || Player.activeSourceFileLvl(8) >= 2) {
     return (
       <>
         <Box display="flex">
@@ -84,12 +82,12 @@ function ShortPosition(props: IProps): React.ReactElement {
           </Tooltip>
         </Box>
 
-        <Typography>Shares: {numeralWrapper.formatShares(stock.playerShortShares)}</Typography>
+        <Typography>Shares: {formatShares(stock.playerShortShares)}</Typography>
         <Typography>
           Average Price: <Money money={stock.playerAvgShortPx} /> (Total Cost: <Money money={totalCost} />)
         </Typography>
         <Typography>
-          Profit: <Money money={gains} /> ({numeralWrapper.formatPercentage(percentageGains)})
+          Profit: <Money money={gains} /> ({formatPercent(percentageGains)})
         </Typography>
       </>
     );
@@ -103,7 +101,7 @@ export function StockTickerPositionText(props: IProps): React.ReactElement {
 
   return (
     <>
-      <Typography>Max Shares: {numeralWrapper.formatShares(stock.maxShares)}</Typography>
+      <Typography>Max Shares: {formatShares(stock.maxShares)}</Typography>
       <Typography>
         Ask Price: <Money money={stock.getAskPrice()} />
       </Typography>

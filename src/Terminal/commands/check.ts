@@ -1,35 +1,29 @@
-import { ITerminal } from "../ITerminal";
-import { IRouter } from "../../ui/Router";
-import { IPlayer } from "../../PersonObjects/IPlayer";
+import { Terminal } from "../../Terminal";
 import { BaseServer } from "../../Server/BaseServer";
-import { findRunningScript } from "../../Script/ScriptHelpers";
-import { isScriptFilename, validScriptExtensions } from "../../Script/isScriptFilename";
+import { findRunningScripts } from "../../Script/ScriptHelpers";
+import { hasScriptExtension, validScriptExtensions } from "../../Paths/ScriptFilePath";
 
-export function check(
-  terminal: ITerminal,
-  router: IRouter,
-  player: IPlayer,
-  server: BaseServer,
-  args: (string | number | boolean)[],
-): void {
+export function check(args: (string | number | boolean)[], server: BaseServer): void {
   if (args.length < 1) {
-    terminal.error(`Incorrect number of arguments. Usage: check [script] [arg1] [arg2]...`);
+    Terminal.error(`Incorrect number of arguments. Usage: check [script] [arg1] [arg2]...`);
   } else {
-    const scriptName = terminal.getFilepath(args[0] + "");
+    const scriptName = Terminal.getFilepath(args[0] + "");
+    if (!scriptName) return Terminal.error(`Invalid filename: ${args[0]}`);
+
     // Can only tail script files
-    if (!isScriptFilename(scriptName)) {
-      terminal.error(
-        `'check' can only be called on scripts files (filename must end with ${validScriptExtensions.join(", ")})`,
-      );
-      return;
+    if (!hasScriptExtension(scriptName)) {
+      return Terminal.error(`check: File extension must be one of ${validScriptExtensions.join(", ")})`);
     }
 
     // Check that the script is running on this machine
-    const runningScript = findRunningScript(scriptName, args.slice(1), server);
-    if (runningScript == null) {
-      terminal.error(`No script named ${scriptName} is running on the server`);
+    const runningScripts = findRunningScripts(scriptName, args.slice(1), server);
+    if (runningScripts === null) {
+      Terminal.error(`No script named ${scriptName} is running on the server`);
       return;
     }
-    runningScript.displayLog();
+    const next = runningScripts.values().next();
+    if (!next.done) {
+      next.value.displayLog();
+    }
   }
 }

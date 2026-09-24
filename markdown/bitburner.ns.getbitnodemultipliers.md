@@ -4,14 +4,67 @@
 
 ## NS.getBitNodeMultipliers() method
 
-Get the current Bitnode multipliers.
+Get the current BitNode multipliers.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getBitNodeMultipliers(): BitNodeMultipliers;
+getBitNodeMultipliers(n?: number, lvl?: number): BitNodeMultipliers;
 ```
-<b>Returns:</b>
+
+## Parameters
+
+<table><thead><tr><th>
+
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+n
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+<tr><td>
+
+lvl
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 [BitNodeMultipliers](./bitburner.bitnodemultipliers.md)
 
@@ -21,27 +74,16 @@ Object containing the current BitNode multipliers.
 
 RAM cost: 4 GB
 
-Returns an object containing the current BitNode multipliers. This function requires you to be in Bitnode 5 or have Source-File 5 in order to run. The multipliers are returned in decimal forms (e.g. 1.5 instead of 150%). The multipliers represent the difference between the current BitNode and the original BitNode (BitNode-1).
+Returns an object containing the current (or supplied) BitNode multipliers. This function requires you to be in BitNode 5 or have Source-File 5 in order to run. The multipliers are returned in decimal forms (e.g. 1.5 instead of 150%). The multipliers represent the difference between the current BitNode and the original BitNode (BitNode-1).
 
 For example, if the CrimeMoney multiplier has a value of 0.1, then that means that committing crimes in the current BitNode will only give 10% of the money you would have received in BitNode-1.
 
-## Example 1
+## Example
 
 
-```ts
-// NS1:
-var mults = getBitNodeMultipliers();
-print(mults.ServerMaxMoney);
-print(mults.HackExpGain);
-```
-
-## Example 2
-
-
-```ts
-// NS2:
-const {ServerMaxMoney, HackExpGain} = ns.getBitNodeMultipliers();
-print(ServerMaxMoney);
-print(HackExpGain);
+```js
+const mults = ns.getBitNodeMultipliers();
+ns.tprint(`ServerMaxMoney: ${mults.ServerMaxMoney}`);
+ns.tprint(`HackExpGain: ${mults.HackExpGain}`);
 ```
 

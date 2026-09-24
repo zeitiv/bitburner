@@ -6,7 +6,7 @@
 
 Get the input data.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 getData(filename: string, host?: string): any;
@@ -14,20 +14,65 @@ getData(filename: string, host?: string): any;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  filename | string | Filename of the contract. |
-|  host | string | Host of the server containing the contract. Optional. Defaults to current server if not provided. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+filename
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Filename of the contract.
+
+
+</td></tr>
+<tr><td>
+
+host
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Hostname/IP of the server containing the contract. Optional. Defaults to current server if not provided.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 any
 
-The specified contract’s data, data type depends on contract type.;
+The specified contract’s data, data type depends on contract type.
 
 ## Remarks
 
 RAM cost: 5 GB
 
-Get the data associated with the specific Coding Contract. Note that this is not the same as the contract’s description. This is just the data that the contract wants you to act on in order to solve
+Get the data associated with the specific Coding Contract. Note that this is not the same as the contract’s description. This is just the data that the contract wants you to act on in order to solve the contract.
 

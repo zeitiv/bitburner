@@ -4,9 +4,9 @@
 
 ## CrimeStats.agility\_success\_weight property
 
-agility level impact on success change of the crime
+Impact of agility level on success chance of the crime
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 agility_success_weight: number;

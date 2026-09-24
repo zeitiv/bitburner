@@ -6,47 +6,67 @@
 
 Suspends the script for n milliseconds.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-sleep(millis: number): Promise<void>;
+sleep(millis?: number): Promise<true>;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  millis | number | Number of milliseconds to sleep. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
 
-Promise&lt;void&gt;
 
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+millis
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Number of milliseconds to sleep. Default to 0.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
+
+Promise&lt;true&gt;
+
+A promise that resolves to true when the sleep is completed.
 
 ## Remarks
 
 RAM cost: 0 GB
 
-## Example 1
+Note that the actual delay may be longer than intended. For more information, please check [https://developer.mozilla.org/en-US/docs/Web/API/Window/setTimeout\#delay](https://developer.mozilla.org/en-US/docs/Web/API/Window/setTimeout#delay)<!-- -->.
+
+## Example
 
 
-```ts
-// NS1:
+```js
 // This will count from 1 to 10 in your terminal, with one number every 5 seconds
-for (var i=0; i<10; i++) {
-  tprint(i + 1);
-  sleep(5000);
-}
-```
-
-## Example 2
-
-
-```ts
-// NS2:
-// This will count from 1 to 10 in your terminal, with one number every 5 seconds
-for (var i=0; i<10; i++) {
-  ns.tprint(i + 1);
+for (let i = 1; i <= 10; ++i) {
+  ns.tprint(i);
   await ns.sleep(5000);
 }
 ```

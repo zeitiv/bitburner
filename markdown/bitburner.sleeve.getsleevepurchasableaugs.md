@@ -6,7 +6,7 @@
 
 List purchasable augs for a sleeve.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 getSleevePurchasableAugs(sleeveNumber: number): AugmentPair[];
@@ -14,11 +14,41 @@ getSleevePurchasableAugs(sleeveNumber: number): AugmentPair[];
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  sleeveNumber | number | Index of the sleeve to retrieve purchasable augmentations from. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+sleeveNumber
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Index of the sleeve to retrieve purchasable augmentations from.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 [AugmentPair](./bitburner.augmentpair.md)<!-- -->\[\]
 

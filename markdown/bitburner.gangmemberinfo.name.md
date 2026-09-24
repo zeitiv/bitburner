@@ -4,7 +4,9 @@
 
 ## GangMemberInfo.name property
 
-<b>Signature:</b>
+Name of the gang member
+
+**Signature:**
 
 ```typescript
 name: string;

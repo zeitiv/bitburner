@@ -6,35 +6,34 @@ import * as React from "react";
 
 import { Money } from "../React/Money";
 import { MoneyRate } from "../React/MoneyRate";
-import { use } from "../Context";
+import { Player } from "@player";
 
 import Typography from "@mui/material/Typography";
 
 import { Theme } from "@mui/material/styles";
-import makeStyles from "@mui/styles/makeStyles";
-import createStyles from "@mui/styles/createStyles";
+import { makeStyles } from "tss-react/mui";
 import Table from "@mui/material/Table";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
 import TableRow from "@mui/material/TableRow";
 
-const useStyles = makeStyles((theme: Theme) =>
-  createStyles({
-    cell: {
-      borderBottom: "none",
-      padding: theme.spacing(1),
-      margin: theme.spacing(1),
-      whiteSpace: "nowrap",
-    },
-    size: {
-      width: "1px",
-    },
-  }),
-);
+const useStyles = makeStyles()((theme: Theme) => ({
+  cell: {
+    borderBottom: "none",
+    padding: theme.spacing(1),
+    margin: theme.spacing(1),
+    whiteSpace: "nowrap",
+  },
+  size: {
+    width: "1px",
+  },
+}));
 export function ScriptProduction(): React.ReactElement {
-  const player = use.Player();
-  const classes = useStyles();
-  const prodRateSinceLastAug = player.scriptProdSinceLastAug / (player.playtimeSinceLastAug / 1000);
+  const { classes } = useStyles();
+  let prodRateSinceLastAug = Player.scriptProdSinceLastAug / (Player.playtimeSinceLastAug / 1000);
+  if (!Number.isFinite(prodRateSinceLastAug)) {
+    prodRateSinceLastAug = 0;
+  }
 
   return (
     <Table size="small" classes={{ root: classes.size }}>
@@ -45,7 +44,7 @@ export function ScriptProduction(): React.ReactElement {
           </TableCell>
           <TableCell align="left" classes={{ root: classes.cell }}>
             <Typography variant="body2">
-              <Money money={player.scriptProdSinceLastAug} />
+              <Money money={Player.scriptProdSinceLastAug} />
             </Typography>
           </TableCell>
           <TableCell align="left" classes={{ root: classes.cell }}>

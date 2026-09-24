@@ -1,8 +1,11 @@
 import { CONSTANTS } from "../Constants";
-import { IPlayer } from "../PersonObjects/IPlayer";
-import { IPlayerOrSleeve } from "../PersonObjects/IPlayerOrSleeve";
-import { IRouter } from "../ui/Router";
+import { Player } from "@player";
+import { Person as IPerson } from "@nsdefs";
 import { WorkerScript } from "../Netscript/WorkerScript";
+import { CrimeType } from "@enums";
+import { CrimeWork } from "../Work/CrimeWork";
+import { calculateIntelligenceBonus } from "../PersonObjects/formulas/intelligence";
+import { currentNodeMults } from "../BitNode/BitNodeMultipliers";
 
 interface IConstructorParams {
   hacking_success_weight?: number;
@@ -23,26 +26,29 @@ interface IConstructorParams {
 }
 
 export class Crime {
+  // Corresponding type, also the name of the crime.
+  type: CrimeType;
+
   // Number representing the difficulty of the crime. Used for success chance calculations
-  difficulty = 0;
+  difficulty: number;
 
   // Amount of karma lost for SUCCESSFULLY committing this crime
-  karma = 0;
+  karma: number;
 
   // How many people die as a result of this crime
-  kills = 0;
+  kills: number;
 
-  // How much money is given by the
-  money = 0;
+  // How much money is given by the crime
+  money: number;
 
-  // Name of crime
-  name = "";
+  // Name of crime as it appears on work screen: "You are attempting..."
+  workName: string;
+
+  // Tooltip text in slums ui
+  tooltipText: string;
 
   // Milliseconds it takes to attempt the crime
   time = 0;
-
-  // Corresponding type in CONSTANTS. Contains a description for the crime activity
-  type = "";
 
   // Weighting factors that determine how stats affect the success rate of this crime
   hacking_success_weight = 0;
@@ -61,8 +67,18 @@ export class Crime {
   charisma_exp = 0;
   intelligence_exp = 0;
 
-  constructor(name = "", type = "", time = 0, money = 0, difficulty = 0, karma = 0, params: IConstructorParams = {}) {
-    this.name = name;
+  constructor(
+    workName: string,
+    tooltipText: string,
+    type: CrimeType,
+    time: number,
+    money: number,
+    difficulty: number,
+    karma: number,
+    params: IConstructorParams,
+  ) {
+    this.workName = workName;
+    this.tooltipText = tooltipText;
     this.type = type;
     this.time = time;
     this.money = money;
@@ -87,40 +103,34 @@ export class Crime {
     this.kills = params.kills ? params.kills : 0;
   }
 
-  commit(router: IRouter, p: IPlayer, div = 1, workerScript: WorkerScript | null = null): number {
+  commit(div = 1, workerScript: WorkerScript | null = null): number {
     if (div <= 0) {
       div = 1;
     }
-    p.startCrime(
-      router,
-      this.type,
-      this.hacking_exp / div,
-      this.strength_exp / div,
-      this.defense_exp / div,
-      this.dexterity_exp / div,
-      this.agility_exp / div,
-      this.charisma_exp / div,
-      this.money / div,
-      this.time,
-      workerScript,
+    Player.startWork(
+      new CrimeWork({
+        crimeType: this.type,
+        singularity: workerScript !== null,
+      }),
     );
 
     return this.time;
   }
 
-  successRate(p: IPlayerOrSleeve): number {
+  successRate(p: IPerson): number {
     let chance: number =
-      this.hacking_success_weight * p.hacking +
-      this.strength_success_weight * p.strength +
-      this.defense_success_weight * p.defense +
-      this.dexterity_success_weight * p.dexterity +
-      this.agility_success_weight * p.agility +
-      this.charisma_success_weight * p.charisma +
-      CONSTANTS.IntelligenceCrimeWeight * p.intelligence;
+      this.hacking_success_weight * p.skills.hacking +
+      this.strength_success_weight * p.skills.strength +
+      this.defense_success_weight * p.skills.defense +
+      this.dexterity_success_weight * p.skills.dexterity +
+      this.agility_success_weight * p.skills.agility +
+      this.charisma_success_weight * p.skills.charisma +
+      CONSTANTS.IntelligenceCrimeWeight * p.skills.intelligence;
     chance /= CONSTANTS.MaxSkillLevel;
     chance /= this.difficulty;
-    chance *= p.crime_success_mult;
-    chance *= p.getIntelligenceBonus(1);
+    chance *= p.mults.crime_success;
+    chance *= currentNodeMults.CrimeSuccessRate;
+    chance *= calculateIntelligenceBonus(p.skills.intelligence, 1);
 
     return Math.min(chance, 1);
   }

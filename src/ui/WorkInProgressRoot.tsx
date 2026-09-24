@@ -1,476 +1,540 @@
-import React, { useState, useEffect } from "react";
-import { use } from "./Context";
-import { CONSTANTS } from "../Constants";
-import { numeralWrapper } from "./numeralFormat";
+import React from "react";
+import { Box, Button, Container, Paper, Table, TableBody, Tooltip, Typography } from "@mui/material";
+
+import { Player } from "@player";
+import { FactionWorkType, LocationName } from "@enums";
+
+import { Money } from "./React/Money";
+import { MoneyRate } from "./React/MoneyRate";
+import { ProgressBar } from "./React/Progress";
 import { Reputation } from "./React/Reputation";
 import { ReputationRate } from "./React/ReputationRate";
-import { MoneyRate } from "./React/MoneyRate";
-import { Money } from "./React/Money";
-import { convertTimeMsToTimeElapsedString } from "../utils/StringHelperFunctions";
-import { Factions } from "../Faction/Factions";
-import { Company } from "../Company/Company";
+import { StatsRow } from "./React/StatsRow";
+import { useCycleRerender } from "./React/hooks";
+
 import { Companies } from "../Company/Companies";
+import { CONSTANTS } from "../Constants";
 import { Locations } from "../Locations/Locations";
-import { LocationName } from "../Locations/data/LocationNames";
+import { Settings } from "../Settings/Settings";
+import { convertTimeMsToTimeElapsedString } from "../utils/StringHelperFunctions";
+import { filterTruthy } from "../utils/helpers/ArrayHelpers";
 
-import Typography from "@mui/material/Typography";
-import Grid from "@mui/material/Grid";
-import Button from "@mui/material/Button";
-
-import { createProgressBarText } from "../utils/helpers/createProgressBarText";
+import { isCrimeWork } from "../Work/CrimeWork";
+import { isClassWork } from "../Work/ClassWork";
+import { WorkStats } from "../Work/WorkStats";
+import { isCreateProgramWork } from "../Work/CreateProgramWork";
+import { isGraftingWork } from "../Work/GraftingWork";
+import { isFactionWork } from "../Work/FactionWork";
+import { isCompanyWork } from "../Work/CompanyWork";
+import { Router } from "./GameRoot";
+import { Page } from "./Router";
+import { formatExp, formatPercent } from "./formatNumber";
 
 const CYCLES_PER_SEC = 1000 / CONSTANTS.MilliPerCycle;
 
+interface IWorkInfo {
+  buttons: {
+    cancel: () => void;
+    unfocus?: () => void;
+  };
+  title: string | React.ReactElement;
+
+  description?: string | React.ReactElement;
+  gains?: React.ReactElement[];
+  progress?: {
+    elapsed?: number;
+    remaining?: number;
+    percentage?: number;
+  };
+
+  stopText: string;
+  stopTooltip?: string | React.ReactElement;
+}
+
+function ExpRows(rate: WorkStats): React.ReactElement[] {
+  return filterTruthy([
+    rate.hackExp > 0 && (
+      <StatsRow
+        key="hack"
+        name="Hacking Exp"
+        color={Settings.theme.hack}
+        data={{
+          content: `${formatExp(rate.hackExp * CYCLES_PER_SEC)} / sec`,
+        }}
+      />
+    ),
+    rate.strExp > 0 && (
+      <StatsRow
+        key="str"
+        name="Strength Exp"
+        color={Settings.theme.combat}
+        data={{
+          content: `${formatExp(rate.strExp * CYCLES_PER_SEC)} / sec`,
+        }}
+      />
+    ),
+    rate.defExp > 0 && (
+      <StatsRow
+        key="def"
+        name="Defense Exp"
+        color={Settings.theme.combat}
+        data={{
+          content: `${formatExp(rate.defExp * CYCLES_PER_SEC)} / sec`,
+        }}
+      />
+    ),
+    rate.dexExp > 0 && (
+      <StatsRow
+        key="dex"
+        name="Dexterity Exp"
+        color={Settings.theme.combat}
+        data={{
+          content: `${formatExp(rate.dexExp * CYCLES_PER_SEC)} / sec`,
+        }}
+      />
+    ),
+    rate.agiExp > 0 && (
+      <StatsRow
+        key="agi"
+        name="Agility Exp"
+        color={Settings.theme.combat}
+        data={{
+          content: `${formatExp(rate.agiExp * CYCLES_PER_SEC)} / sec`,
+        }}
+      />
+    ),
+    rate.chaExp > 0 && (
+      <StatsRow
+        key="cha"
+        name="Charisma Exp"
+        color={Settings.theme.cha}
+        data={{
+          content: `${formatExp(rate.chaExp * CYCLES_PER_SEC)} / sec`,
+        }}
+      />
+    ),
+  ]);
+}
+
+/* Because crime exp is given all at once at the end, we don't care about the cycles per second. */
+function CrimeExpRows(rate: WorkStats): React.ReactElement[] {
+  return filterTruthy([
+    rate.hackExp > 0 && (
+      <StatsRow
+        key="hack"
+        name="Hacking Exp"
+        color={Settings.theme.hack}
+        data={{
+          content: `${formatExp(rate.hackExp)}`,
+        }}
+      />
+    ),
+    rate.strExp > 0 && (
+      <StatsRow
+        key="str"
+        name="Strength Exp"
+        color={Settings.theme.combat}
+        data={{
+          content: `${formatExp(rate.strExp)}`,
+        }}
+      />
+    ),
+    rate.defExp > 0 && (
+      <StatsRow
+        key="def"
+        name="Defense Exp"
+        color={Settings.theme.combat}
+        data={{
+          content: `${formatExp(rate.defExp)}`,
+        }}
+      />
+    ),
+    rate.dexExp > 0 && (
+      <StatsRow
+        key="dex"
+        name="Dexterity Exp"
+        color={Settings.theme.combat}
+        data={{
+          content: `${formatExp(rate.dexExp)}`,
+        }}
+      />
+    ),
+    rate.agiExp > 0 && (
+      <StatsRow
+        key="agi"
+        name="Agility Exp"
+        color={Settings.theme.combat}
+        data={{
+          content: `${formatExp(rate.agiExp)}`,
+        }}
+      />
+    ),
+    rate.chaExp > 0 && (
+      <StatsRow
+        key="cha"
+        name="Charisma Exp"
+        color={Settings.theme.cha}
+        data={{
+          content: `${formatExp(rate.chaExp)}`,
+        }}
+      />
+    ),
+  ]);
+}
+
 export function WorkInProgressRoot(): React.ReactElement {
-  const setRerender = useState(false)[1];
-  function rerender(): void {
-    setRerender((old) => !old);
+  useCycleRerender();
+
+  let workInfo: IWorkInfo = {
+    buttons: {
+      cancel: () => undefined,
+    },
+    title: "",
+    stopText: "",
+  };
+
+  if (Player.currentWork === null) {
+    setTimeout(() => {
+      /**
+       * We must check again before routing to the Terminal page. The player might have started an action right before
+       * the callback of setTimeout is called.
+       */
+      if (Player.currentWork === null) {
+        Router.toPage(Page.Terminal);
+      }
+    });
+    return <></>;
   }
 
-  useEffect(() => {
-    const id = setInterval(rerender, CONSTANTS.MilliPerCycle);
-    return () => clearInterval(id);
-  }, []);
-  const player = use.Player();
-  const router = use.Router();
-  const faction = Factions[player.currentWorkFactionName];
-  if (player.workType == CONSTANTS.WorkTypeFaction) {
-    function cancel(): void {
-      router.toFaction(faction);
-      player.finishFactionWork(true);
-    }
-    function unfocus(): void {
-      router.toFaction(faction);
-      player.stopFocusing();
-    }
-    return (
-      <Grid container direction="column" justifyContent="center" alignItems="center" style={{ minHeight: "100vh" }}>
-        <Grid item>
+  if (isCrimeWork(Player.currentWork)) {
+    const crime = Player.currentWork.getCrime();
+    const completion = (Player.currentWork.unitCompleted / crime.time) * 100;
+    const gains = Player.currentWork.earnings();
+    const successChance = crime.successRate(Player);
+    workInfo = {
+      buttons: {
+        cancel: () => {
+          Router.toPage(Page.Location, { location: Locations[LocationName.Slums] });
+          Player.finishWork(true);
+        },
+        unfocus: () => {
+          Router.toPage(Page.City);
+        },
+      },
+      title: `You are attempting ${crime.workName}`,
+
+      gains: [
+        <tr key="header">
+          <td>
+            <Typography>Success chance: {formatPercent(successChance)}</Typography>
+            <Typography>Gains (on success)</Typography>
+          </td>
+        </tr>,
+        <StatsRow key="money" name="Money:" color={Settings.theme.money}>
           <Typography>
-            You are currently {player.currentWorkFactionDescription} for your faction {faction.name}
-            <br />
-            (Current Faction Reputation: <Reputation reputation={faction.playerReputation} />
-            ). <br />
-            You have been doing this for {convertTimeMsToTimeElapsedString(player.timeWorked)}
-            <br />
-            <br />
-            You have earned: <br />
-            <br />
-            <Money money={player.workMoneyGained} /> (<MoneyRate money={player.workMoneyGainRate * CYCLES_PER_SEC} />){" "}
-            <br />
-            <br />
-            <Reputation reputation={player.workRepGained} /> (
-            <ReputationRate reputation={player.workRepGainRate * CYCLES_PER_SEC} />) reputation for this faction <br />
-            <br />
-            {player.workHackExpGained > 0 && (
-              <>
-                {numeralWrapper.formatExp(player.workHackExpGained)} (
-                {numeralWrapper.formatExp(player.workHackExpGainRate * CYCLES_PER_SEC)} / sec) hacking exp <br />
-              </>
-            )}
-            <br />
-            {player.workStrExpGained > 0 && (
-              <>
-                {numeralWrapper.formatExp(player.workStrExpGained)} (
-                {numeralWrapper.formatExp(player.workStrExpGainRate * CYCLES_PER_SEC)} / sec) strength exp <br />
-              </>
-            )}
-            {player.workDefExpGained > 0 && (
-              <>
-                {numeralWrapper.formatExp(player.workDefExpGained)} (
-                {numeralWrapper.formatExp(player.workDefExpGainRate * CYCLES_PER_SEC)} / sec) defense exp <br />
-              </>
-            )}
-            {player.workDexExpGained > 0 && (
-              <>
-                {numeralWrapper.formatExp(player.workDexExpGained)} (
-                {numeralWrapper.formatExp(player.workDexExpGainRate * CYCLES_PER_SEC)} / sec) dexterity exp <br />
-              </>
-            )}
-            {player.workAgiExpGained > 0 && (
-              <>
-                {numeralWrapper.formatExp(player.workAgiExpGained)} (
-                {numeralWrapper.formatExp(player.workAgiExpGainRate * CYCLES_PER_SEC)} / sec) agility exp <br />
-              </>
-            )}
-            <br />
-            {player.workChaExpGained > 0 && (
-              <>
-                {numeralWrapper.formatExp(player.workChaExpGained)} (
-                {numeralWrapper.formatExp(player.workChaExpGainRate * CYCLES_PER_SEC)} / sec) charisma exp <br />
-              </>
-            )}
-            <br />
-            You will automatically finish after working for 20 hours. You can cancel earlier if you wish.
-            <br />
-            There is no penalty for cancelling earlier.
+            <Money money={gains.money} />
           </Typography>
-        </Grid>
-        <Grid item>
-          <Button sx={{ mx: 2 }} onClick={cancel}>
-            Stop Faction Work
-          </Button>
-          <Button onClick={unfocus}>Do something else simultaneously</Button>
-        </Grid>
-      </Grid>
-    );
+        </StatsRow>,
+        ...CrimeExpRows(gains),
+      ],
+      progress: {
+        remaining: crime.time - Player.currentWork.unitCompleted,
+        percentage: completion,
+      },
+
+      stopText: "Stop committing crime",
+    };
   }
 
-  const className = player.className;
-  if (player.className !== "") {
-    function cancel(): void {
-      player.finishClass(true);
-      router.toCity();
-    }
-
-    function unfocus(): void {
-      router.toFaction(faction);
-      router.toCity();
-      player.stopFocusing();
-    }
+  if (isClassWork(Player.currentWork)) {
+    const classWork = Player.currentWork;
 
     let stopText = "";
-    if (
-      className == CONSTANTS.ClassGymStrength ||
-      className == CONSTANTS.ClassGymDefense ||
-      className == CONSTANTS.ClassGymDexterity ||
-      className == CONSTANTS.ClassGymAgility
-    ) {
+    if (classWork.isGym()) {
       stopText = "Stop training at gym";
     } else {
       stopText = "Stop taking course";
     }
 
-    return (
-      <Grid container direction="column" justifyContent="center" alignItems="center" style={{ minHeight: "100vh" }}>
-        <Grid item>
+    const rates = classWork.calculateRates();
+    workInfo = {
+      buttons: {
+        cancel: () => {
+          Player.finishWork(true);
+          Router.toPage(Page.Location, { location: Locations[classWork.location] });
+        },
+        unfocus: () => {
+          Router.toPage(Page.Location, { location: Locations[classWork.location] });
+        },
+      },
+      title: (
+        <>
+          You are currently <b>{classWork.getClass().youAreCurrently}</b>
+        </>
+      ),
+
+      gains: [
+        <StatsRow key="totalCost" name="Total Cost" color={Settings.theme.money}>
           <Typography>
-            You have been {className} for {convertTimeMsToTimeElapsedString(player.timeWorked)}
-            <br />
-            <br />
-            This has cost you: <br />
-            <Money money={-player.workMoneyGained} /> (<MoneyRate money={player.workMoneyLossRate * CYCLES_PER_SEC} />){" "}
-            <br />
-            <br />
-            You have gained: <br />
-            {player.workHackExpGained > 0 && (
-              <>
-                {numeralWrapper.formatExp(player.workHackExpGained)} (
-                {numeralWrapper.formatExp(player.workHackExpGainRate * CYCLES_PER_SEC)} / sec) hacking exp <br />
-              </>
-            )}
-            {player.workStrExpGained > 0 && (
-              <>
-                {numeralWrapper.formatExp(player.workStrExpGained)} (
-                {numeralWrapper.formatExp(player.workStrExpGainRate * CYCLES_PER_SEC)} / sec) strength exp <br />
-              </>
-            )}
-            {player.workDefExpGained > 0 && (
-              <>
-                {numeralWrapper.formatExp(player.workDefExpGained)} (
-                {numeralWrapper.formatExp(player.workDefExpGainRate * CYCLES_PER_SEC)} / sec) defense exp <br />
-              </>
-            )}
-            {player.workDexExpGained > 0 && (
-              <>
-                {numeralWrapper.formatExp(player.workDexExpGained)} (
-                {numeralWrapper.formatExp(player.workDexExpGainRate * CYCLES_PER_SEC)} / sec) dexterity exp <br />
-              </>
-            )}
-            {player.workAgiExpGained > 0 && (
-              <>
-                {numeralWrapper.formatExp(player.workAgiExpGained)} (
-                {numeralWrapper.formatExp(player.workAgiExpGainRate * CYCLES_PER_SEC)} / sec) agility exp <br />
-              </>
-            )}
-            {player.workChaExpGained > 0 && (
-              <>
-                {numeralWrapper.formatExp(player.workChaExpGained)} (
-                {numeralWrapper.formatExp(player.workChaExpGainRate * CYCLES_PER_SEC)} / sec) charisma exp <br />
-              </>
-            )}
-            You may cancel at any time
+            <Money money={classWork.earnings.money} /> (<MoneyRate money={rates.money * CYCLES_PER_SEC} />)
           </Typography>
-        </Grid>
-        <Grid item>
-          <Button sx={{ mx: 2 }} onClick={cancel}>
-            {stopText}
-          </Button>
-          <Button onClick={unfocus}>Do something else simultaneously</Button>
-        </Grid>
-      </Grid>
-    );
+        </StatsRow>,
+        ...ExpRows(rates),
+      ],
+      progress: {
+        elapsed: classWork.cyclesWorked * CONSTANTS.MilliPerCycle,
+      },
+
+      stopText: stopText,
+    };
   }
 
-  if (player.workType == CONSTANTS.WorkTypeCompany) {
-    const comp = Companies[player.companyName];
-    let companyRep = 0;
-    if (comp == null || !(comp instanceof Company)) {
-      throw new Error(`Could not find Company: ${player.companyName}`);
-    }
-    companyRep = comp.playerReputation;
+  if (isCreateProgramWork(Player.currentWork)) {
+    const create = Player.currentWork;
+    const completion = (create.unitCompleted / create.unitNeeded()) * 100;
+    const remainingTime = ((create.unitNeeded() - create.unitCompleted) / create.unitRate) * CONSTANTS.MilliPerCycle;
+    workInfo = {
+      buttons: {
+        cancel: () => {
+          Player.finishWork(true);
+          Router.toPage(Page.Terminal);
+        },
+        unfocus: () => {
+          Router.toPage(Page.Terminal);
+        },
+      },
+      title: (
+        <>
+          You are currently working on coding <b>{create.programName}</b>
+        </>
+      ),
 
-    function cancel(): void {
-      player.finishWork(true);
-      router.toJob();
-    }
-    function unfocus(): void {
-      player.stopFocusing();
-      router.toJob();
-    }
+      progress: {
+        remaining: remainingTime,
+        percentage: completion,
+      },
 
-    const position = player.jobs[player.companyName];
-
-    const penalty = player.cancelationPenalty();
-
-    const penaltyString = penalty === 0.5 ? "half" : "three-quarters";
-    return (
-      <Grid container direction="column" justifyContent="center" alignItems="center" style={{ minHeight: "100vh" }}>
-        <Grid item>
-          <Typography>
-            You are currently working as a {position} at {player.companyName} (Current Company Reputation:{" "}
-            <Reputation reputation={companyRep} />)<br />
-            <br />
-            You have been working for {convertTimeMsToTimeElapsedString(player.timeWorked)}
-            <br />
-            <br />
-            You have earned: <br />
-            <br />
-            <Money money={player.workMoneyGained} /> (<MoneyRate money={player.workMoneyGainRate * CYCLES_PER_SEC} />){" "}
-            <br />
-            <br />
-            <Reputation reputation={player.workRepGained} /> (
-            <ReputationRate reputation={player.workRepGainRate * CYCLES_PER_SEC} />) reputation for this company <br />
-            <br />
-            {player.workHackExpGained > 0 && (
-              <>
-                {numeralWrapper.formatExp(player.workHackExpGained)} (
-                {`${numeralWrapper.formatExp(player.workHackExpGainRate * CYCLES_PER_SEC)} / sec`}
-                ) hacking exp <br />
-              </>
-            )}
-            <br />
-            {player.workStrExpGained > 0 && (
-              <>
-                {numeralWrapper.formatExp(player.workStrExpGained)} (
-                {`${numeralWrapper.formatExp(player.workStrExpGainRate * CYCLES_PER_SEC)} / sec`}
-                ) strength exp <br />
-              </>
-            )}
-            {player.workDefExpGained > 0 && (
-              <>
-                {numeralWrapper.formatExp(player.workDefExpGained)} (
-                {`${numeralWrapper.formatExp(player.workDefExpGainRate * CYCLES_PER_SEC)} / sec`}
-                ) defense exp <br />
-              </>
-            )}
-            {player.workDexExpGained > 0 && (
-              <>
-                {numeralWrapper.formatExp(player.workDexExpGained)} (
-                {`${numeralWrapper.formatExp(player.workDexExpGainRate * CYCLES_PER_SEC)} / sec`}
-                ) dexterity exp <br />
-              </>
-            )}
-            {player.workAgiExpGained > 0 && (
-              <>
-                {numeralWrapper.formatExp(player.workAgiExpGained)} (
-                {`${numeralWrapper.formatExp(player.workAgiExpGainRate * CYCLES_PER_SEC)} / sec`}
-                ) agility exp <br />
-              </>
-            )}
-            <br />
-            {player.workChaExpGained > 0 && (
-              <>
-                {numeralWrapper.formatExp(player.workChaExpGained)} (
-                {`${numeralWrapper.formatExp(player.workChaExpGainRate * CYCLES_PER_SEC)} / sec`}
-                ) charisma exp <br />
-              </>
-            )}
-            <br />
-            You will automatically finish after working for 8 hours. You can cancel earlier if you wish, but you will
-            only gain {penaltyString} of the reputation you've earned so far.
-          </Typography>
-        </Grid>
-        <Grid item>
-          <Button sx={{ mx: 2 }} onClick={cancel}>
-            Stop Working
-          </Button>
-          <Button onClick={unfocus}>Do something else simultaneously</Button>
-        </Grid>
-      </Grid>
-    );
+      stopText: "Stop creating program",
+      stopTooltip: "Your work will be saved and you can return to complete the program later.",
+    };
   }
 
-  if (player.workType == CONSTANTS.WorkTypeCompanyPartTime) {
-    function cancel(): void {
-      player.finishWorkPartTime(true);
-      router.toJob();
-    }
-    function unfocus(): void {
-      player.stopFocusing();
-      router.toJob();
-    }
-    const comp = Companies[player.companyName];
-    let companyRep = 0;
-    if (comp == null || !(comp instanceof Company)) {
-      throw new Error(`Could not find Company: ${player.companyName}`);
-    }
-    companyRep = comp.playerReputation;
+  if (isGraftingWork(Player.currentWork)) {
+    const graftWork = Player.currentWork;
+    const remainingTime =
+      ((graftWork.unitNeeded() - graftWork.unitCompleted) / graftWork.unitRate) * CONSTANTS.MilliPerCycle;
+    workInfo = {
+      buttons: {
+        cancel: () => {
+          Player.finishWork(true);
+          Router.toPage(Page.Terminal);
+        },
+        unfocus: () => {
+          Router.toPage(Page.Terminal);
+        },
+      },
+      title: (
+        <>
+          You are currently working on grafting <b>{graftWork.augmentation}</b>
+        </>
+      ),
 
-    const position = player.jobs[player.companyName];
-    return (
-      <Grid container direction="column" justifyContent="center" alignItems="center" style={{ minHeight: "100vh" }}>
-        <Grid item>
-          <Typography>
-            You are currently working as a {position} at {player.companyName} (Current Company Reputation:{" "}
-            <Reputation reputation={companyRep} />)<br />
-            <br />
-            You have been working for {convertTimeMsToTimeElapsedString(player.timeWorked)}
-            <br />
-            <br />
-            You have earned: <br />
-            <br />
-            <Money money={player.workMoneyGained} /> (<MoneyRate money={player.workMoneyGainRate * CYCLES_PER_SEC} />){" "}
-            <br />
-            <br />
-            <Reputation reputation={player.workRepGained} /> (
-            <ReputationRate reputation={player.workRepGainRate * CYCLES_PER_SEC} />
-            ) reputation for this company <br />
-            <br />
-            {player.workHackExpGained > 0 && (
-              <>
-                {numeralWrapper.formatExp(player.workHackExpGained)} (
-                {`${numeralWrapper.formatExp(player.workHackExpGainRate * CYCLES_PER_SEC)} / sec`}
-                ) hacking exp <br />
-              </>
-            )}
-            <br />
-            {player.workStrExpGained > 0 && (
-              <>
-                {numeralWrapper.formatExp(player.workStrExpGained)} (
-                {`${numeralWrapper.formatExp(player.workStrExpGainRate * CYCLES_PER_SEC)} / sec`}
-                ) strength exp <br />
-              </>
-            )}
-            {player.workDefExpGained > 0 && (
-              <>
-                {numeralWrapper.formatExp(player.workDefExpGained)} (
-                {`${numeralWrapper.formatExp(player.workDefExpGainRate * CYCLES_PER_SEC)} / sec`}
-                ) defense exp <br />
-              </>
-            )}
-            {player.workDexExpGained > 0 && (
-              <>
-                {numeralWrapper.formatExp(player.workDexExpGained)} (
-                {`${numeralWrapper.formatExp(player.workDexExpGainRate * CYCLES_PER_SEC)} / sec`}
-                ) dexterity exp <br />
-              </>
-            )}
-            {player.workAgiExpGained > 0 && (
-              <>
-                {numeralWrapper.formatExp(player.workAgiExpGained)} (
-                {`${numeralWrapper.formatExp(player.workAgiExpGainRate * CYCLES_PER_SEC)} / sec`}
-                ) agility exp <br />
-              </>
-            )}
-            <br />
-            {player.workChaExpGained > 0 && (
-              <>
-                {numeralWrapper.formatExp(player.workChaExpGained)} (
-                {`${numeralWrapper.formatExp(player.workChaExpGainRate * CYCLES_PER_SEC)} / sec`}
-                ) charisma exp <br />
-              </>
-            )}
-            <br />
-            You will automatically finish after working for 8 hours. You can cancel earlier if you wish, and there will
-            be no penalty because this is a part-time job.
-          </Typography>
-        </Grid>
-        <Grid item>
-          <Button sx={{ mx: 2 }} onClick={cancel}>
-            Stop Working
-          </Button>
-          <Button onClick={unfocus}>Do something else simultaneously</Button>
-        </Grid>
-      </Grid>
-    );
+      progress: {
+        remaining: remainingTime,
+        percentage: (graftWork.unitCompleted / graftWork.unitNeeded()) * 100,
+      },
+
+      stopText: "Stop grafting",
+      stopTooltip: (
+        <>
+          If you cancel, your work will <b>not</b> be saved, and the money you spent will <b>not</b> be returned
+        </>
+      ),
+    };
   }
 
-  if (player.crimeType !== "") {
-    const percent = Math.round((player.timeWorked / player.timeNeededToCompleteWork) * 100);
-    let numBars = Math.round(percent / 5);
-    if (numBars < 0) {
-      numBars = 0;
+  if (isFactionWork(Player.currentWork)) {
+    const faction = Player.currentWork.getFaction();
+    if (!faction) {
+      workInfo = {
+        buttons: {
+          cancel: () => Router.toPage(Page.Factions),
+        },
+        title:
+          `You have not joined ${Player.currentWork.factionName || "(Faction not found)"} at this time,` +
+          " please try again if you think this should have worked",
+
+        stopText: "Back to Factions",
+      };
     }
-    if (numBars > 20) {
-      numBars = 20;
-    }
-    // const progressBar = "[" + Array(numBars + 1).join("|") + Array(20 - numBars + 1).join(" ") + "]";
-    const progressBar = createProgressBarText({ progress: (numBars + 1) / 20, totalTicks: 20 });
 
-    return (
-      <Grid container direction="column" justifyContent="center" alignItems="center" style={{ minHeight: "100vh" }}>
-        <Grid item>
-          <Typography>
-            <Typography>You are attempting to {player.crimeType}.</Typography>
-            <br />
+    const description = {
+      [FactionWorkType.hacking]: "carrying out hacking contracts",
+      [FactionWorkType.field]: "carrying out field missions",
+      [FactionWorkType.security]: "performing security detail",
+    };
 
-            <Typography>
-              Time remaining: {convertTimeMsToTimeElapsedString(player.timeNeededToCompleteWork - player.timeWorked)}
-            </Typography>
+    const exp = Player.currentWork.getExpRates();
 
-            <br />
-            <pre>{progressBar}</pre>
-          </Typography>
-        </Grid>
-        <Grid item>
-          <Button
-            onClick={() => {
-              router.toLocation(Locations[LocationName.Slums]);
-              player.finishCrime(true);
-            }}
-          >
-            Cancel crime
-          </Button>
-        </Grid>
-      </Grid>
-    );
+    workInfo = {
+      buttons: {
+        cancel: () => {
+          Router.toPage(Page.Faction, { faction });
+          Player.finishWork(true);
+        },
+        unfocus: () => {
+          Router.toPage(Page.Faction, { faction });
+        },
+      },
+      title: (
+        <>
+          You are currently {description[Player.currentWork.factionWorkType]} for <b>{faction.name}</b>
+        </>
+      ),
+
+      description: (
+        <>
+          Current Faction Reputation: <Reputation reputation={faction.playerReputation} /> (
+          <ReputationRate reputation={Player.currentWork.getReputationRate() * CYCLES_PER_SEC} />)
+        </>
+      ),
+      gains: ExpRows(exp),
+      progress: {
+        elapsed: Player.currentWork.cyclesWorked * CONSTANTS.MilliPerCycle,
+      },
+
+      stopText: "Stop Faction work",
+    };
   }
 
-  if (player.createProgramName !== "") {
-    function cancel(): void {
-      player.finishCreateProgramWork(true);
-      router.toTerminal();
+  if (isCompanyWork(Player.currentWork)) {
+    const comp = Companies[Player.currentWork.companyName];
+    if (comp) {
+      workInfo = {
+        buttons: {
+          cancel: () => Router.toPage(Page.Terminal),
+        },
+        title:
+          `You cannot work for ${Player.currentWork.companyName} at this time,` +
+          " please try again if you think this should have worked",
+
+        stopText: "Back to Terminal",
+      };
     }
-    function unfocus(): void {
-      router.toTerminal();
-      player.stopFocusing();
-    }
-    return (
-      <Grid container direction="column" justifyContent="center" alignItems="center" style={{ minHeight: "100vh" }}>
-        <Grid item>
+
+    const companyRep = comp.playerReputation;
+
+    const position = Player.jobs[Player.currentWork.companyName];
+    if (!position) return <></>;
+    const gains = Player.currentWork.getGainRates(position);
+    workInfo = {
+      buttons: {
+        cancel: () => {
+          Player.finishWork(true);
+          Router.toPage(Page.Job);
+        },
+        unfocus: () => {
+          Router.toPage(Page.Job);
+        },
+      },
+      title: (
+        <>
+          You are currently working as a <b>{position}</b> at <b>{Player.currentWork.companyName}</b>
+        </>
+      ),
+
+      description: (
+        <>
+          Current Company Reputation: <Reputation reputation={companyRep} />
+        </>
+      ),
+      gains: [
+        <StatsRow key="money" name="Money" color={Settings.theme.money}>
           <Typography>
-            You are currently working on coding {player.createProgramName}.<br />
-            <br />
-            You have been working for {convertTimeMsToTimeElapsedString(player.timeWorked)}
-            <br />
-            <br />
-            The program is {((player.timeWorkedCreateProgram / player.timeNeededToCompleteWork) * 100).toFixed(2)}
-            % complete. <br />
-            If you cancel, your work will be saved and you can come back to complete the program later.
+            <MoneyRate money={gains.money * CYCLES_PER_SEC} />
           </Typography>
-        </Grid>
-        <Grid item>
-          <Button sx={{ mx: 2 }} onClick={cancel}>
-            Cancel work on creating program
-          </Button>
-          <Button onClick={unfocus}>Do something else simultaneously</Button>
-        </Grid>
-      </Grid>
-    );
+        </StatsRow>,
+        <StatsRow key="reputation" name="Company Reputation" color={Settings.theme.rep}>
+          <Typography>
+            <ReputationRate reputation={gains.reputation * CYCLES_PER_SEC} />
+          </Typography>
+        </StatsRow>,
+        ...ExpRows(gains),
+      ],
+      progress: {
+        elapsed: Player.currentWork.cyclesWorked * CONSTANTS.MilliPerCycle,
+      },
+
+      stopText: "Stop working",
+    };
   }
 
-  if (!player.workType) router.toTerminal();
+  if (workInfo.title === "") {
+    return <></>;
+  }
 
-  return <></>;
+  const tooltipInfo =
+    typeof workInfo.stopTooltip === "string" ? (
+      <Typography>{workInfo.stopTooltip}</Typography>
+    ) : (
+      workInfo.stopTooltip || <></>
+    );
+
+  return (
+    <Container
+      maxWidth="md"
+      sx={{ display: "flex", flexDirection: "column", justifyContent: "center", height: "calc(100vh - 16px)" }}
+    >
+      <Paper sx={{ p: 1, mb: 1 }}>
+        <Typography variant="h6">{workInfo.title}</Typography>
+        <Typography>{workInfo.description}</Typography>
+        {workInfo.gains && (
+          <Table sx={{ mt: 1 }}>
+            <TableBody>{workInfo.gains}</TableBody>
+          </Table>
+        )}
+      </Paper>
+      <Paper sx={{ mb: 1, p: 1 }}>
+        {workInfo.progress !== undefined && (
+          <Box sx={{ mb: 1 }}>
+            <Box
+              display="grid"
+              sx={{
+                gridTemplateColumns: `repeat(${Object.keys(workInfo.progress).length}, 1fr)`,
+                width: "100%",
+                justifyItems: "center",
+                textAlign: "center",
+              }}
+            >
+              {workInfo.progress.elapsed !== undefined && (
+                <Typography>{convertTimeMsToTimeElapsedString(workInfo.progress.elapsed)} elapsed</Typography>
+              )}
+              {workInfo.progress.remaining !== undefined && (
+                <Typography>{convertTimeMsToTimeElapsedString(workInfo.progress.remaining)} remaining</Typography>
+              )}
+              {workInfo.progress.percentage !== undefined && (
+                <Typography>{workInfo.progress.percentage.toFixed(2)}% done</Typography>
+              )}
+            </Box>
+            {workInfo.progress.percentage !== undefined && (
+              <ProgressBar variant="determinate" value={workInfo.progress.percentage} color="primary" />
+            )}
+          </Box>
+        )}
+
+        <Box display="grid" sx={{ gridTemplateColumns: `repeat(${Object.keys(workInfo.buttons).length}, 1fr)` }}>
+          {workInfo.stopTooltip ? (
+            <Tooltip title={tooltipInfo}>
+              <Button onClick={workInfo.buttons.cancel}>{workInfo.stopText}</Button>
+            </Tooltip>
+          ) : (
+            <Button onClick={workInfo.buttons.cancel}>{workInfo.stopText}</Button>
+          )}
+          {workInfo.buttons.unfocus && (
+            <Button onClick={workInfo.buttons.unfocus}>Do something else simultaneously</Button>
+          )}
+        </Box>
+      </Paper>
+    </Container>
+  );
 }

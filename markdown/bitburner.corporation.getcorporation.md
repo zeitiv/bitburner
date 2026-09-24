@@ -4,16 +4,20 @@
 
 ## Corporation.getCorporation() method
 
-Get corporation data
+Get corporation data.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 getCorporation(): CorporationInfo;
 ```
-<b>Returns:</b>
+**Returns:**
 
 [CorporationInfo](./bitburner.corporationinfo.md)
 
 Corporation data
+
+## Remarks
+
+RAM cost: 10 GB
 

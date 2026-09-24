@@ -6,20 +6,65 @@
 
 Get the current level of an action.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getActionCurrentLevel(type: string, name: string): number;
+getActionCurrentLevel(type: BladeburnerActionType, name: BladeburnerActionName): number;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  type | string | Type of action. |
-|  name | string | Name of action. Must be an exact match. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+type
+
+
+</td><td>
+
+[BladeburnerActionType](./bitburner.bladeburneractiontype.md)
+
+
+</td><td>
+
+Type of action.
+
+
+</td></tr>
+<tr><td>
+
+name
+
+
+</td><td>
+
+[BladeburnerActionName](./bitburner.bladeburneractionname.md)
+
+
+</td><td>
+
+Name of action. Must be an exact match.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 

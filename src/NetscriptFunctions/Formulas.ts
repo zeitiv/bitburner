@@ -1,7 +1,6 @@
-import { INetscriptHelper } from "./INetscriptHelper";
-import { WorkerScript } from "../Netscript/WorkerScript";
-import { IPlayer } from "../PersonObjects/IPlayer";
-import { calculateServerGrowth } from "../Server/formulas/grow";
+import { Player } from "@player";
+import { calculateServerGrowth, calculateGrowMoney } from "../Server/formulas/grow";
+import { getWeakenEffect, numCycleForGrowthCorrected } from "../Server/ServerHelpers";
 import {
   calculateMoneyGainRate,
   calculateLevelUpgradeCost,
@@ -27,8 +26,8 @@ import {
   calculateGrowTime,
   calculateWeakenTime,
 } from "../Hacking";
-import { Programs } from "../Programs/Programs";
-import { Formulas as IFormulas } from "../ScriptEditor/NetscriptDefinitions";
+import { CityName, CompletedProgramName, LocationName } from "@enums";
+import { Formulas as IFormulas, Player as IPlayer, Person as IPerson } from "@nsdefs";
 import {
   calculateRespectGain,
   calculateWantedLevelGain,
@@ -37,180 +36,481 @@ import {
   calculateAscensionMult,
   calculateAscensionPointsGain,
 } from "../Gang/formulas/formulas";
+import { favorToRep as calculateFavorToRep, repToFavor as calculateRepToFavor } from "../Faction/formulas/favor";
+import { repFromDonation, donationForRep } from "../Faction/formulas/donation";
+import { InternalAPI, NetscriptContext, setRemovedFunctions } from "../Netscript/APIWrapper";
+import { helpers } from "../Netscript/NetscriptHelpers";
+import { calculateCrimeWorkStats } from "../Work/Formulas";
+import { calculateCompanyWorkStats } from "../Work/Formulas";
+import { Companies } from "../Company/Companies";
+import { calculateClassEarnings } from "../Work/Formulas";
+import { calculateFactionExp, calculateFactionRep } from "../Work/Formulas";
 
-export interface INetscriptFormulas {
-  skills: {
-    calculateSkill(exp: any, mult?: any): any;
-    calculateExp(skill: any, mult?: any): any;
-  };
-  hacking: {
-    hackChance(server: any, player: any): any;
-    hackExp(server: any, player: any): any;
-    hackPercent(server: any, player: any): any;
-    growPercent(server: any, threads: any, player: any, cores?: any): any;
-    hackTime(server: any, player: any): any;
-    growTime(server: any, player: any): any;
-    weakenTime(server: any, player: any): any;
-  };
-  hacknetNodes: {
-    moneyGainRate(level: any, ram: any, cores: any, mult?: any): any;
-    levelUpgradeCost(startingLevel: any, extraLevels?: any, costMult?: any): any;
-    ramUpgradeCost(startingRam: any, extraLevels?: any, costMult?: any): any;
-    coreUpgradeCost(startingCore: any, extraCores?: any, costMult?: any): any;
-    hacknetNodeCost(n: any, mult: any): any;
-    constants(): any;
-  };
-  hacknetServers: {
-    hashGainRate(level: any, ramUsed: any, maxRam: any, cores: any, mult?: any): any;
-    levelUpgradeCost(startingLevel: any, extraLevels?: any, costMult?: any): any;
-    ramUpgradeCost(startingRam: any, extraLevels?: any, costMult?: any): any;
-    coreUpgradeCost(startingCore: any, extraCores?: any, costMult?: any): any;
-    cacheUpgradeCost(startingCache: any, extraCache?: any): any;
-    hashUpgradeCost(upgName: any, level: any): any;
-    hacknetServerCost(n: any, mult: any): any;
-    constants(): any;
-  };
-}
+import { defaultMultipliers } from "../PersonObjects/Multipliers";
+import { getEnumHelper } from "../utils/EnumHelper";
+import { CompanyPositions } from "../Company/CompanyPositions";
+import { Skills } from "../Bladeburner/data/Skills";
+import type { PositiveNumber } from "../types";
+import { Crimes } from "../Crime/Crimes";
+import { calculateEffectiveSharedThreads, calculateShareBonus } from "../NetworkShare/Share";
+import { calculateAuthenticationTime } from "../DarkNet/effects/effects";
+import { assertDarknetServerDetails } from "../Netscript/TypeAssertion";
+import { getRamBlockRemoved } from "../DarkNet/effects/ramblock";
 
-export function NetscriptFormulas(player: IPlayer, workerScript: WorkerScript, helper: INetscriptHelper): IFormulas {
-  const checkFormulasAccess = function (func: string): void {
-    if (!player.hasProgram(Programs.Formulas.name)) {
-      throw helper.makeRuntimeErrorMsg(`formulas.${func}`, `Requires Formulas.exe to run.`);
+export function NetscriptFormulas(): InternalAPI<IFormulas> {
+  const checkFormulasAccess = function (ctx: NetscriptContext): void {
+    if (!Player.hasProgram(CompletedProgramName.formulas)) {
+      throw helpers.errorMessage(ctx, `Requires Formulas.exe to run.`);
     }
   };
-  return {
+  const formulasFunctions: InternalAPI<IFormulas> = {
+    mockServer: () => () => ({
+      cpuCores: 0,
+      ftpPortOpen: false,
+      hasAdminRights: false,
+      hostname: "",
+      httpPortOpen: false,
+      ip: "",
+      isConnectedTo: false,
+      maxRam: 0,
+      organizationName: "",
+      ramUsed: 0,
+      smtpPortOpen: false,
+      sqlPortOpen: false,
+      sshPortOpen: false,
+      purchasedByPlayer: false,
+      backdoorInstalled: false,
+      baseDifficulty: 0,
+      hackDifficulty: 0,
+      minDifficulty: 0,
+      moneyAvailable: 0,
+      moneyMax: 0,
+      numOpenPortsRequired: 0,
+      openPortCount: 0,
+      requiredHackingSkill: 0,
+      serverGrowth: 0,
+    }),
+    mockPlayer: () => (): IPlayer => ({
+      // Person
+      hp: { current: 0, max: 0 },
+      skills: { hacking: 0, strength: 0, defense: 0, dexterity: 0, agility: 0, charisma: 0, intelligence: 0 },
+      exp: { hacking: 0, strength: 0, defense: 0, dexterity: 0, agility: 0, charisma: 0, intelligence: 0 },
+      mults: defaultMultipliers(),
+      city: CityName.Sector12,
+      // Player-specific
+      numPeopleKilled: 0,
+      money: 0,
+      location: LocationName.TravelAgency,
+      totalPlaytime: 0,
+      jobs: {},
+      factions: [],
+      entropy: 0,
+      karma: 0,
+    }),
+    mockPerson: () => (): IPerson => ({
+      hp: { current: 0, max: 0 },
+      skills: { hacking: 0, strength: 0, defense: 0, dexterity: 0, agility: 0, charisma: 0, intelligence: 0 },
+      exp: { hacking: 0, strength: 0, defense: 0, dexterity: 0, agility: 0, charisma: 0, intelligence: 0 },
+      mults: defaultMultipliers(),
+      city: CityName.Sector12,
+    }),
+    reputation: {
+      calculateFavorToRep: (ctx) => (_favor) => {
+        const favor = helpers.number(ctx, "favor", _favor);
+        checkFormulasAccess(ctx);
+        return calculateFavorToRep(favor);
+      },
+      calculateRepToFavor: (ctx) => (_rep) => {
+        const rep = helpers.number(ctx, "rep", _rep);
+        checkFormulasAccess(ctx);
+        return calculateRepToFavor(rep);
+      },
+      repFromDonation: (ctx) => (_amount, _player) => {
+        const amount = helpers.number(ctx, "amount", _amount);
+        const person = helpers.person(ctx, _player);
+        checkFormulasAccess(ctx);
+        return repFromDonation(amount, person);
+      },
+      donationForRep: (ctx) => (_reputation, _player) => {
+        const reputation = helpers.number(ctx, "reputation", _reputation);
+        const person = helpers.person(ctx, _player);
+        checkFormulasAccess(ctx);
+        return donationForRep(reputation, person);
+      },
+      sharePower:
+        (ctx) =>
+        (_threads, _cpuCores = 1) => {
+          const threads = helpers.positiveInteger(ctx, "threads", _threads);
+          const cpuCores = helpers.positiveInteger(ctx, "cpuCores", _cpuCores);
+          checkFormulasAccess(ctx);
+          return calculateShareBonus(calculateEffectiveSharedThreads(threads, cpuCores));
+        },
+    },
     skills: {
-      calculateSkill: function (exp: any, mult: any = 1): any {
-        checkFormulasAccess("skills.calculateSkill");
-        return calculateSkill(exp, mult);
-      },
-      calculateExp: function (skill: any, mult: any = 1): any {
-        checkFormulasAccess("skills.calculateExp");
-        return calculateExp(skill, mult);
-      },
+      calculateSkill:
+        (ctx) =>
+        (_exp, _mult = 1) => {
+          const exp = helpers.number(ctx, "exp", _exp);
+          const mult = helpers.number(ctx, "mult", _mult);
+          checkFormulasAccess(ctx);
+          return calculateSkill(exp, mult);
+        },
+      calculateExp:
+        (ctx) =>
+        (_skill, _mult = 1) => {
+          const skill = helpers.number(ctx, "skill", _skill);
+          const mult = helpers.number(ctx, "mult", _mult);
+          checkFormulasAccess(ctx);
+          return calculateExp(skill, mult);
+        },
     },
     hacking: {
-      hackChance: function (server: any, player: any): any {
-        checkFormulasAccess("hacking.hackChance");
-        return calculateHackingChance(server, player);
+      hackChance: (ctx) => (_server, _player) => {
+        const server = helpers.server(ctx, _server);
+        const person = helpers.person(ctx, _player);
+        checkFormulasAccess(ctx);
+        return calculateHackingChance(server, person);
       },
-      hackExp: function (server: any, player: any): any {
-        checkFormulasAccess("hacking.hackExp");
-        return calculateHackingExpGain(server, player);
+      hackExp: (ctx) => (_server, _player) => {
+        const server = helpers.server(ctx, _server);
+        const person = helpers.person(ctx, _player);
+        checkFormulasAccess(ctx);
+        return calculateHackingExpGain(server, person);
       },
-      hackPercent: function (server: any, player: any): any {
-        checkFormulasAccess("hacking.hackPercent");
-        return calculatePercentMoneyHacked(server, player);
+      hackPercent: (ctx) => (_server, _player) => {
+        const server = helpers.server(ctx, _server);
+        const person = helpers.person(ctx, _player);
+        checkFormulasAccess(ctx);
+        return calculatePercentMoneyHacked(server, person);
       },
-      growPercent: function (server: any, threads: any, player: any, cores: any = 1): any {
-        checkFormulasAccess("hacking.growPercent");
-        return calculateServerGrowth(server, threads, player, cores);
+      /* TODO 2.3: Remove growPercent, add growMultiplier function?
+      Much better name given the output. Not sure if removedFunction error dialog/editing script will be too annoying.
+      Changing the function name also allows reordering params as server, player, etc. like other formulas functions */
+      growPercent:
+        (ctx) =>
+        (_server, _threads, _player, _cores = 1) => {
+          const server = helpers.server(ctx, _server);
+          const person = helpers.person(ctx, _player);
+          const threads = helpers.number(ctx, "threads", _threads);
+          const cores = helpers.number(ctx, "cores", _cores);
+          checkFormulasAccess(ctx);
+          return calculateServerGrowth(server, threads, person, cores);
+        },
+      growThreads:
+        (ctx) =>
+        (_server, _player, _targetMoney, _cores = 1) => {
+          const server = helpers.server(ctx, _server);
+          const player = helpers.person(ctx, _player);
+          const targetMoney = helpers.number(ctx, "targetMoney", _targetMoney);
+          const startMoney = helpers.number(ctx, "server.moneyAvailable", server.moneyAvailable);
+          const cores = helpers.number(ctx, "cores", _cores);
+          checkFormulasAccess(ctx);
+          return numCycleForGrowthCorrected(server, targetMoney, startMoney, cores, player);
+        },
+      growAmount:
+        (ctx) =>
+        (_server, _player, _threads, _cores = 1) => {
+          const server = helpers.server(ctx, _server);
+          const person = helpers.person(ctx, _player);
+          const threads = helpers.number(ctx, "threads", _threads);
+          const cores = helpers.number(ctx, "cores", _cores);
+          checkFormulasAccess(ctx);
+          return calculateGrowMoney(server, threads, person, cores);
+        },
+      hackTime: (ctx) => (_server, _player) => {
+        const server = helpers.server(ctx, _server);
+        const person = helpers.person(ctx, _player);
+        checkFormulasAccess(ctx);
+        return calculateHackingTime(server, person) * 1000;
       },
-      hackTime: function (server: any, player: any): any {
-        checkFormulasAccess("hacking.hackTime");
-        return calculateHackingTime(server, player) * 1000;
+      growTime: (ctx) => (_server, _player) => {
+        const server = helpers.server(ctx, _server);
+        const person = helpers.person(ctx, _player);
+        checkFormulasAccess(ctx);
+        return calculateGrowTime(server, person) * 1000;
       },
-      growTime: function (server: any, player: any): any {
-        checkFormulasAccess("hacking.growTime");
-        return calculateGrowTime(server, player) * 1000;
+      weakenTime: (ctx) => (_server, _player) => {
+        const server = helpers.server(ctx, _server);
+        const person = helpers.person(ctx, _player);
+        checkFormulasAccess(ctx);
+        return calculateWeakenTime(server, person) * 1000;
       },
-      weakenTime: function (server: any, player: any): any {
-        checkFormulasAccess("hacking.weakenTime");
-        return calculateWeakenTime(server, player) * 1000;
-      },
+      weakenEffect:
+        (ctx) =>
+        (_threads, _cores = 1) => {
+          const threads = helpers.number(ctx, "threads", _threads);
+          const cores = helpers.number(ctx, "cores", _cores);
+          checkFormulasAccess(ctx);
+          return getWeakenEffect(threads, cores);
+        },
     },
     hacknetNodes: {
-      moneyGainRate: function (level: any, ram: any, cores: any, mult: any = 1): any {
-        checkFormulasAccess("hacknetNodes.moneyGainRate");
-        return calculateMoneyGainRate(level, ram, cores, mult);
-      },
-      levelUpgradeCost: function (startingLevel: any, extraLevels: any = 1, costMult: any = 1): any {
-        checkFormulasAccess("hacknetNodes.levelUpgradeCost");
-        return calculateLevelUpgradeCost(startingLevel, extraLevels, costMult);
-      },
-      ramUpgradeCost: function (startingRam: any, extraLevels: any = 1, costMult: any = 1): any {
-        checkFormulasAccess("hacknetNodes.ramUpgradeCost");
-        return calculateRamUpgradeCost(startingRam, extraLevels, costMult);
-      },
-      coreUpgradeCost: function (startingCore: any, extraCores: any = 1, costMult: any = 1): any {
-        checkFormulasAccess("hacknetNodes.coreUpgradeCost");
-        return calculateCoreUpgradeCost(startingCore, extraCores, costMult);
-      },
-      hacknetNodeCost: function (n: any, mult: any): any {
-        checkFormulasAccess("hacknetNodes.hacknetNodeCost");
-        return calculateNodeCost(n, mult);
-      },
-      constants: function (): any {
-        checkFormulasAccess("hacknetNodes.constants");
+      moneyGainRate:
+        (ctx) =>
+        (_level, _ram, _cores, _mult = 1) => {
+          const level = helpers.number(ctx, "level", _level);
+          const ram = helpers.number(ctx, "ram", _ram);
+          const cores = helpers.number(ctx, "cores", _cores);
+          const mult = helpers.number(ctx, "mult", _mult);
+          checkFormulasAccess(ctx);
+          return calculateMoneyGainRate(level, ram, cores, mult);
+        },
+      levelUpgradeCost:
+        (ctx) =>
+        (_startingLevel, _extraLevels = 1, _costMult = 1) => {
+          const startingLevel = helpers.number(ctx, "startingLevel", _startingLevel);
+          const extraLevels = helpers.number(ctx, "extraLevels", _extraLevels);
+          const costMult = helpers.number(ctx, "costMult", _costMult);
+          checkFormulasAccess(ctx);
+          return calculateLevelUpgradeCost(startingLevel, extraLevels, costMult);
+        },
+      ramUpgradeCost:
+        (ctx) =>
+        (_startingRam, _extraLevels = 1, _costMult = 1) => {
+          const startingRam = helpers.number(ctx, "startingRam", _startingRam);
+          const extraLevels = helpers.number(ctx, "extraLevels", _extraLevels);
+          const costMult = helpers.number(ctx, "costMult", _costMult);
+          checkFormulasAccess(ctx);
+          return calculateRamUpgradeCost(startingRam, extraLevels, costMult);
+        },
+      coreUpgradeCost:
+        (ctx) =>
+        (_startingCore, _extraCores = 1, _costMult = 1) => {
+          const startingCore = helpers.number(ctx, "startingCore", _startingCore);
+          const extraCores = helpers.number(ctx, "extraCores", _extraCores);
+          const costMult = helpers.number(ctx, "costMult", _costMult);
+          checkFormulasAccess(ctx);
+          return calculateCoreUpgradeCost(startingCore, extraCores, costMult);
+        },
+      hacknetNodeCost:
+        (ctx) =>
+        (_n, _mult = 1) => {
+          const n = helpers.number(ctx, "n", _n);
+          const mult = helpers.number(ctx, "mult", _mult);
+          checkFormulasAccess(ctx);
+          return calculateNodeCost(n, mult);
+        },
+      constants: (ctx) => () => {
+        checkFormulasAccess(ctx);
         return Object.assign({}, HacknetNodeConstants);
       },
     },
     hacknetServers: {
-      hashGainRate: function (level: any, ramUsed: any, maxRam: any, cores: any, mult: any = 1): any {
-        checkFormulasAccess("hacknetServers.hashGainRate");
-        return HScalculateHashGainRate(level, ramUsed, maxRam, cores, mult);
-      },
-      levelUpgradeCost: function (startingLevel: any, extraLevels: any = 1, costMult: any = 1): any {
-        checkFormulasAccess("hacknetServers.levelUpgradeCost");
-        return HScalculateLevelUpgradeCost(startingLevel, extraLevels, costMult);
-      },
-      ramUpgradeCost: function (startingRam: any, extraLevels: any = 1, costMult: any = 1): any {
-        checkFormulasAccess("hacknetServers.ramUpgradeCost");
-        return HScalculateRamUpgradeCost(startingRam, extraLevels, costMult);
-      },
-      coreUpgradeCost: function (startingCore: any, extraCores: any = 1, costMult: any = 1): any {
-        checkFormulasAccess("hacknetServers.coreUpgradeCost");
-        return HScalculateCoreUpgradeCost(startingCore, extraCores, costMult);
-      },
-      cacheUpgradeCost: function (startingCache: any, extraCache: any = 1): any {
-        checkFormulasAccess("hacknetServers.cacheUpgradeCost");
-        return HScalculateCacheUpgradeCost(startingCache, extraCache);
-      },
-      hashUpgradeCost: function (upgName: any, level: any): any {
-        checkFormulasAccess("hacknetServers.hashUpgradeCost");
-        const upg = player.hashManager.getUpgrade(upgName);
+      hashGainRate:
+        (ctx) =>
+        (_level, _ramUsed, _maxRam, _cores, _mult = 1) => {
+          const level = helpers.number(ctx, "level", _level);
+          const ramUsed = helpers.number(ctx, "ramUsed", _ramUsed);
+          const maxRam = helpers.number(ctx, "maxRam", _maxRam);
+          const cores = helpers.number(ctx, "cores", _cores);
+          const mult = helpers.number(ctx, "mult", _mult);
+          checkFormulasAccess(ctx);
+          return HScalculateHashGainRate(level, ramUsed, maxRam, cores, mult);
+        },
+      levelUpgradeCost:
+        (ctx) =>
+        (_startingLevel, _extraLevels = 1, _costMult = 1) => {
+          const startingLevel = helpers.number(ctx, "startingLevel", _startingLevel);
+          const extraLevels = helpers.number(ctx, "extraLevels", _extraLevels);
+          const costMult = helpers.number(ctx, "costMult", _costMult);
+          checkFormulasAccess(ctx);
+          return HScalculateLevelUpgradeCost(startingLevel, extraLevels, costMult);
+        },
+      ramUpgradeCost:
+        (ctx) =>
+        (_startingRam, _extraLevels = 1, _costMult = 1) => {
+          const startingRam = helpers.number(ctx, "startingRam", _startingRam);
+          const extraLevels = helpers.number(ctx, "extraLevels", _extraLevels);
+          const costMult = helpers.number(ctx, "costMult", _costMult);
+          checkFormulasAccess(ctx);
+          return HScalculateRamUpgradeCost(startingRam, extraLevels, costMult);
+        },
+      coreUpgradeCost:
+        (ctx) =>
+        (_startingCore, _extraCores = 1, _costMult = 1) => {
+          const startingCore = helpers.number(ctx, "startingCore", _startingCore);
+          const extraCores = helpers.number(ctx, "extraCores", _extraCores);
+          const costMult = helpers.number(ctx, "costMult", _costMult);
+          checkFormulasAccess(ctx);
+          return HScalculateCoreUpgradeCost(startingCore, extraCores, costMult);
+        },
+      cacheUpgradeCost:
+        (ctx) =>
+        (_startingCache, _extraCache = 1) => {
+          const startingCache = helpers.number(ctx, "startingCache", _startingCache);
+          const extraCache = helpers.number(ctx, "extraCache", _extraCache);
+          checkFormulasAccess(ctx);
+          return HScalculateCacheUpgradeCost(startingCache, extraCache);
+        },
+      hashUpgradeCost: (ctx) => (_upgName, _level) => {
+        const upgName = getEnumHelper("HashUpgradeEnum").nsGetMember(ctx, _upgName);
+        const level = helpers.number(ctx, "level", _level);
+        checkFormulasAccess(ctx);
+        const upg = Player.hashManager.getUpgrade(upgName);
         if (!upg) {
-          throw helper.makeRuntimeErrorMsg(
-            "formulas.hacknetServers.calculateHashUpgradeCost",
-            `Invalid Hash Upgrade: ${upgName}`,
-          );
+          throw helpers.errorMessage(ctx, `Invalid Hash Upgrade: ${upgName}`);
         }
         return upg.getCost(level);
       },
-      hacknetServerCost: function (n: any, mult: any = 1): any {
-        checkFormulasAccess("hacknetServers.hacknetServerCost");
-        return HScalculateServerCost(n, mult);
-      },
-      constants: function (): any {
-        checkFormulasAccess("hacknetServers.constants");
+      hacknetServerCost:
+        (ctx) =>
+        (_n, _mult = 1) => {
+          const n = helpers.number(ctx, "n", _n);
+          const mult = helpers.number(ctx, "mult", _mult);
+          checkFormulasAccess(ctx);
+          return HScalculateServerCost(n, mult);
+        },
+      constants: (ctx) => () => {
+        checkFormulasAccess(ctx);
         return Object.assign({}, HacknetServerConstants);
       },
     },
     gang: {
-      wantedPenalty(gang: any): number {
-        checkFormulasAccess("gang.wantedPenalty");
+      wantedPenalty: (ctx) => (_gang) => {
+        const gang = helpers.gang(ctx, _gang);
+        checkFormulasAccess(ctx);
         return calculateWantedPenalty(gang);
       },
-      respectGain: function (gang: any, member: any, task: any): number {
-        checkFormulasAccess("gang.respectGain");
+      respectGain: (ctx) => (_gang, _member, _task) => {
+        const gang = helpers.gang(ctx, _gang);
+        const member = helpers.gangMember(ctx, _member);
+        const task = helpers.gangTask(ctx, _task);
+        checkFormulasAccess(ctx);
         return calculateRespectGain(gang, member, task);
       },
-      wantedLevelGain: function (gang: any, member: any, task: any): number {
-        checkFormulasAccess("gang.wantedLevelGain");
+      wantedLevelGain: (ctx) => (_gang, _member, _task) => {
+        const gang = helpers.gang(ctx, _gang);
+        const member = helpers.gangMember(ctx, _member);
+        const task = helpers.gangTask(ctx, _task);
+        checkFormulasAccess(ctx);
         return calculateWantedLevelGain(gang, member, task);
       },
-      moneyGain: function (gang: any, member: any, task: any): number {
-        checkFormulasAccess("gang.moneyGain");
+      moneyGain: (ctx) => (_gang, _member, _task) => {
+        const gang = helpers.gang(ctx, _gang);
+        const member = helpers.gangMember(ctx, _member);
+        const task = helpers.gangTask(ctx, _task);
+        checkFormulasAccess(ctx);
         return calculateMoneyGain(gang, member, task);
       },
-      ascensionPointsGain: function (exp: any): number {
-        checkFormulasAccess("gang.ascensionPointsGain");
+      ascensionPointsGain: (ctx) => (_exp) => {
+        const exp = helpers.number(ctx, "exp", _exp);
+        checkFormulasAccess(ctx);
         return calculateAscensionPointsGain(exp);
       },
-      ascensionMultiplier: function (points: any): number {
-        checkFormulasAccess("gang.ascensionMultiplier");
+      ascensionMultiplier: (ctx) => (_points) => {
+        const points = helpers.number(ctx, "points", _points);
+        checkFormulasAccess(ctx);
         return calculateAscensionMult(points);
       },
     },
+    work: {
+      crimeSuccessChance: (ctx) => (_person, _crimeType) => {
+        checkFormulasAccess(ctx);
+        const person = helpers.person(ctx, _person);
+        const crime = Crimes[getEnumHelper("CrimeType").nsGetMember(ctx, _crimeType)];
+        if (!crime) {
+          throw new Error(`Invalid crime type: ${_crimeType}`);
+        }
+        return crime.successRate(person);
+      },
+      crimeGains: (ctx) => (_person, _crimeType) => {
+        checkFormulasAccess(ctx);
+        const person = helpers.person(ctx, _person);
+        const crime = Crimes[getEnumHelper("CrimeType").nsGetMember(ctx, _crimeType)];
+        if (!crime) {
+          throw new Error(`Invalid crime type: ${_crimeType}`);
+        }
+        return calculateCrimeWorkStats(person, crime);
+      },
+      gymGains: (ctx) => (_person, _classType, _locationName) => {
+        checkFormulasAccess(ctx);
+        const person = helpers.person(ctx, _person);
+        const classType = getEnumHelper("GymType").nsGetMember(ctx, _classType);
+        const locationName = getEnumHelper("LocationName").nsGetMember(ctx, _locationName);
+        return calculateClassEarnings(person, classType, locationName);
+      },
+      universityGains: (ctx) => (_person, _classType, _locationName) => {
+        checkFormulasAccess(ctx);
+        const person = helpers.person(ctx, _person);
+        const classType = getEnumHelper("UniversityClassType").nsGetMember(ctx, _classType);
+        const locationName = getEnumHelper("LocationName").nsGetMember(ctx, _locationName);
+        return calculateClassEarnings(person, classType, locationName);
+      },
+      factionGains: (ctx) => (_player, _workType, _favor) => {
+        checkFormulasAccess(ctx);
+        const player = helpers.person(ctx, _player);
+        const workType = getEnumHelper("FactionWorkType").nsGetMember(ctx, _workType);
+        const favor = helpers.number(ctx, "favor", _favor);
+        const exp = calculateFactionExp(player, workType);
+        const rep = calculateFactionRep(player, workType, favor);
+        exp.reputation = rep;
+        return exp;
+      },
+      companyGains: (ctx) => (_person, _companyName, _positionName, _favor) => {
+        checkFormulasAccess(ctx);
+        const person = helpers.person(ctx, _person);
+        const companyName = getEnumHelper("CompanyName").nsGetMember(ctx, _companyName);
+        const company = Companies[companyName];
+        const positionName = getEnumHelper("JobName").nsGetMember(ctx, _positionName);
+        const position = CompanyPositions[positionName];
+        const favor = helpers.number(ctx, "favor", _favor);
+        return calculateCompanyWorkStats(person, company, position, favor);
+      },
+    },
+    bladeburner: {
+      skillMaxUpgradeCount: (ctx) => (_name, _level, _skillPoints) => {
+        checkFormulasAccess(ctx);
+        const name = getEnumHelper("BladeburnerSkillName").nsGetMember(ctx, _name, "name");
+        const level = helpers.number(ctx, "level", _level);
+        if (!Number.isFinite(level) || level < 0) {
+          throw new Error(`Level must be a finite, non-negative number. Its value is ${level}.`);
+        }
+        const skillPoints = helpers.number(ctx, "skillPoints", _skillPoints);
+        if (!Number.isFinite(skillPoints) || skillPoints < 0) {
+          throw new Error(`SkillPoints must be a finite, non-negative number. Its value is ${skillPoints}.`);
+        }
+        const skill = Skills[name];
+        if (level >= skill.maxLvl) {
+          return 0;
+        }
+        if (skillPoints === 0) {
+          return 0;
+        }
+        return skill.calculateMaxUpgradeCount(level, skillPoints as PositiveNumber);
+      },
+    },
+    dnet: {
+      getAuthenticateTime:
+        (ctx) =>
+        (_darknetServerDetails, _threads, _player, _correctCharactersInPassword): number => {
+          assertDarknetServerDetails(ctx, _darknetServerDetails);
+          const threads = helpers.number(ctx, "threads", _threads ?? 1);
+          const person = helpers.person(ctx, _player ?? Player);
+          const correctChars = helpers.number(ctx, "correctCharactersInPassword", _correctCharactersInPassword ?? 0);
+          return calculateAuthenticationTime(_darknetServerDetails, person, threads, correctChars);
+        },
+      getHeartbleedTime:
+        (ctx) =>
+        (_darknetServerDetails, _threads, _player): number => {
+          assertDarknetServerDetails(ctx, _darknetServerDetails);
+          const threads = helpers.number(ctx, "threads", _threads ?? 1);
+          const person = helpers.person(ctx, _player ?? Player);
+          return calculateAuthenticationTime(_darknetServerDetails, person, threads) * 1.5;
+        },
+      getExpectedRamBlockRemoved:
+        (ctx) =>
+        (_darknetServerDetails, _threads, _person): number => {
+          assertDarknetServerDetails(ctx, _darknetServerDetails);
+          const threads = helpers.number(ctx, "threads", _threads ?? 1);
+          const person = helpers.person(ctx, _person ?? Player);
+          return getRamBlockRemoved(_darknetServerDetails, threads, person);
+        },
+    },
   };
+
+  // Removed functions
+  setRemovedFunctions(formulasFunctions.work, {
+    classGains: { version: "2.2.0", replacement: "formulas.work.universityGains or formulas.work.gymGains" },
+  });
+  return formulasFunctions;
 }

@@ -4,9 +4,9 @@
 
 ## GangTaskStats.strWeight property
 
-Stength skill impact on task scaling
+Strength skill impact on task scaling
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 strWeight: number;

@@ -4,9 +4,9 @@
 
 ## CorporationInfo.numShares property
 
-Amount of share owned
+Amount of shares owned by the CEO.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 numShares: number;

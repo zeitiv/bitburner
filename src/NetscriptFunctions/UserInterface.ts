@@ -1,104 +1,193 @@
-import { INetscriptHelper } from "./INetscriptHelper";
-import { WorkerScript } from "../Netscript/WorkerScript";
-import { IPlayer } from "../PersonObjects/IPlayer";
-import { getRamCost } from "../Netscript/RamCostGenerator";
-import { GameInfo, IStyleSettings, UserInterface as IUserInterface, UserInterfaceTheme } from "../ScriptEditor/NetscriptDefinitions";
+import { UserInterface as IUserInterface } from "@nsdefs";
 import { Settings } from "../Settings/Settings";
 import { ThemeEvents } from "../Themes/ui/Theme";
 import { defaultTheme } from "../Themes/Themes";
 import { defaultStyles } from "../Themes/Styles";
 import { CONSTANTS } from "../Constants";
-import { hash } from "../hash/hash";
+import { commitHash } from "../utils/helpers/commitHash";
+import { InternalAPI } from "../Netscript/APIWrapper";
+import { Terminal } from "../../src/Terminal";
+import { helpers, wrapUserNode } from "../Netscript/NetscriptHelpers";
+import { assertAndSanitizeMainTheme, assertAndSanitizeStyles } from "../JsonSchema/JSONSchemaAssertion";
+import { LogBoxCloserEvents, LogBoxEvents } from "../ui/React/LogBoxManager";
 
-export function NetscriptUserInterface(
-  player: IPlayer,
-  workerScript: WorkerScript,
-  helper: INetscriptHelper,
-): IUserInterface {
+export function NetscriptUserInterface(): InternalAPI<IUserInterface> {
   return {
-    getTheme: function (): UserInterfaceTheme {
-      helper.updateDynamicRam("getTheme", getRamCost(player, "ui", "getTheme"));
+    openTail:
+      (ctx) =>
+      (scriptID, host, ...scriptArgs) => {
+        const ident = helpers.scriptIdentifier(ctx, scriptID, host, scriptArgs);
+        const runningScriptObj = helpers.getRunningScript(ctx, ident);
+        if (runningScriptObj == null) {
+          helpers.log(ctx, () => helpers.getCannotFindRunningScriptErrorMessage(ident));
+          return;
+        }
+
+        LogBoxEvents.emit(runningScriptObj);
+      },
+
+    renderTail:
+      (ctx) =>
+      (_pid = ctx.workerScript.scriptRef.pid) => {
+        const pid = helpers.number(ctx, "pid", _pid);
+        const runningScriptObj = helpers.getRunningScript(ctx, pid);
+        if (runningScriptObj == null) {
+          helpers.log(ctx, () => helpers.getCannotFindRunningScriptErrorMessage(pid));
+          return;
+        }
+        runningScriptObj.tailProps?.rerender();
+      },
+
+    moveTail:
+      (ctx) =>
+      (_x, _y, _pid = ctx.workerScript.scriptRef.pid) => {
+        const x = helpers.number(ctx, "x", _x);
+        const y = helpers.number(ctx, "y", _y);
+        const pid = helpers.number(ctx, "pid", _pid);
+        const runningScriptObj = helpers.getRunningScript(ctx, pid);
+        if (runningScriptObj == null) {
+          helpers.log(ctx, () => helpers.getCannotFindRunningScriptErrorMessage(pid));
+          return;
+        }
+        runningScriptObj.tailProps?.setPosition(x, y);
+      },
+
+    resizeTail:
+      (ctx) =>
+      (_w, _h, _pid = ctx.workerScript.scriptRef.pid) => {
+        const w = helpers.number(ctx, "w", _w);
+        const h = helpers.number(ctx, "h", _h);
+        const pid = helpers.number(ctx, "pid", _pid);
+        const runningScriptObj = helpers.getRunningScript(ctx, pid);
+        if (runningScriptObj == null) {
+          helpers.log(ctx, () => helpers.getCannotFindRunningScriptErrorMessage(pid));
+          return;
+        }
+        runningScriptObj.tailProps?.setSize(w, h);
+      },
+
+    closeTail:
+      (ctx) =>
+      (_pid = ctx.workerScript.scriptRef.pid) => {
+        const pid = helpers.number(ctx, "pid", _pid);
+        const runningScriptObj = helpers.getRunningScript(ctx, pid);
+        if (runningScriptObj == null) {
+          helpers.log(ctx, () => helpers.getCannotFindRunningScriptErrorMessage(pid));
+          return;
+        }
+        // Emit an event to tell the game to close the tail window if it exists.
+        LogBoxCloserEvents.emit(pid);
+      },
+
+    setTailTitle:
+      (ctx) =>
+      (title, _pid = ctx.workerScript.scriptRef.pid) => {
+        const pid = helpers.number(ctx, "pid", _pid);
+        const runningScriptObj = helpers.getRunningScript(ctx, pid);
+        if (runningScriptObj == null) {
+          helpers.log(ctx, () => helpers.getCannotFindRunningScriptErrorMessage(pid));
+          return;
+        }
+        runningScriptObj.title = typeof title === "string" ? title : wrapUserNode(title);
+        runningScriptObj.tailProps?.rerender();
+      },
+
+    setTailFontSize:
+      (ctx) =>
+      (_pixel, scriptID, host, ...scriptArgs) => {
+        const ident = helpers.scriptIdentifier(ctx, scriptID, host, scriptArgs);
+        const runningScriptObj = helpers.getRunningScript(ctx, ident);
+        if (runningScriptObj == null) {
+          helpers.log(ctx, () => helpers.getCannotFindRunningScriptErrorMessage(ident));
+          return;
+        }
+        if (_pixel === undefined) runningScriptObj.tailProps?.setFontSize(undefined);
+        else runningScriptObj.tailProps?.setFontSize(helpers.number(ctx, "pixel", _pixel));
+      },
+
+    setTailMinimized:
+      (ctx) =>
+      (_minimized, _pid = ctx.workerScript.scriptRef.pid) => {
+        const minimized = helpers.boolean(ctx, "minimized", _minimized);
+        const pid = helpers.number(ctx, "pid", _pid);
+        const runningScriptObj = helpers.getRunningScript(ctx, pid);
+        if (runningScriptObj == null) {
+          helpers.log(ctx, () => helpers.getCannotFindRunningScriptErrorMessage(pid));
+          return;
+        }
+        runningScriptObj.tailProps?.setMinimized(minimized);
+      },
+
+    windowSize: () => () => {
+      return [window.innerWidth, window.innerHeight];
+    },
+
+    getTheme: () => () => {
       return { ...Settings.theme };
     },
 
-    getStyles: function (): IStyleSettings {
-      helper.updateDynamicRam("getStyles", getRamCost(player, "ui", "getStyles"));
+    getStyles: () => () => {
       return { ...Settings.styles };
     },
 
-    setTheme: function (newTheme: UserInterfaceTheme): void {
-      helper.updateDynamicRam("setTheme", getRamCost(player, "ui", "setTheme"));
-      const hex = /^(#)((?:[A-Fa-f0-9]{3}){1,2})$/;
-      const currentTheme = {...Settings.theme}
-      const errors: string[] = [];
-      for (const key of Object.keys(newTheme)) {
-        if (!currentTheme[key]) {
-          // Invalid key
-          errors.push(`Invalid key "${key}"`);
-        } else if (!hex.test(newTheme[key] ?? '')) {
-          errors.push(`Invalid color "${key}": ${newTheme[key]}`);
-        } else {
-          currentTheme[key] = newTheme[key];
-        }
+    setTheme: (ctx) => (newTheme) => {
+      let newData: unknown;
+      try {
+        /**
+         * assertAndSanitizeMainTheme may mutate its parameter, so we have to clone the user-provided data here.
+         */
+        newData = structuredClone(newTheme);
+        assertAndSanitizeMainTheme(newData);
+      } catch (error) {
+        helpers.log(ctx, () => `Failed to set theme. Errors: ${error}`);
+        return;
       }
-
-      if (errors.length === 0) {
-        Object.assign(Settings.theme, currentTheme);
-        ThemeEvents.emit();
-        workerScript.log("ui.setTheme", () => `Successfully set theme`);
-      } else {
-        workerScript.log("ui.setTheme", () => `Failed to set theme. Errors: ${errors.join(', ')}`);
-      }
+      Object.assign(Settings.theme, newData);
+      ThemeEvents.emit();
+      helpers.log(ctx, () => `Successfully set theme`);
     },
 
-    setStyles: function (newStyles: IStyleSettings): void {
-      helper.updateDynamicRam("setStyles", getRamCost(player, "ui", "setStyles"));
-
-      const currentStyles = {...Settings.styles}
-      const errors: string[] = [];
-      for (const key of Object.keys(newStyles)) {
-        if (!((currentStyles as any)[key])) {
-          // Invalid key
-          errors.push(`Invalid key "${key}"`);
-        } else {
-          (currentStyles as any)[key] = (newStyles as any)[key];
-        }
+    setStyles: (ctx) => (newStyles) => {
+      let newData: unknown;
+      try {
+        /**
+         * assertAndSanitizeStyles may mutate its parameter, so we have to clone the user-provided data here.
+         */
+        newData = structuredClone(newStyles);
+        assertAndSanitizeStyles(newData);
+      } catch (error) {
+        helpers.log(ctx, () => `Failed to set styles. Errors: ${error}`);
+        return;
       }
-
-      if (errors.length === 0) {
-        Object.assign(Settings.styles, currentStyles);
-        ThemeEvents.emit();
-        workerScript.log("ui.setStyles", () => `Successfully set styles`);
-      } else {
-        workerScript.log("ui.setStyles", () => `Failed to set styles. Errors: ${errors.join(', ')}`);
-      }
+      Object.assign(Settings.styles, newData);
+      ThemeEvents.emit();
+      helpers.log(ctx, () => `Successfully set styles`);
     },
 
-    resetTheme: function (): void {
-      helper.updateDynamicRam("resetTheme", getRamCost(player, "ui", "resetTheme"));
+    resetTheme: (ctx) => () => {
       Settings.theme = { ...defaultTheme };
       ThemeEvents.emit();
-      workerScript.log("ui.resetTheme", () => `Reinitialized theme to default`);
+      helpers.log(ctx, () => `Reinitialized theme to default`);
     },
 
-    resetStyles: function (): void {
-      helper.updateDynamicRam("resetStyles", getRamCost(player, "ui", "resetStyles"));
+    resetStyles: (ctx) => () => {
       Settings.styles = { ...defaultStyles };
       ThemeEvents.emit();
-      workerScript.log("ui.resetStyles", () => `Reinitialized styles to default`);
+      helpers.log(ctx, () => `Reinitialized styles to default`);
     },
 
-    getGameInfo: function (): GameInfo {
-      helper.updateDynamicRam("getGameInfo", getRamCost(player, "ui", "getGameInfo"));
-      const version = CONSTANTS.VersionString;
-      const commit = hash();
-      const platform = (navigator.userAgent.toLowerCase().indexOf(" electron/") > -1) ? 'Steam' : 'Browser';
+    getGameInfo: () => () => {
+      return {
+        version: CONSTANTS.VersionString,
+        versionNumber: CONSTANTS.VersionNumber,
+        commit: commitHash(),
+        platform: navigator.userAgent.toLowerCase().includes(" electron/") ? "Steam" : "Browser",
+      };
+    },
 
-      const gameInfo = {
-        version, commit, platform,
-      }
-
-      return gameInfo;
-    }
-  }
+    clearTerminal: (ctx) => () => {
+      helpers.log(ctx, () => `Clearing terminal`);
+      Terminal.clear();
+    },
+  };
 }

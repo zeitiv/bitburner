@@ -6,24 +6,69 @@
 
 Kill all scripts with a filename.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-scriptKill(script: string, host: string): boolean;
+scriptKill(script: string, host?: string): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  script | string | Filename of script to kill. This is case-sensitive. |
-|  host | string | Host of target server. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+script
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Filename of script to kill. This is case-sensitive.
+
+
+</td></tr>
+<tr><td>
+
+host
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Hostname/IP of the target server. Optional. Defaults to current server if not provided.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 boolean
 
-true if one or more scripts were successfully killed, and false if none were.
+True if one or more scripts were successfully killed, and false if none were.
 
 ## Remarks
 

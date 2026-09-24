@@ -19,87 +19,113 @@ import { UniversityLocation } from "./UniversityLocation";
 import { CasinoLocation } from "./CasinoLocation";
 
 import { Location } from "../Location";
-import { LocationType } from "../LocationTypeEnum";
-
-import { Settings } from "../../Settings/Settings";
+import { LocationType } from "@enums";
 
 import { isBackdoorInstalled } from "../../Server/ServerHelpers";
 import { GetServer } from "../../Server/AllServers";
 
-import { CorruptableText } from "../../ui/React/CorruptableText";
-import { use } from "../../ui/Context";
+import { CorruptibleText } from "../../ui/React/CorruptibleText";
+import { Router } from "../../ui/GameRoot";
+import { Page } from "../../ui/Router";
 import { serverMetadata } from "../../Server/data/servers";
 import { Tooltip } from "@mui/material";
+import { getEnumHelper } from "../../utils/EnumHelper";
+import { exceptionAlert } from "../../utils/helpers/exceptionAlert";
 
-type IProps = {
-  loc: Location;
-};
+interface IProps {
+  location: Location;
+  showBackButton: boolean;
+}
 
-export function GenericLocation({ loc }: IProps): React.ReactElement {
-  const router = use.Router();
-  const player = use.Player();
-  /**
-   * Determine what needs to be rendered for this location based on the locations
-   * type. Returns an array of React components that should be rendered
-   */
-  function getLocationSpecificContent(): React.ReactNode[] {
-    const content: React.ReactNode[] = [];
+/**
+ * Determine what needs to be rendered for this location based on the locations
+ * type. Returns an array of React components that should be rendered
+ */
+function getLocationSpecificContent(location: Location): React.ReactNode[] {
+  const content: React.ReactNode[] = [];
 
-    if (loc.types.includes(LocationType.Company)) {
-      content.push(<CompanyLocation key={"companylocation"} locName={loc.name} />);
+  if (location.types.includes(LocationType.Company)) {
+    if (!getEnumHelper("CompanyName").isMember(location.name)) {
+      throw new Error(`Location name ${location.name} is for a company but is not a company name.`);
     }
-
-    if (loc.types.includes(LocationType.Gym)) {
-      content.push(<GymLocation key={"gymlocation"} router={router} loc={loc} p={player} />);
-    }
-
-    if (loc.types.includes(LocationType.Hospital)) {
-      content.push(<HospitalLocation key={"hospitallocation"} p={player} />);
-    }
-
-    if (loc.types.includes(LocationType.Slums)) {
-      content.push(<SlumsLocation key={"slumslocation"} />);
-    }
-
-    if (loc.types.includes(LocationType.Special)) {
-      content.push(<SpecialLocation key={"speciallocation"} loc={loc} />);
-    }
-
-    if (loc.types.includes(LocationType.TechVendor)) {
-      content.push(<TechVendorLocation key={"techvendorlocation"} loc={loc} />);
-    }
-
-    if (loc.types.includes(LocationType.TravelAgency)) {
-      content.push(<TravelAgencyRoot key={"travelagencylocation"} p={player} router={router} />);
-    }
-
-    if (loc.types.includes(LocationType.University)) {
-      content.push(<UniversityLocation key={"universitylocation"} loc={loc} />);
-    }
-
-    if (loc.types.includes(LocationType.Casino)) {
-      content.push(<CasinoLocation key={"casinoLocation"} p={player} />);
-    }
-
-    return content;
+    content.push(<CompanyLocation key="CompanyLocation" companyName={location.name} />);
   }
 
-  const locContent: React.ReactNode[] = getLocationSpecificContent();
-  const serverMeta = serverMetadata.find((s) => s.specialName === loc.name);
+  if (location.types.includes(LocationType.Gym)) {
+    content.push(<GymLocation key="GymLocation" loc={location} />);
+  }
+
+  if (location.types.includes(LocationType.Hospital)) {
+    content.push(<HospitalLocation key="HospitalLocation" />);
+  }
+
+  if (location.types.includes(LocationType.Slums)) {
+    content.push(<SlumsLocation key="SlumsLocation" />);
+  }
+
+  if (location.types.includes(LocationType.Special)) {
+    content.push(<SpecialLocation key="SpecialLocation" loc={location} />);
+  }
+
+  if (location.types.includes(LocationType.TechVendor)) {
+    content.push(<TechVendorLocation key="TechVendorLocation" loc={location} />);
+  }
+
+  if (location.types.includes(LocationType.TravelAgency)) {
+    content.push(<TravelAgencyRoot key="TravelAgencyRoot" />);
+  }
+
+  if (location.types.includes(LocationType.University)) {
+    content.push(<UniversityLocation key="UniversityLocation" loc={location} />);
+  }
+
+  if (location.types.includes(LocationType.Casino)) {
+    content.push(<CasinoLocation key="CasinoLocation" />);
+  }
+
+  return content;
+}
+
+export function GenericLocation({ location, showBackButton }: IProps): React.ReactElement {
+  /**
+   * location can be undefined if GenericLocation is used like this:
+   *
+   * <GenericLocation location={Locations["unknown"]} showBackButton={true} />
+   *
+   * We need to check it before using.
+   */
+  if (location == null) {
+    exceptionAlert(new Error(`GenericLocation is used with invalid location.`), true);
+    /**
+     * Return to the Terminal tab. We put the call of Router.toPage() inside setTimeout to avoid updating GameRoot while
+     * rendering this component.
+     */
+    setTimeout(() => {
+      Router.toPage(Page.Terminal);
+    }, 100);
+    return <></>;
+  }
+  const locationContent: React.ReactNode[] = getLocationSpecificContent(location);
+  const serverMeta = serverMetadata.find((s) => s.specialName === location.name);
   const server = GetServer(serverMeta ? serverMeta.hostname : "");
 
   const backdoorInstalled = server !== null && isBackdoorInstalled(server);
 
   return (
     <>
-      <Button onClick={() => router.toCity()}>Return to World</Button>
+      {showBackButton && <Button onClick={() => Router.toPage(Page.City)}>Return to World</Button>}
       <Typography variant="h4" sx={{ mt: 1 }}>
-        {backdoorInstalled && !Settings.DisableTextEffects ? (
-          <Tooltip title={`Backdoor installed on ${loc.name}.`}>
-            <span><CorruptableText content={loc.name} /></span>
-          </Tooltip>) : loc.name}
+        {backdoorInstalled && serverMeta ? (
+          <Tooltip title={`Backdoor installed on ${serverMeta.hostname}.`}>
+            <span>
+              <CorruptibleText content={location.name} spoiler={false} />
+            </span>
+          </Tooltip>
+        ) : (
+          location.name
+        )}
       </Typography>
-      {locContent}
+      {locationContent}
     </>
   );
 }

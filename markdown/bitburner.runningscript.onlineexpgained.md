@@ -4,7 +4,9 @@
 
 ## RunningScript.onlineExpGained property
 
-<b>Signature:</b>
+Total amount of hacking experience earned from this script when online
+
+**Signature:**
 
 ```typescript
 onlineExpGained: number;

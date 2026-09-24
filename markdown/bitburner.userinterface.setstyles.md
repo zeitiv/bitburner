@@ -6,7 +6,7 @@
 
 Sets the current styles
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 setStyles(newStyles: IStyleSettings): void;
@@ -14,11 +14,39 @@ setStyles(newStyles: IStyleSettings): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  newStyles | IStyleSettings |  |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+newStyles
+
+
+</td><td>
+
+[IStyleSettings](./bitburner.istylesettings.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 void
 
@@ -28,9 +56,8 @@ RAM cost: 0 GB
 
 ## Example
 
-Usage example (NS2)
 
-```ts
+```js
 const styles = ns.ui.getStyles();
 styles.fontFamily = 'Comic Sans Ms';
 ns.ui.setStyles(styles);

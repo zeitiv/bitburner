@@ -4,24 +4,77 @@
 
 ## Corporation.createCorporation() method
 
-Create a Corporation
+Create a Corporation. You should use [canCreateCorporation](./bitburner.corporation.cancreatecorporation.md) to check if you are unsure you can do it, because it throws an error in these cases:
 
-<b>Signature:</b>
+- Use seed money outside BitNode 3.
+
+- Be in a BitNode that has CorporationSoftcap (a BitNode modifier) less than 0.15.
+
+**Signature:**
 
 ```typescript
-createCorporation(corporationName: string, selfFund: boolean): boolean;
+createCorporation(corporationName: string, selfFund?: boolean): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  corporationName | string |  |
-|  selfFund | boolean | If you should self fund, defaults to true, false will only work on Bitnode 3 |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+corporationName
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the corporation. It must be a non-empty string.
+
+
+</td></tr>
+<tr><td>
+
+selfFund
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+_(Optional)_ If you want to self-fund. Defaults to true, false will only work in BitNode 3.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 boolean
 
 true if created and false if not
+
+## Remarks
+
+RAM cost: 20 GB
 

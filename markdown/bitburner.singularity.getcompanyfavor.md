@@ -6,19 +6,49 @@
 
 Get company favor.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getCompanyFavor(companyName: string): number;
+getCompanyFavor(companyName: CompanyName): number;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  companyName | string | Name of the company. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+companyName
+
+
+</td><td>
+
+[CompanyName](./bitburner.companyname.md)
+
+
+</td><td>
+
+Name of the company.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Modal } from "../../ui/React/Modal";
 
 import Button from "@mui/material/Button";
@@ -13,94 +13,54 @@ import { ThemeEvents } from "./Theme";
 import { Settings } from "../../Settings/Settings";
 import { defaultStyles } from "../Styles";
 import { Tooltip } from "@mui/material";
-import { IStyleSettings } from "../../ScriptEditor/NetscriptDefinitions";
+import { IStyleSettings } from "@nsdefs";
 
 interface IProps {
   open: boolean;
   onClose: () => void;
 }
 
-interface FontFamilyProps {
-  value: React.CSSProperties["fontFamily"];
-  onChange: (newValue: React.CSSProperties["fontFamily"], error?: string) => void;
-  refreshId: number;
+interface StyleFieldProps<T extends keyof React.CSSProperties> {
+  name: string;
+  type: "string" | "number";
+  value: React.CSSProperties[T];
+  onChange: (newValue: React.CSSProperties[T], error?: string) => void;
 }
 
-function FontFamilyField({ value, onChange, refreshId }: FontFamilyProps): React.ReactElement {
+function StyleField<T extends keyof React.CSSProperties>({
+  value,
+  onChange,
+  name,
+  type,
+}: StyleFieldProps<T>): React.ReactElement {
   const [errorText, setErrorText] = useState<string | undefined>();
-  const [fontFamily, setFontFamily] = useState<React.CSSProperties["fontFamily"]>(value);
+  const [fieldValue, setFieldValue] = useState<React.CSSProperties[T]>(value);
 
-  function update(newValue: React.CSSProperties["fontFamily"]): void {
-    setFontFamily(newValue);
-    if (!newValue) {
-      setErrorText("Must have a value");
-    } else {
-      setErrorText("");
-    }
-  }
-
-  function onTextChange(event: React.ChangeEvent<HTMLInputElement>): void {
-    update(event.target.value);
-  }
-
-  useEffect(() => onChange(fontFamily, errorText), [fontFamily]);
-  useEffect(() => update(value), [refreshId]);
+  const update = (newValue: React.CSSProperties[T]) => {
+    const errorText = !newValue
+      ? "Must have a value"
+      : type === "number" && Number.isNaN(Number(newValue))
+      ? "Must be a number"
+      : "";
+    setFieldValue(newValue);
+    setErrorText(errorText);
+    onChange(newValue, errorText);
+  };
 
   return (
     <TextField
       sx={{ my: 1 }}
-      label={"Font-Family"}
+      label={name}
       error={!!errorText}
-      value={fontFamily}
+      value={fieldValue}
       helperText={errorText}
-      onChange={onTextChange}
+      onChange={(event) => update(event.target.value as React.CSSProperties[T])}
       fullWidth
     />
   );
 }
 
-interface LineHeightProps {
-  value: React.CSSProperties["lineHeight"];
-  onChange: (newValue: React.CSSProperties["lineHeight"], error?: string) => void;
-  refreshId: number;
-}
-
-function LineHeightField({ value, onChange, refreshId }: LineHeightProps): React.ReactElement {
-  const [errorText, setErrorText] = useState<string | undefined>();
-  const [lineHeight, setLineHeight] = useState<React.CSSProperties["lineHeight"]>(value);
-
-  function update(newValue: React.CSSProperties["lineHeight"]): void {
-    setLineHeight(newValue);
-    if (!newValue) {
-      setErrorText("Must have a value");
-    } else if (isNaN(Number(newValue))) {
-      setErrorText("Must be a number");
-    } else {
-      setErrorText("");
-    }
-  }
-
-  function onTextChange(event: React.ChangeEvent<HTMLInputElement>): void {
-    update(event.target.value);
-  }
-
-  useEffect(() => onChange(lineHeight, errorText), [lineHeight]);
-  useEffect(() => update(value), [refreshId]);
-
-  return (
-    <TextField
-      sx={{ my: 1 }}
-      label={"Line Height"}
-      error={!!errorText}
-      value={lineHeight}
-      helperText={errorText}
-      onChange={onTextChange}
-    />
-  );
-}
-
 export function StyleEditorModal(props: IProps): React.ReactElement {
-  const [refreshId, setRefreshId] = useState<number>(0);
   const [error, setError] = useState<string | undefined>();
   const [customStyle, setCustomStyle] = useState<IStyleSettings>({
     ...Settings.styles,
@@ -119,7 +79,6 @@ export function StyleEditorModal(props: IProps): React.ReactElement {
     const styles = { ...defaultStyles };
     setCustomStyle(styles);
     persistToSettings(styles);
-    setRefreshId(refreshId + 1);
   }
 
   function update(styles: IStyleSettings, errorMessage?: string): void {
@@ -137,16 +96,39 @@ export function StyleEditorModal(props: IProps): React.ReactElement {
         <strong>NOT recommended</strong>.
       </Typography>
       <Paper sx={{ p: 2, my: 2 }}>
-        <FontFamilyField
+        <StyleField<"fontFamily">
+          name="Font Family"
+          type="string"
           value={customStyle.fontFamily}
-          refreshId={refreshId}
-          onChange={(value, error) => update({ ...customStyle, fontFamily: value as any }, error)}
+          onChange={(value, error) => update({ ...customStyle, fontFamily: value ?? "" }, error)}
         />
         <br />
-        <LineHeightField
+        <StyleField<"fontSize">
+          name="Font Size"
+          type="number"
+          value={customStyle.fontSize * (16 / 14)}
+          onChange={(value, error) =>
+            // MUI has an internal font size of 14, which then gets translated to 16px inside the typography.
+            // The font size that "overwrites" the tail font size is directly added by the styling. This value is in pixels.
+            // The inputs need to match, as two differently scaling inputs are hard to work with.
+            // To the user, both inputs are in pixels. The value MUI uses to set the font size needs to have this weird
+            // scaling of 16 to 14, so it will correctly scale back to 16px.
+            update({ ...customStyle, fontSize: Math.max(5, (Number(value) ?? 8) * (14 / 16)) }, error)
+          }
+        />
+        <br />
+        <StyleField<"fontSize">
+          name="Tail Font Size"
+          type="number"
+          value={customStyle.tailFontSize}
+          onChange={(value, error) => update({ ...customStyle, tailFontSize: Number(value) ?? 0 }, error)}
+        />
+        <br />
+        <StyleField<"lineHeight">
+          name="Line Height"
+          type="number"
           value={customStyle.lineHeight}
-          refreshId={refreshId}
-          onChange={(value, error) => update({ ...customStyle, lineHeight: value as any }, error)}
+          onChange={(value, error) => update({ ...customStyle, lineHeight: Number(value) ?? 0 }, error)}
         />
         <br />
         <ButtonGroup sx={{ my: 1 }}>

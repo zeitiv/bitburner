@@ -4,8 +4,8 @@
 
 ## Player.factions property
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-factions: string[];
+factions: FactionName[];
 ```

@@ -4,52 +4,101 @@
 
 ## NS.grow() method
 
-Spoof money in a servers bank account, increasing the amount available.
+Spoof money in a server's bank account, increasing the amount available.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-grow(host: string, opts?: BasicHGWOptions): Promise<number>;
+grow(host?: string, opts?: BasicHGWOptions): Promise<number>;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  host | string | Hostname of the target server to grow. |
-|  opts | [BasicHGWOptions](./bitburner.basichgwoptions.md) | Optional parameters for configuring function behavior. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+host
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Hostname/IP of the target server to grow. Optional. Defaults to current server if not provided.
+
+
+</td></tr>
+<tr><td>
+
+opts
+
+
+</td><td>
+
+[BasicHGWOptions](./bitburner.basichgwoptions.md)
+
+
+</td><td>
+
+_(Optional)_ Optional parameters for configuring function behavior.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 Promise&lt;number&gt;
 
-The number by which the money on the server was multiplied for the growth.
+The total effective multiplier that was applied to the server's money (after both additive and multiplicative growth).
 
 ## Remarks
 
 RAM cost: 0.15 GB
 
-Use your hacking skills to increase the amount of money available on a server. The runtime for this command depends on your hacking level and the target server’s security level. When `grow` completes, the money available on a target server will be increased by a certain, fixed percentage. This percentage is determined by the target server’s growth rate (which varies between servers) and security level. Generally, higher-level servers have higher growth rates. The getServerGrowth() function can be used to obtain a server’s growth rate.
+Use your hacking skills to increase the amount of money available on a server.
 
-Like hack, `grow` can be called on any server, regardless of where the script is running. The grow() command requires root access to the target server, but there is no required hacking level to run the command. It also raises the security level of the target server by 0.004.
+Once the grow is complete, $1 is added to the server's available money for every script thread. This additive growth allows for rescuing a server even after it is emptied.
 
-## Example 1
+After this addition, the thread count is also used to determine a multiplier, which the server's money is then multiplied by.
+
+The multiplier scales exponentially with thread count, and its base depends on the server's security level and in inherent "growth" statistic that varies between different servers.
+
+[getServerGrowth](./bitburner.ns.getservergrowth.md) can be used to check the inherent growth statistic of a server.
+
+[growthAnalyze](./bitburner.ns.growthanalyze.md) can be used to determine the number of threads needed for a specified multiplicative portion of server growth.
+
+To determine the effect of a single grow, obtain access to the Formulas API and use [formulas.hacking.growPercent](./bitburner.hackingformulas.growamount.md)<!-- -->, or invert [growthAnalyze](./bitburner.ns.growthanalyze.md)<!-- -->.
+
+To determine how many threads are needed to return a server to max money, obtain access to the Formulas API and use [formulas.hacking.growThreads](./bitburner.hackingformulas.growthreads.md)<!-- -->, or [NS.growthAnalyze()](./bitburner.ns.growthanalyze.md) \*if\* the server will be at the same security in the future.
+
+Like [hack](./bitburner.ns.hack.md)<!-- -->, `grow` can be called on any hackable server, regardless of where the script is running. Hackable servers are any servers not owned by the player.
+
+The grow() command requires root access to the target server, but there is no required hacking level to run the command. It also raises the security level of the target server based on the number of threads. The security increase can be determined using [growthAnalyzeSecurity](./bitburner.ns.growthanalyzesecurity.md)<!-- -->.
+
+## Example
 
 
-```ts
-// NS1:
-var availableMoney = getServerMoneyAvailable("foodnstuff");
-currentMoney = currentMoney * (1 + grow("foodnstuff"));
-currentMoney = currentMoney * (1 + grow("foodnstuff", { threads: 5 })); // Only use 5 threads to grow
-```
-
-## Example 2
-
-
-```ts
-// NS2:
-let availableMoney = ns.getServerMoneyAvailable("foodnstuff");
-currentMoney *= (1 + await ns.grow("foodnstuff"));
-currentMoney *= (1 + await ns.grow("foodnstuff", { threads: 5 })); // Only use 5 threads to grow
+```js
+let currentMoney = ns.getServerMoneyAvailable("n00dles");
+currentMoney *= await ns.grow("n00dles");
 ```
 

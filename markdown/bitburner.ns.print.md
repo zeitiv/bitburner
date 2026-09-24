@@ -4,9 +4,9 @@
 
 ## NS.print() method
 
-Prints one or move values or variables to the script’s logs.
+Prints one or more values or variables to the script’s logs.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 print(...args: any[]): void;
@@ -14,15 +14,80 @@ print(...args: any[]): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  args | any\[\] | Value(s) to be printed. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+args
+
+
+</td><td>
+
+any\[\]
+
+
+</td><td>
+
+Value(s) to be printed.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 void
 
 ## Remarks
 
 RAM cost: 0 GB
+
+If the argument is a string, you can color code your message by prefixing your string with one of these strings:
+
+- `"ERROR"`<!-- -->: The whole string will be printed in red. Use this prefix to indicate that an error has occurred.
+
+- `"SUCCESS"`<!-- -->: The whole string will be printed in green, similar to the default theme of the Terminal. Use this prefix to indicate that something is correct.
+
+- `"WARN"`<!-- -->: The whole string will be printed in yellow. Use this prefix to indicate that you or a user of your script should be careful of something.
+
+- `"INFO"`<!-- -->: The whole string will be printed in purplish blue. Use this prefix to remind yourself or a user of your script of something. Think of this prefix as indicating an FYI (for your information).
+
+For custom coloring, use ANSI escape sequences. The examples below use the Unicode escape code `\u001b`<!-- -->. The color coding also works if `\u001b` is replaced with the hexadecimal escape code `\x1b`<!-- -->. The Bash escape code `\e` is not supported. The octal escape code `\033` is not allowed because the game runs JavaScript in strict mode.
+
+## Example
+
+
+```js
+// Default color coding.
+ns.print("ERROR means something's wrong.");
+ns.print("SUCCESS means everything's OK.");
+ns.print("WARN Tread with caution!");
+ns.print("WARNING, warning, danger, danger!");
+ns.print("WARNing! Here be dragons.");
+ns.print("INFO for your I's only (FYI).");
+ns.print("INFOrmation overload!");
+// Custom color coding.
+const cyan = "\u001b[36m";
+const green = "\u001b[32m";
+const red = "\u001b[31m";
+const reset = "\u001b[0m";
+ns.print(`${red}Ugh! What a mess.${reset}`);
+ns.print(`${green}Well done!${reset}`);
+ns.print(`${cyan}ERROR Should this be in red?${reset}`);
+ns.ui.openTail();
+```
 

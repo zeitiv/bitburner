@@ -1,7 +1,6 @@
-import { Generic_fromJSON, Generic_toJSON, Reviver } from "../utils/JSONReviver";
-
-// Array of all valid states
-const AllCorporationStates: string[] = ["START", "PURCHASE", "PRODUCTION", "SALE", "EXPORT"];
+import { CorpStateName } from "@nsdefs";
+import { Generic_fromJSON, Generic_toJSON, IReviverValue, constructorsForReviver } from "../utils/JSONReviver";
+import { stateNames } from "./data/Constants";
 
 export class CorporationState {
   // Number representing what state the Corporation is in. The number
@@ -11,32 +10,25 @@ export class CorporationState {
   // Get the name of the current state
   // NOTE: This does NOT return the number stored in the 'state' property,
   // which is just an index for the array of all possible Corporation States.
-  getState(): string {
-    return AllCorporationStates[this.state];
+  get nextName(): CorpStateName {
+    return stateNames[this.state];
   }
-
+  get prevName(): CorpStateName {
+    return stateNames[(this.state + (stateNames.length - 1)) % stateNames.length];
+  }
   // Transition to the next state
-  nextState(): void {
-    if (this.state < 0 || this.state >= AllCorporationStates.length) {
-      this.state = 0;
-    }
-
-    ++this.state;
-    if (this.state >= AllCorporationStates.length) {
-      this.state = 0;
-    }
+  incrementState(): void {
+    this.state = (this.state + 1) % stateNames.length;
   }
 
   // Serialize the current object to a JSON save state.
-  toJSON(): any {
+  toJSON(): IReviverValue {
     return Generic_toJSON("CorporationState", this);
   }
-
-  // Initiatizes a CorporationState object from a JSON save state.
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-  static fromJSON(value: any): CorporationState {
+  // Initializes a CorporationState object from a JSON save state.
+  static fromJSON(value: IReviverValue): CorporationState {
     return Generic_fromJSON(CorporationState, value.data);
   }
 }
 
-Reviver.constructors.CorporationState = CorporationState;
+constructorsForReviver.CorporationState = CorporationState;

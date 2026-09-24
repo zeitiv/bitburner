@@ -1,17 +1,18 @@
 // Class representing a single hackable Server
 import { BaseServer } from "./BaseServer";
 
-import { BitNodeMultipliers } from "../BitNode/BitNodeMultipliers";
+import { currentNodeMults } from "../BitNode/BitNodeMultipliers";
 
-import { createRandomString } from "../utils/helpers/createRandomString";
+import { getRandomAlphanumericString } from "../utils/StringHelperFunctions";
 import { createRandomIp } from "../utils/IPAddress";
-import { Generic_fromJSON, Generic_toJSON, Reviver } from "../utils/JSONReviver";
+import { IReviverValue, constructorsForReviver } from "../utils/JSONReviver";
+import { IPAddress } from "../Types/strings";
 
-export interface IConstructorParams {
+export interface StandardServerConstructorParams {
   adminRights?: boolean;
   hackDifficulty?: number;
   hostname: string;
-  ip?: string;
+  ip?: IPAddress;
   isConnectedTo?: boolean;
   maxRam?: number;
   moneyAvailable?: number;
@@ -55,12 +56,12 @@ export class Server extends BaseServer {
   // be increased using the grow() Netscript function
   serverGrowth = 1;
 
-  constructor(params: IConstructorParams = { hostname: "", ip: createRandomIp() }) {
+  constructor(params: StandardServerConstructorParams = { hostname: "", ip: createRandomIp() }) {
     super(params);
 
     // "hacknet-node-X" hostnames are reserved for Hacknet Servers
-    if (this.hostname.startsWith("hacknet-node-")) {
-      this.hostname = createRandomString(10);
+    if (this.hostname.startsWith("hacknet-node-") || this.hostname.startsWith("hacknet-server-")) {
+      this.hostname = getRandomAlphanumericString(10);
     }
 
     this.purchasedByPlayer = params.purchasedByPlayer != null ? params.purchasedByPlayer : false;
@@ -68,26 +69,25 @@ export class Server extends BaseServer {
     //RAM, CPU speed and Scripts
     this.maxRam = params.maxRam != null ? params.maxRam : 0; //GB
 
-    /* Hacking information (only valid for "foreign" aka non-purchased servers) */
+    /* Hacking information (only valid for "foreign" aka non-owned servers) */
     this.requiredHackingSkill = params.requiredHackingSkill != null ? params.requiredHackingSkill : 1;
-    this.moneyAvailable =
-      params.moneyAvailable != null ? params.moneyAvailable * BitNodeMultipliers.ServerStartingMoney : 0;
-    this.moneyMax = 25 * this.moneyAvailable * BitNodeMultipliers.ServerMaxMoney;
+    const baseMoney = params.moneyAvailable ?? 0;
+    this.moneyAvailable = baseMoney * currentNodeMults.ServerStartingMoney;
+    this.moneyMax = 25 * baseMoney * currentNodeMults.ServerMaxMoney;
 
     //Hack Difficulty is synonymous with server security. Base Difficulty = Starting difficulty
-    this.hackDifficulty =
-      params.hackDifficulty != null ? params.hackDifficulty * BitNodeMultipliers.ServerStartingSecurity : 1;
+    const realDifficulty =
+      params.hackDifficulty != null ? params.hackDifficulty * currentNodeMults.ServerStartingSecurity : 1;
+    this.hackDifficulty = Math.min(realDifficulty, 100);
     this.baseDifficulty = this.hackDifficulty;
-    this.minDifficulty = Math.max(1, Math.round(this.hackDifficulty / 3));
+    this.minDifficulty = Math.min(Math.max(1, Math.round(realDifficulty / 3)), 100);
     this.serverGrowth = params.serverGrowth != null ? params.serverGrowth : 1; //Integer from 0 to 100. Affects money increase from grow()
 
     //Port information, required for porthacking servers to get admin rights
     this.numOpenPortsRequired = params.numOpenPortsRequired != null ? params.numOpenPortsRequired : 5;
   }
 
-  /**
-   * Ensures that the server's difficulty (server security) doesn't get too high
-   */
+  /** Ensures that the server's difficulty (server security) doesn't get too high */
   capDifficulty(): void {
     if (this.hackDifficulty < this.minDifficulty) {
       this.hackDifficulty = this.minDifficulty;
@@ -133,34 +133,28 @@ export class Server extends BaseServer {
     this.moneyMax *= n;
   }
 
-  /**
-   * Strengthens a server's security level (difficulty) by the specified amount
-   */
+  /** Strengthens a server's security level (difficulty) by the specified amount */
   fortify(amt: number): void {
     this.hackDifficulty += amt;
     this.capDifficulty();
   }
 
-  /**
-   * Lowers the server's security level (difficulty) by the specified amount)
-   */
+  /** Lowers the server's security level (difficulty) by the specified amount) */
   weaken(amt: number): void {
-    this.hackDifficulty -= amt * BitNodeMultipliers.ServerWeakenRate;
+    this.hackDifficulty -= amt;
     this.capDifficulty();
   }
 
-  /**
-   * Serialize the current object to a JSON save state
-   */
-  toJSON(): any {
-    return Generic_toJSON("Server", this);
+  /** Serialize the current object to a JSON save state */
+  toJSON(): IReviverValue {
+    return this.toJSONBase("Server", includedKeys);
   }
 
   // Initializes a Server Object from a JSON save state
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-  static fromJSON(value: any): Server {
-    return Generic_fromJSON(Server, value.data);
+  static fromJSON(value: IReviverValue): Server {
+    return BaseServer.fromJSONBase(value, Server, includedKeys);
   }
 }
+const includedKeys = BaseServer.getIncludedKeys(Server);
 
-Reviver.constructors.Server = Server;
+constructorsForReviver.Server = Server;

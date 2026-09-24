@@ -1,5 +1,6 @@
+// No need for an enum helper
 export enum RamCalculationErrorCode {
   SyntaxError = -1,
   ImportError = -2,
-  URLImportError = -3,
+  InvalidServer = -3,
 }

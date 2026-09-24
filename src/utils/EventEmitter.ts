@@ -1,33 +1,26 @@
-/**
- * Generic Event Emitter class following a subscribe/publish paradigm.
- */
-function uuidv4(): string {
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function (c) {
-    const r = (Math.random() * 16) | 0,
-      v = c == "x" ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
-
+/** Generic Event Emitter class following a subscribe/publish paradigm. */
 export class EventEmitter<T extends any[]> {
-  subscribers: { [key: string]: (...args: [...T]) => void | undefined } = {};
+  private subscribers: Set<(...args: [...T]) => void> = new Set();
 
   subscribe(s: (...args: [...T]) => void): () => void {
-    let uuid = uuidv4();
-    while (this.subscribers[uuid] !== undefined) uuid = uuidv4();
-    this.subscribers[uuid] = s;
+    this.subscribers.add(s);
 
     return () => {
-      delete this.subscribers[uuid];
+      this.subscribers.delete(s);
     };
   }
 
   emit(...args: [...T]): void {
-    for (const s in this.subscribers) {
-      const sub = this.subscribers[s];
-      if (sub === undefined) continue;
-
+    // It is necessary to make a copy of the subscribers list, because since
+    // the subscribers call arbitrary code, it can eventually call back in and
+    // subscribe or unsubscribe new listeners. We must only dispatch to the
+    // ones that were active at the time the event came in.
+    for (const sub of [...this.subscribers]) {
       sub(...args);
     }
+  }
+
+  hasSubscribers(): boolean {
+    return this.subscribers.size > 0;
   }
 }

@@ -1,24 +1,28 @@
 import React from "react";
-import { IIndustry } from "../IIndustry";
-import { MathJaxWrapper } from "../../MathJaxWrapper";
+import { Division } from "../Division";
+import { getRecordEntries } from "../../Types/Record";
+import Typography from "@mui/material/Typography";
 
 interface IProps {
-  division: IIndustry;
+  division: Division;
 }
 
 export function IndustryProductEquation(props: IProps): React.ReactElement {
   const reqs = [];
-  for (const reqMat of Object.keys(props.division.reqMats)) {
-    const reqAmt = props.division.reqMats[reqMat];
-    if (reqAmt === undefined) continue;
-    reqs.push(String.raw`${reqAmt}\text{ }${reqMat}`);
+  for (const [reqMat, reqAmt] of getRecordEntries(props.division.requiredMaterials)) {
+    if (!reqAmt) {
+      continue;
+    }
+    reqs.push(`${reqAmt} ${reqMat}`);
   }
-  const prod = props.division.prodMats.slice();
+  const prod = props.division.producedMaterials.map((materialName) => `1 ${materialName}`);
   if (props.division.makesProducts) {
-    prod.push(props.division.type);
+    prod.push("Products");
   }
 
   return (
-    <MathJaxWrapper>{"\\(" + reqs.join("+") + `\\Rightarrow` + prod.map((p) => `1 \\text{${p}}`).join("+") + "\\)"}</MathJaxWrapper>
+    <Typography component="span">
+      {reqs.join(" + ")} ⟹ {prod.join(" + ")}
+    </Typography>
   );
 }

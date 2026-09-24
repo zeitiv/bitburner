@@ -1,69 +1,94 @@
-import React, { useState, useEffect } from "react";
-import { KEY } from "../../utils/helpers/keyCodes";
+import React, { useState, useEffect, useCallback } from "react";
+import { KEY } from "../../utils/KeyboardEventKey";
 
-import { CodingContract, CodingContractTypes } from "../../CodingContracts";
+import { CodingContractTypes } from "../../CodingContract/ContractTypes";
 import { CopyableText } from "./CopyableText";
 import { Modal } from "./Modal";
-import { EventEmitter } from "../../utils/EventEmitter";
 import Typography from "@mui/material/Typography";
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
-
-interface IProps {
-  c: CodingContract;
-  onClose: () => void;
-  onAttempt: (answer: string) => void;
-}
-
-export const CodingContractEvent = new EventEmitter<[IProps]>();
+import { pluralize } from "../../utils/I18nUtils";
+import {
+  type CodingContractEventData,
+  CodingContractEventEmitter,
+} from "../../CodingContract/CodingContractEventEmitter";
 
 export function CodingContractModal(): React.ReactElement {
-  const [props, setProps] = useState<IProps | null>(null);
+  const [eventData, setEventData] = useState<CodingContractEventData | null>(null);
   const [answer, setAnswer] = useState("");
 
+  const close = useCallback(() => {
+    setEventData((old) => {
+      old?.onClose();
+      return null;
+    });
+  }, []);
+
+  useEffect(
+    () =>
+      CodingContractEventEmitter.subscribe((event) => {
+        switch (event.type) {
+          case "run":
+            setEventData(event.data);
+            break;
+          case "close":
+            close();
+            break;
+        }
+      }),
+    [close],
+  );
   useEffect(() => {
-    CodingContractEvent.subscribe((props) => setProps(props));
-  });
-  if (props === null) return <></>;
+    return () => {
+      eventData?.onClose();
+    };
+  }, [eventData]);
+
+  if (eventData === null) {
+    return <></>;
+  }
 
   function onChange(event: React.ChangeEvent<HTMLInputElement>): void {
     setAnswer(event.target.value);
   }
 
   function onKeyDown(event: React.KeyboardEvent<HTMLInputElement>): void {
-    if (props === null) return;
-    // React just won't cooperate on this one.
-    // "React.KeyboardEvent<HTMLInputElement>" seems like the right type but
-    // whatever ...
-    const value = (event.target as any).value;
+    if (eventData === null) {
+      return;
+    }
+    const value = event.currentTarget.value;
 
-    if (event.keyCode === KEY.ENTER && value !== "") {
+    if (event.key === KEY.ENTER && value !== "") {
       event.preventDefault();
-      props.onAttempt(answer);
+      eventData.onAttempt(answer);
       setAnswer("");
       close();
     }
   }
 
-  function close(): void {
-    if (props === null) return;
-    props.onClose();
-    setProps(null);
-  }
-
-  const contractType = CodingContractTypes[props.c.type];
+  const contractType = CodingContractTypes[eventData.codingContract.type];
   const description = [];
-  for (const [i, value] of contractType.desc(props.c.data).split("\n").entries())
-    description.push(<span key={i} dangerouslySetInnerHTML={{ __html: value + "<br />" }}></span>);
+  for (const [i, value] of contractType.desc(eventData.codingContract.getData()).split("\n").entries()) {
+    description.push(
+      <span key={i} style={{ whiteSpace: "pre-wrap" }}>
+        {value} <br />
+      </span>,
+    );
+  }
   return (
-    <Modal open={props !== null} onClose={close}>
-      <CopyableText variant="h4" value={props.c.type} />
+    <Modal open={eventData !== null} onClose={close}>
+      <CopyableText variant="h4" value={eventData.codingContract.type} />
       <Typography>
-        You are attempting to solve a Coding Contract. You have {props.c.getMaxNumTries() - props.c.tries} tries
+        You are attempting to solve a Coding Contract. You have{" "}
+        {pluralize(eventData.codingContract.getMaxNumTries() - eventData.codingContract.tries, "try", "tries")}{" "}
         remaining, after which the contract will self-destruct.
       </Typography>
       <br />
       <Typography>{description}</Typography>
+      <br />
+      <Typography>
+        If your solution is an empty string, you must leave the text box empty. Do not use "", '', or ``.
+      </Typography>
       <br />
       <TextField
         autoFocus
@@ -75,7 +100,7 @@ export function CodingContractModal(): React.ReactElement {
           endAdornment: (
             <Button
               onClick={() => {
-                props.onAttempt(answer);
+                eventData.onAttempt(answer);
                 setAnswer("");
                 close();
               }}

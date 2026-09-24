@@ -6,22 +6,87 @@
 
 Hire an employee.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-hireEmployee(divisionName: string, cityName: string): Employee | undefined;
+hireEmployee(divisionName: string, city: CityName, employeePosition?: CorpEmployeePosition): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  divisionName | string | Name of the division |
-|  cityName | string | Name of the city |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
 
-[Employee](./bitburner.employee.md) \| undefined
 
-The newly hired employee, if any
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+divisionName
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the division
+
+
+</td></tr>
+<tr><td>
+
+city
+
+
+</td><td>
+
+[CityName](./bitburner.cityname.md)
+
+
+</td><td>
+
+Name of the city
+
+
+</td></tr>
+<tr><td>
+
+employeePosition
+
+
+</td><td>
+
+[CorpEmployeePosition](./bitburner.corpemployeeposition.md)
+
+
+</td><td>
+
+_(Optional)_ Position to place into. Defaults to "Unassigned".
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
+
+boolean
+
+True if an employee was hired, false otherwise
+
+## Remarks
+
+RAM cost: 20 GB
 

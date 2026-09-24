@@ -6,7 +6,7 @@
 
 Warehouse for a division in a city
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 interface Warehouse 
@@ -14,11 +14,121 @@ interface Warehouse
 
 ## Properties
 
-|  Property | Type | Description |
-|  --- | --- | --- |
-|  [level](./bitburner.warehouse.level.md) | number | Amount of size upgrade bought |
-|  [loc](./bitburner.warehouse.loc.md) | string | City in which the warehouse is located |
-|  [size](./bitburner.warehouse.size.md) | number | Total space in the warehouse |
-|  [sizeUsed](./bitburner.warehouse.sizeused.md) | number | Used space in the warehouse |
-|  [smartSupplyEnabled](./bitburner.warehouse.smartsupplyenabled.md) | boolean | Smart Supply status in the warehouse |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[city](./bitburner.warehouse.city.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[CityName](./bitburner.cityname.md)
+
+
+</td><td>
+
+City in which the warehouse is located
+
+
+</td></tr>
+<tr><td>
+
+[level](./bitburner.warehouse.level.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Amount of size upgrade bought
+
+
+</td></tr>
+<tr><td>
+
+[size](./bitburner.warehouse.size.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Total space in the warehouse
+
+
+</td></tr>
+<tr><td>
+
+[sizeUsed](./bitburner.warehouse.sizeused.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Used space in the warehouse
+
+
+</td></tr>
+<tr><td>
+
+[smartSupplyEnabled](./bitburner.warehouse.smartsupplyenabled.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Smart Supply status in the warehouse
+
+
+</td></tr>
+</tbody></table>
 

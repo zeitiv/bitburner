@@ -4,7 +4,9 @@
 
 ## RunningScript.filename property
 
-<b>Signature:</b>
+Filename of the script
+
+**Signature:**
 
 ```typescript
 filename: string;

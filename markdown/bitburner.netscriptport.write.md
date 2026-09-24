@@ -6,21 +6,51 @@
 
 Write data to a port.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-write(value: string | number): null | string | number;
+write(value: any): any;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  value | string \| number |  |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
 
-null \| string \| number
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+value
+
+
+</td><td>
+
+any
+
+
+</td><td>
+
+Data to write, it's cloned with structuredClone().
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
+
+any
 
 The data popped off the queue if it was full.
 

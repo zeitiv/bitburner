@@ -4,9 +4,9 @@
 
 ## Server.sshPortOpen property
 
-Flag indicating whether the SSH Port is open
+Whether or not the SSH Port is open
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 sshPortOpen: boolean;

@@ -1,203 +1,354 @@
-import { Theme } from "@mui/material/styles";
-import createStyles from "@mui/styles/createStyles";
-import makeStyles from "@mui/styles/makeStyles";
-import { toString } from "lodash";
 import React from "react";
-import { IPlayer } from "../../PersonObjects/IPlayer";
-import { BaseServer } from "../../Server/BaseServer";
-import { evaluateDirectoryPath, getFirstParentDirectory, isValidDirectoryPath } from "../../Terminal/DirectoryHelpers";
-import { IRouter } from "../../ui/Router";
-import { ITerminal } from "../ITerminal";
+import { Theme } from "@mui/material/styles";
 
-export function ls(
-  terminal: ITerminal,
-  router: IRouter,
-  player: IPlayer,
-  server: BaseServer,
-  args: (string | number | boolean)[],
-): void {
-  const numArgs = args.length;
-  function incorrectUsage(): void {
-    terminal.error("Incorrect usage of ls command. Usage: ls [dir] [| grep pattern]");
+import { hasTextExtension, type TextFilePath } from "../../Paths/TextFilePath";
+import type { ContractFilePath } from "../../Paths/ContractFilePath";
+import type { ProgramFilePath } from "../../Paths/ProgramFilePath";
+import type { ContentFilePath } from "../../Paths/ContentFile";
+import type { ScriptFilePath } from "../../Paths/ScriptFilePath";
+
+import { makeStyles } from "tss-react/mui";
+import { BaseServer } from "../../Server/BaseServer";
+import { Router } from "../../ui/GameRoot";
+import { Page } from "../../ui/Router";
+import { Terminal } from "../../Terminal";
+import libarg from "arg";
+import { showLiterature } from "../../Literature/LiteratureHelpers";
+import { showMessage } from "../../Message/MessageHelpers";
+import { FilePath, combinePath, removeDirectoryFromPath } from "../../Paths/FilePath";
+import {
+  Directory,
+  directoryExistsOnServer,
+  getFirstDirectoryInPath,
+  resolveDirectory,
+  root,
+} from "../../Paths/Directory";
+import { isMember } from "../../utils/EnumHelper";
+import { Settings } from "../../Settings/Settings";
+import { formatBytes, formatRam } from "../../ui/formatNumber";
+import { DarknetServer } from "../../Server/DarknetServer";
+import type { CacheFilePath } from "../../Paths/CacheFilePath";
+
+export function ls(args: (string | number | boolean)[], server: BaseServer): void {
+  enum FileType {
+    Folder,
+    Message,
+    TextFile,
+    Program,
+    Contract,
+    Cache,
+    Script,
   }
 
-  if (numArgs > 4 || numArgs === 2) {
+  type FileGroup =
+    | {
+        // Types that are not clickable only need to be string[]
+        type: FileType.Folder | FileType.Program | FileType.Contract | FileType.Cache;
+        segments: string[];
+      }
+    | { type: FileType.Message; segments: FilePath[] }
+    | { type: FileType.Script; segments: ScriptFilePath[] }
+    | { type: FileType.TextFile; segments: TextFilePath[] };
+
+  interface LSFlags {
+    ["-l"]: boolean;
+    ["-h"]: boolean;
+    ["--grep"]: string;
+  }
+  let flags: LSFlags;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-assignment
+    flags = libarg(
+      {
+        "-l": Boolean,
+        "-h": Boolean,
+        "--grep": String,
+        "-g": "--grep",
+      },
+      { argv: args },
+    );
+  } catch (e) {
+    // catch passing only -g / --grep with no string to use as the search
+    incorrectUsage();
+    return;
+  }
+  const filter = flags["--grep"] ?? "";
+
+  const numArgs = args.length;
+  function incorrectUsage(): void {
+    Terminal.error("Incorrect usage of ls command. Usage: ls [dir] [-l] [-h] [-g, --grep pattern]");
+  }
+
+  if (numArgs > 5) {
     return incorrectUsage();
   }
 
-  // Grep
-  let filter = ""; // Grep
-
-  // Directory path
-  let prefix = terminal.cwd();
-  if (!prefix.endsWith("/")) {
-    prefix += "/";
-  }
-
-  // If there are 3+ arguments, then the last 3 must be for grep
-  if (numArgs >= 3) {
-    if (args[numArgs - 2] !== "grep" || args[numArgs - 3] !== "|") {
-      return incorrectUsage();
-    }
-    filter = args[numArgs - 1] + "";
-  }
-
-  // If the second argument is not a pipe, then it must be for listing a directory
-  if (numArgs >= 1 && args[0] !== "|") {
-    const newPath = evaluateDirectoryPath(args[0] + "", terminal.cwd());
-    prefix = newPath ? newPath : "";
-    if (prefix != null) {
-      if (!prefix.endsWith("/")) {
-        prefix += "/";
-      }
-      if (!isValidDirectoryPath(prefix)) {
-        return incorrectUsage();
-      }
-    }
-  }
-
-  // Root directory, which is the same as no 'prefix' at all
-  if (prefix === "/") {
-    prefix = "";
+  let baseDirectory = Terminal.currDir;
+  // Parse first argument which should be a directory.
+  if (args[0] && typeof args[0] == "string" && !args[0].startsWith("-")) {
+    const directory = resolveDirectory(args[0], args[0].startsWith("/") ? root : Terminal.currDir);
+    if (directory !== null && directoryExistsOnServer(directory, server)) {
+      baseDirectory = directory;
+    } else return incorrectUsage();
   }
 
   // Display all programs and scripts
-  const allPrograms: string[] = [];
-  const allScripts: string[] = [];
-  const allTextFiles: string[] = [];
-  const allContracts: string[] = [];
-  const allMessages: string[] = [];
-  const folders: string[] = [];
+  const allPrograms: ProgramFilePath[] = [];
+  const allScripts: ScriptFilePath[] = [];
+  const allTextFiles: TextFilePath[] = [];
+  const allContracts: ContractFilePath[] = [];
+  const allCaches: CacheFilePath[] = [];
+  const allMessages: FilePath[] = [];
+  const folders: Directory[] = [];
 
-  function handleFn(fn: string, dest: string[]): void {
-    let parsedFn = fn;
-    if (prefix) {
-      if (!fn.startsWith(prefix)) {
-        return;
-      } else {
-        parsedFn = fn.slice(prefix.length, fn.length);
-      }
-    }
+  function handlePath(path: FilePath, dest: FilePath[]): void {
+    // This parses out any files not in the starting directory.
+    const parsedPath = removeDirectoryFromPath(baseDirectory, path);
+    if (!parsedPath) return;
 
-    if (filter && !parsedFn.includes(filter)) {
+    if (!parsedPath.includes(filter)) return;
+
+    // Check if there's a directory in the parsed path, if so we need to add the folder and not the file.
+    const firstParentDir = getFirstDirectoryInPath(parsedPath);
+    if (firstParentDir) {
+      if (!firstParentDir.includes(filter) || folders.includes(firstParentDir)) return;
+      folders.push(firstParentDir);
       return;
     }
-
-    // If the fn includes a forward slash, it must be in a subdirectory.
-    // Therefore, we only list the "first" directory in its path
-    if (parsedFn.includes("/")) {
-      const firstParentDir = getFirstParentDirectory(parsedFn);
-      if (filter && !firstParentDir.includes(filter)) {
-        return;
-      }
-
-      if (!folders.includes(firstParentDir)) {
-        folders.push(firstParentDir);
-      }
-
-      return;
-    }
-
-    dest.push(parsedFn);
+    dest.push(parsedPath);
   }
 
   // Get all of the programs and scripts on the machine into one temporary array
-  const s = player.getCurrentServer();
-  for (const program of s.programs) handleFn(program, allPrograms);
-  for (const script of s.scripts) handleFn(script.filename, allScripts);
-  for (const txt of s.textFiles) handleFn(txt.fn, allTextFiles);
-  for (const contract of s.contracts) handleFn(contract.fn, allContracts);
-  for (const msgOrLit of s.messages) handleFn(msgOrLit, allMessages);
+  // Type assertions that programs and msg/lit are filepaths are safe due to checks in
+  // Program, Message, and Literature constructors
+  for (const program of server.programs) handlePath(program as FilePath, allPrograms);
+  for (const scriptFilename of server.scripts.keys()) handlePath(scriptFilename, allScripts);
+  for (const txtFilename of server.textFiles.keys()) handlePath(txtFilename, allTextFiles);
+  for (const contract of server.contracts) handlePath(contract.fn, allContracts);
+  if (server instanceof DarknetServer) {
+    for (const cache of server.caches) handlePath(cache, allCaches);
+  }
+  for (const msgOrLit of server.messages) handlePath(msgOrLit as FilePath, allMessages);
 
   // Sort the files/folders alphabetically then print each
   allPrograms.sort();
   allScripts.sort();
   allTextFiles.sort();
   allContracts.sort();
+  allCaches.sort();
   allMessages.sort();
   folders.sort();
 
-  interface ClickableScriptRowProps {
-    row: string;
-    prefix: string;
-    hostname: string;
+  let maxSizeStrLength = 0;
+  let maxRamStrLength = 0;
+  if (flags["-l"]) {
+    // Collect all items to calculate max string lengths
+    const allDisplayableItems: { path: FilePath | Directory; type: FileType }[] = [];
+    folders.forEach((p) => allDisplayableItems.push({ path: p, type: FileType.Folder }));
+    allMessages.forEach((p) => allDisplayableItems.push({ path: p, type: FileType.Message }));
+    allTextFiles.forEach((p) => allDisplayableItems.push({ path: p, type: FileType.TextFile }));
+    allScripts.forEach((p) => allDisplayableItems.push({ path: p, type: FileType.Script }));
+    allPrograms.forEach((p) => allDisplayableItems.push({ path: p, type: FileType.Program }));
+    allContracts.forEach((p) => allDisplayableItems.push({ path: p, type: FileType.Contract }));
+    allCaches.forEach((p) => allDisplayableItems.push({ path: p, type: FileType.Cache }));
+
+    for (const item of allDisplayableItems) {
+      const { ramDisplay, sizeDisplay } = getItemNumericData(item.path, item.type);
+      if (sizeDisplay.length > maxSizeStrLength) maxSizeStrLength = sizeDisplay.length;
+      if (ramDisplay.length > maxRamStrLength) maxRamStrLength = ramDisplay.length;
+    }
   }
 
-  function ClickableScriptRow({ row, prefix, hostname }: ClickableScriptRowProps): React.ReactElement {
-    const classes = makeStyles((theme: Theme) =>
-      createStyles({
-        scriptLinksWrap: {
-          display: "inline-flex",
-          color: theme.palette.warning.main,
-        },
-        scriptLink: {
-          cursor: "pointer",
-          textDecorationLine: "underline",
-          paddingRight: "1.15em",
-          "&:last-child": { padding: 0 },
-        },
-      }),
-    )();
+  function getItemNameElement(relativePath: string, fileType: FileType): React.ReactElement {
+    switch (fileType) {
+      case FileType.Folder:
+        return <span style={{ color: "cyan" }}>{relativePath}</span>;
+      case FileType.Message:
+        return <ClickableMessageLink path={relativePath as FilePath} />;
+      case FileType.TextFile:
+      case FileType.Script:
+        return <ClickableContentFileLink path={relativePath as ScriptFilePath | TextFilePath} />;
+      case FileType.Program:
+      case FileType.Contract:
+      default:
+        return <span>{relativePath}</span>;
+    }
+  }
 
-    const rowSplit = row
-      .split(" ")
-      .map((x) => x.trim())
-      .filter((x) => !!x);
+  function getItemNumericData(relativePath: string, fileType: FileType): { ramDisplay: string; sizeDisplay: string } {
+    let sizeDisplay = "-";
+    const fullPath =
+      fileType === FileType.Message || relativePath.startsWith("/")
+        ? (relativePath as FilePath)
+        : combinePath(baseDirectory, relativePath as FilePath);
 
-    function onScriptLinkClick(filename: string): void {
-      if (player.getCurrentServer().hostname !== hostname) {
-        return terminal.error(`File is not on this server, connect to ${hostname} and try again`);
-      }
-      if (filename.startsWith("/")) filename = filename.slice(1);
-      const filepath = terminal.getFilepath(`${prefix}${filename}`);
-      const code = toString(terminal.getScript(player, filepath)?.code);
-      router.toScriptEditor({ [filepath]: code });
+    // Determine file size
+    let contentBytes = 0;
+    if (fileType === FileType.TextFile) {
+      const file = server.textFiles.get(fullPath as TextFilePath);
+      contentBytes = file?.content ? new TextEncoder().encode(file.content).length : 0;
+    } else {
+      // Script
+      const file = server.scripts.get(fullPath as ScriptFilePath);
+      contentBytes = file?.content ? new TextEncoder().encode(file.content).length : 0;
+    }
+    if (flags["-l"] && flags["-h"]) {
+      sizeDisplay = formatBytes(contentBytes);
+    } else {
+      sizeDisplay = `${contentBytes}`;
     }
 
+    // Determine RAM usage
+    let ramDisplay = "-";
+    if (fileType === FileType.Script) {
+      const file = server.scripts.get(fullPath as ScriptFilePath);
+      const ramUsage = file?.getRamUsage(server.scripts);
+      ramDisplay = ramUsage ? formatRam(ramUsage) : "NaN";
+    }
+    return { ramDisplay, sizeDisplay };
+  }
+
+  function SegmentGrid(props: { colSize: string; children: React.ReactChild[] }): React.ReactElement {
+    const { classes } = makeStyles()({
+      segmentGrid: {
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill, var(--colSize))",
+      },
+    })();
+    const style = { ["--colSize"]: props.colSize } as React.CSSProperties;
     return (
-      <span className={classes.scriptLinksWrap}>
-        {rowSplit.map((rowItem) => (
-          <span key={rowItem} className={classes.scriptLink} onClick={() => onScriptLinkClick(rowItem)}>
-            {rowItem}
-          </span>
-        ))}
+      <span style={style} className={classes.segmentGrid}>
+        {props.children}
       </span>
     );
   }
 
-  function postSegments(segments: string[], style?: any, linked?: boolean): void {
-    const maxLength = Math.max(...segments.map((s) => s.length)) + 1;
-    const filesPerRow = Math.floor(80 / maxLength);
-    for (let i = 0; i < segments.length; i++) {
-      let row = "";
-      for (let col = 0; col < filesPerRow; col++) {
-        if (!(i < segments.length)) break;
-        row += segments[i];
-        row += " ".repeat(maxLength * (col + 1) - row.length);
-        i++;
-      }
-      i--;
-      if (!style) {
-        terminal.print(row);
+  function ClickableContentFileLink(props: { path: ScriptFilePath | TextFilePath }): React.ReactElement {
+    const { classes } = makeStyles()((theme: Theme) => ({
+      link: {
+        cursor: "pointer",
+        textDecorationLine: "underline",
+        color: theme.palette.warning.main,
+      },
+    }))();
+    const fullPath = combinePath(baseDirectory, props.path);
+    function onClick() {
+      let content;
+      if (hasTextExtension(fullPath)) {
+        content = server.textFiles.get(fullPath)?.content ?? "";
       } else {
-        if (linked) {
-          terminal.printRaw(<ClickableScriptRow row={row} prefix={prefix} hostname={server.hostname} />);
-        } else {
-          terminal.printRaw(<span style={style}>{row}</span>);
-        }
+        content = server.scripts.get(fullPath)?.content ?? "";
       }
+      const files = new Map<ContentFilePath, string>();
+      const options = { hostname: server.hostname, vim: Settings.MonacoDefaultToVim };
+      files.set(fullPath, content);
+      Router.toPage(Page.ScriptEditor, { files, options });
+    }
+    return (
+      <span>
+        <span className={classes.link} onClick={onClick}>
+          {props.path}
+        </span>
+      </span>
+    );
+  }
+
+  function ClickableMessageLink(props: { path: FilePath }): React.ReactElement {
+    const { classes } = makeStyles()({
+      link: {
+        cursor: "pointer",
+        textDecorationLine: "underline",
+      },
+    })();
+    function onClick(): void {
+      if (!server.isConnectedTo) {
+        return Terminal.error(`File is not on this server, connect to ${server.hostname} and try again`);
+      }
+      // Message and lit files are always in root, no need to combine path with base directory
+      if (isMember("MessageFilename", props.path)) {
+        showMessage(props.path);
+      } else if (isMember("LiteratureName", props.path)) {
+        showLiterature(props.path);
+      }
+    }
+    return (
+      <span>
+        <span className={classes.link} onClick={onClick}>
+          {props.path}
+        </span>
+      </span>
+    );
+  }
+
+  function LongListItem(props: {
+    children: React.ReactNode;
+    sizeInfo: string;
+    ramInfo: string;
+    maxSizeStrLengthCalculated: number;
+    maxRamStrLengthCalculated: number;
+  }): React.ReactElement {
+    const sizeColumnWidth = props.maxSizeStrLengthCalculated > 0 ? `${props.maxSizeStrLengthCalculated}ch` : "auto";
+    const ramColumnWidth = props.maxRamStrLengthCalculated > 0 ? `${props.maxRamStrLengthCalculated}ch` : "auto";
+    return (
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: `${ramColumnWidth} ${sizeColumnWidth} 1fr`,
+          alignItems: "baseline",
+          gap: "1em",
+        }}
+      >
+        <span style={{ color: Settings.theme.secondary, whiteSpace: "nowrap", textAlign: "right" }}>
+          {props.ramInfo}
+        </span>
+        <span style={{ color: Settings.theme.secondary, whiteSpace: "nowrap", textAlign: "right" }}>
+          {props.sizeInfo}
+        </span>
+        <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{props.children}</span>
+      </div>
+    );
+  }
+
+  function postSegments({ type, segments }: FileGroup, flags: LSFlags): void {
+    if (segments.length === 0) return;
+
+    // print file based on mode
+    if (flags["-l"]) {
+      for (const segmentPath of segments) {
+        const { ramDisplay, sizeDisplay } = getItemNumericData(segmentPath, type);
+        const nameElement = getItemNameElement(segmentPath, type);
+        Terminal.printRaw(
+          <LongListItem
+            key={segmentPath.toString()}
+            sizeInfo={sizeDisplay}
+            ramInfo={ramDisplay}
+            maxSizeStrLengthCalculated={maxSizeStrLength}
+            maxRamStrLengthCalculated={maxRamStrLength}
+          >
+            {nameElement}
+          </LongListItem>,
+        );
+      }
+    } else {
+      const segmentElements = segments.map((segmentPath) => {
+        const nameElement = getItemNameElement(segmentPath, type);
+        return React.cloneElement(nameElement, { key: segmentPath.toString() });
+      });
+      const colSize = Math.ceil(Math.max(...segments.map((segment) => segment.length)) * 0.7) + "em";
+      Terminal.printRaw(<SegmentGrid colSize={colSize}>{segmentElements}</SegmentGrid>);
     }
   }
 
-  const groups = [
-    { segments: folders, style: { color: "cyan" } },
-    { segments: allMessages },
-    { segments: allTextFiles },
-    { segments: allPrograms },
-    { segments: allContracts },
-    { segments: allScripts, style: { color: "yellow", fontStyle: "bold" }, linked: true },
-  ].filter((g) => g.segments.length > 0);
-  for (let i = 0; i < groups.length; i++) {
-    postSegments(groups[i].segments, groups[i].style, groups[i].linked);
+  const groups: FileGroup[] = [
+    { type: FileType.Folder, segments: folders },
+    { type: FileType.Message, segments: allMessages },
+    { type: FileType.TextFile, segments: allTextFiles },
+    { type: FileType.Program, segments: allPrograms },
+    { type: FileType.Contract, segments: allContracts },
+    { type: FileType.Cache, segments: allCaches },
+    { type: FileType.Script, segments: allScripts },
+  ];
+  for (const group of groups) {
+    if (group.segments.length > 0) postSegments(group, flags);
   }
 }

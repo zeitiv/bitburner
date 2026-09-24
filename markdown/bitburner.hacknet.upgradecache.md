@@ -6,28 +6,73 @@
 
 Upgrade the cache of a hacknet node.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-upgradeCache(index: number, n: number): boolean;
+upgradeCache(index: number, n?: number): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  index | number | Index/Identifier of Hacknet Node. |
-|  n | number | Number of cache levels to purchase. Must be positive. Rounded to nearest integer. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+index
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Index/Identifier of Hacknet Node.
+
+
+</td></tr>
+<tr><td>
+
+n
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Number of cache levels to purchase. Must be positive. Will be rounded to the nearest integer. Defaults to 1 if not specified.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 boolean
 
-True if the Hacknet Node’s cores are successfully purchased, false otherwise.
+True if the Hacknet Node’s cache level is successfully upgraded, false otherwise.
 
 ## Remarks
 
-RAM cost: 0 GB
+RAM cost: 0.5 GB
 
 This function is only applicable for Hacknet Servers (the upgraded version of a Hacknet Node).
 

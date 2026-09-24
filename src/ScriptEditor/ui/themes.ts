@@ -1,5 +1,192 @@
-export async function loadThemes(monaco: { editor: any }): Promise<void> {
-  monaco.editor.defineTheme("monokai", {
+import type { editor } from "monaco-editor";
+type DefineThemeFn = typeof editor.defineTheme;
+
+export const validEditorThemeBases = ["vs", "vs-dark", "hc-black", "hc-light"] as const;
+
+/**
+ * If we change this interface, we must change EditorThemeSchema.
+ */
+export interface IScriptEditorTheme {
+  base: (typeof validEditorThemeBases)[number];
+  inherit: boolean;
+  common: {
+    accent: string;
+    bg: string;
+    fg: string;
+  };
+  syntax: {
+    tag: string;
+    entity: string;
+    string: string;
+    regexp: string;
+    markup: string;
+    keyword: string;
+    comment: string;
+    constant: string;
+    error: string;
+  };
+  ui: {
+    line: string;
+    panel: {
+      bg: string;
+      selected: string;
+      border: string;
+    };
+    selection: {
+      bg: string;
+    };
+  };
+}
+
+export const defaultMonacoTheme: IScriptEditorTheme = {
+  base: "vs-dark",
+  inherit: true,
+  common: {
+    accent: "B5CEA8",
+    bg: "1E1E1E",
+    fg: "D4D4D4",
+  },
+  syntax: {
+    tag: "569CD6",
+    entity: "569CD6",
+    string: "CE9178",
+    regexp: "646695",
+    markup: "569CD6",
+    keyword: "569CD6",
+    comment: "6A9955",
+    constant: "569CD6",
+    error: "F44747",
+  },
+  ui: {
+    line: "1E1E1E",
+    panel: {
+      bg: "252526",
+      selected: "252526",
+      border: "1E1E1E",
+    },
+    selection: {
+      bg: "ADD6FF26",
+    },
+  },
+};
+
+export function makeTheme(theme: IScriptEditorTheme): editor.IStandaloneThemeData {
+  const themeRules = [
+    {
+      token: "",
+      background: theme.ui.line,
+      foreground: theme.common.fg,
+    },
+    {
+      token: "identifier",
+      foreground: theme.common.accent,
+    },
+    {
+      token: "keyword",
+      foreground: theme.syntax.keyword,
+    },
+    {
+      token: "string",
+      foreground: theme.syntax.string,
+    },
+    {
+      token: "string.escape",
+      foreground: theme.syntax.regexp,
+    },
+    {
+      token: "comment",
+      foreground: theme.syntax.comment,
+    },
+    {
+      token: "constant",
+      foreground: theme.syntax.constant,
+    },
+    {
+      token: "entity",
+      foreground: theme.syntax.entity,
+    },
+    {
+      token: "type",
+      foreground: theme.syntax.tag,
+    },
+    {
+      token: "tag",
+      foreground: theme.syntax.tag,
+    },
+    {
+      token: "regexp",
+      foreground: theme.syntax.regexp,
+    },
+    {
+      token: "attribute",
+      foreground: theme.syntax.tag,
+    },
+    {
+      token: "constructor",
+      foreground: theme.syntax.markup,
+    },
+    {
+      token: "invalid",
+      foreground: theme.syntax.error,
+    },
+    {
+      token: "number",
+      foreground: theme.common.accent,
+    },
+    {
+      token: "delimiter",
+      foreground: theme.common.fg,
+    },
+    // Custom tokens
+    {
+      token: "ns",
+      foreground: theme.syntax.tag,
+    },
+    {
+      token: "netscriptfunction",
+      foreground: theme.syntax.markup,
+    },
+    {
+      token: "otherkeywords",
+      foreground: theme.syntax.keyword,
+    },
+    {
+      token: "otherkeyvars",
+      foreground: theme.common.accent,
+    },
+    {
+      token: "this",
+      foreground: theme.syntax.tag,
+    },
+  ];
+
+  const themeColors = Object.fromEntries(
+    [
+      ["editor.background", theme.common.bg],
+      ["editor.foreground", theme.common.fg],
+      ["editor.lineHighlightBackground", theme.ui.line],
+      ["editor.selectionBackground", theme.ui.selection.bg],
+
+      ["editorSuggestWidget.background", theme.ui.panel.bg],
+      ["editorSuggestWidget.border", theme.ui.panel.border],
+      ["editorSuggestWidget.selectedBackground", theme.ui.panel.selected],
+
+      ["editorHoverWidget.background", theme.ui.panel.bg],
+      ["editorHoverWidget.border", theme.ui.panel.border],
+
+      ["editorWidget.background", theme.ui.panel.bg],
+      ["editorWidget.border", theme.ui.panel.border],
+
+      ["input.background", theme.ui.panel.bg],
+      ["input.border", theme.ui.panel.border],
+    ].map(([k, v]) => [k, "#" + v]),
+  );
+
+  return { base: theme.base, inherit: theme.inherit, rules: themeRules, colors: themeColors };
+}
+
+export function loadThemes(defineTheme: DefineThemeFn): void {
+  defineTheme("monokai", {
     base: "vs-dark",
     inherit: true,
     rules: [
@@ -64,7 +251,7 @@ export async function loadThemes(monaco: { editor: any }): Promise<void> {
     },
   });
 
-  monaco.editor.defineTheme("solarized-dark", {
+  defineTheme("solarized-dark", {
     base: "vs-dark",
     inherit: true,
     rules: [
@@ -141,7 +328,7 @@ export async function loadThemes(monaco: { editor: any }): Promise<void> {
     },
   });
 
-  monaco.editor.defineTheme("solarized-light", {
+  defineTheme("solarized-light", {
     base: "vs",
     inherit: true,
     rules: [
@@ -219,7 +406,7 @@ export async function loadThemes(monaco: { editor: any }): Promise<void> {
     },
   });
 
-  monaco.editor.defineTheme("dracula", {
+  defineTheme("dracula", {
     base: "vs-dark",
     inherit: true,
     rules: [
@@ -260,8 +447,8 @@ export async function loadThemes(monaco: { editor: any }): Promise<void> {
         token: "ns",
         foreground: "FFB86C",
         fontStyle: "italic",
-        
       },
+
       {
         token: "netscriptfunction",
         foreground: "FF79C6",
@@ -273,7 +460,7 @@ export async function loadThemes(monaco: { editor: any }): Promise<void> {
       {
         token: "type.identifier.js",
         foreground: "7EE9FD",
-        fontStyle: "italic"
+        fontStyle: "italic",
       },
       {
         token: "delimiter.square.js",
@@ -281,7 +468,7 @@ export async function loadThemes(monaco: { editor: any }): Promise<void> {
       },
       {
         token: "delimiter.parenthesis.js",
-        foreground: "FFD709"
+        foreground: "FFD709",
       },
       {
         token: "delimiter.bracket.js",
@@ -293,7 +480,7 @@ export async function loadThemes(monaco: { editor: any }): Promise<void> {
         fontStyle: "italic",
       },
     ],
-    "colors": {
+    colors: {
       "editor.foreground": "#F8F8F2",
       "editor.background": "#282A36",
       "editorLineNumber.foreground": "#6272A4",
@@ -315,7 +502,7 @@ export async function loadThemes(monaco: { editor: any }): Promise<void> {
     },
   });
 
-  monaco.editor.defineTheme("one-dark", {
+  defineTheme("one-dark", {
     base: "vs-dark",
     inherit: true,
     rules: [
@@ -402,6 +589,6 @@ export async function loadThemes(monaco: { editor: any }): Promise<void> {
       "scrollbarSlider.background": "#4E566680",
       "scrollbarSlider.activeBackground": "#747D9180",
       "scrollbarSlider.hoverBackground": "#5A637580",
-    }
+    },
   });
 }

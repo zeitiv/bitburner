@@ -1,77 +1,121 @@
-import { Factions } from "../../Faction/Factions";
 import React, { useState } from "react";
-import Grid from "@mui/material/Grid";
+import { Box, Button, MenuItem, Paper, Select, SelectChangeEvent, Typography } from "@mui/material";
+
+import { Player } from "@player";
+import { FactionName } from "@enums";
+
+import type { Infiltration } from "../Infiltration";
+import type { VictoryModel } from "../model/VictoryModel";
+import { inviteToFaction } from "../../Faction/FactionHelpers";
+import { Factions } from "../../Faction/Factions";
 import { Money } from "../../ui/React/Money";
 import { Reputation } from "../../ui/React/Reputation";
-import { BitNodeMultipliers } from "../../BitNode/BitNodeMultipliers";
-import { use } from "../../ui/Context";
-import Typography from "@mui/material/Typography";
-import Button from "@mui/material/Button";
-import MenuItem from "@mui/material/MenuItem";
-import Select, { SelectChangeEvent } from "@mui/material/Select";
+import { formatNumberNoSuffix } from "../../ui/formatNumber";
+import {
+  calculateInfiltratorsRepReward,
+  calculateSellInformationCashReward,
+  calculateTradeInformationRepReward,
+} from "../formulas/victory";
+import { getEnumHelper } from "../../utils/EnumHelper";
+import { isFactionWork } from "../../Work/FactionWork";
+import { calculateReward, decreaseMarketDemandMultiplier } from "../formulas/game";
 
 interface IProps {
-  StartingDifficulty: number;
-  Difficulty: number;
-  Reward: number;
-  MaxLevel: number;
+  state: Infiltration;
+  stage: VictoryModel;
 }
 
-export function Victory(props: IProps): React.ReactElement {
-  const player = use.Player();
-  const router = use.Router();
-  const [faction, setFaction] = useState("none");
+// Use a module-scope variable to save the faction choice.
+let defaultFactionChoice: FactionName | "none" = "none";
+
+export function Victory({ state }: IProps): React.ReactElement {
+  /**
+   * Use the working faction as the default choice in 2 cases:
+   * - The player has not chosen a faction.
+   * - The current default choice is not in the faction list. It may happen after the player "prestiges".
+   */
+  if (defaultFactionChoice === "none" || !Player.factions.includes(defaultFactionChoice)) {
+    defaultFactionChoice = isFactionWork(Player.currentWork) ? Player.currentWork.factionName : "none";
+  }
+  const [factionName, setFactionName] = useState<string>(defaultFactionChoice);
 
   function quitInfiltration(): void {
-    router.toCity();
+    handleInfiltrators();
+    decreaseMarketDemandMultiplier(state.gameStartTimestamp, state.maxLevel);
+    state.cancel();
   }
 
-  const levelBonus = props.MaxLevel * Math.pow(1.01, props.MaxLevel);
+  const soa = Factions[FactionName.ShadowsOfAnarchy];
+  const reward = calculateReward(state.startingSecurityLevel);
+  const repGain = calculateTradeInformationRepReward(
+    reward,
+    state.maxLevel,
+    state.startingSecurityLevel,
+    state.gameStartTimestamp,
+  );
+  const moneyGain = calculateSellInformationCashReward(
+    reward,
+    state.maxLevel,
+    state.startingSecurityLevel,
+    state.gameStartTimestamp,
+  );
+  const infiltrationRepGain = calculateInfiltratorsRepReward(
+    soa,
+    state.maxLevel,
+    state.startingSecurityLevel,
+    state.gameStartTimestamp,
+  );
 
-  const repGain =
-    Math.pow(props.Reward + 1, 1.1) *
-    Math.pow(props.StartingDifficulty, 1.2) *
-    30 *
-    levelBonus *
-    BitNodeMultipliers.InfiltrationRep;
-
-  const moneyGain =
-    Math.pow(props.Reward + 1, 2) *
-    Math.pow(props.StartingDifficulty, 3) *
-    3e3 *
-    levelBonus *
-    BitNodeMultipliers.InfiltrationMoney;
+  const isMemberOfInfiltrators = Player.factions.includes(FactionName.ShadowsOfAnarchy);
 
   function sell(): void {
-    player.gainMoney(moneyGain, "infiltration");
+    Player.gainMoney(moneyGain, "infiltration");
     quitInfiltration();
   }
 
   function trade(): void {
-    if (faction === "none") return;
-    Factions[faction].playerReputation += repGain;
+    if (!getEnumHelper("FactionName").isMember(factionName)) {
+      return;
+    }
+    Factions[factionName].playerReputation += repGain;
+    defaultFactionChoice = factionName;
     quitInfiltration();
   }
 
-  function changeDropdown(event: SelectChangeEvent<string>): void {
-    setFaction(event.target.value);
+  function changeDropdown(event: SelectChangeEvent): void {
+    setFactionName(event.target.value);
+  }
+
+  function handleInfiltrators(): void {
+    inviteToFaction(Factions[FactionName.ShadowsOfAnarchy]);
+    if (isMemberOfInfiltrators) {
+      soa.playerReputation += infiltrationRepGain;
+    }
   }
 
   return (
-    <>
-      <Grid container spacing={3}>
-        <Grid item xs={10}>
-          <Typography variant="h4">Infiltration successful!</Typography>
-        </Grid>
-        <Grid item xs={10}>
-          <Typography variant="h5" color="primary">
-            You can trade the confidential information you found for money or reputation.
-          </Typography>
-          <Select value={faction} onChange={changeDropdown}>
-            <MenuItem key={"none"} value={"none"}>
-              {"none"}
-            </MenuItem>
-            {player.factions
+    <Paper sx={{ p: 1, textAlign: "center", display: "flex", alignItems: "center", flexDirection: "column" }}>
+      <Typography variant="h4">Infiltration successful!</Typography>
+      <Typography variant="h5" color="primary" width="75%">
+        You{" "}
+        {isMemberOfInfiltrators ? (
+          <>
+            have gained {formatNumberNoSuffix(infiltrationRepGain, 2)} rep for {FactionName.ShadowsOfAnarchy} and{" "}
+          </>
+        ) : (
+          <></>
+        )}
+        can trade the confidential information you found for money or reputation.
+      </Typography>
+      <Box sx={{ width: "fit-content" }}>
+        <Box sx={{ width: "100%" }}>
+          <Select value={factionName} onChange={changeDropdown} sx={{ mr: 1 }}>
+            {defaultFactionChoice === "none" && (
+              <MenuItem key={"none"} value={"none"}>
+                {"none"}
+              </MenuItem>
+            )}
+            {Player.factions
               .filter((f) => Factions[f].getInfo().offersWork())
               .map((f) => (
                 <MenuItem key={f} value={f}>
@@ -79,20 +123,20 @@ export function Victory(props: IProps): React.ReactElement {
                 </MenuItem>
               ))}
           </Select>
-          <Button onClick={trade}>
-            Trade for <Reputation reputation={repGain} /> reputation
+          <Button disabled={factionName === "none"} onClick={trade}>
+            Trade for&nbsp;
+            <Reputation reputation={repGain} />
+            &nbsp;reputation
           </Button>
-        </Grid>
-        <Grid item xs={3}>
-          <Button onClick={sell}>
-            Sell for&nbsp;
-            <Money money={moneyGain} />
-          </Button>
-        </Grid>
-        <Grid item xs={3}>
-          <Button onClick={quitInfiltration}>Quit</Button>
-        </Grid>
-      </Grid>
-    </>
+        </Box>
+        <Button onClick={sell} sx={{ width: "100%" }}>
+          Sell for&nbsp;
+          <Money money={moneyGain} />
+        </Button>
+      </Box>
+      <Button onClick={quitInfiltration} sx={{ width: "100%", mt: 1 }}>
+        Quit
+      </Button>
+    </Paper>
   );
 }

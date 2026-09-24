@@ -1,63 +1,63 @@
+import type { PlayerObject } from "./PlayerObject";
+import type { FactionName } from "@enums";
+import type { Faction } from "../../Faction/Faction";
+
 import { Factions } from "../../Faction/Factions";
-import { Faction } from "../../Faction/Faction";
 import { Gang } from "../../Gang/Gang";
-import { SourceFileFlags } from "../../SourceFile/SourceFileFlags";
-import { IPlayer } from "../IPlayer";
+import { GangConstants } from "../../Gang/data/Constants";
+import { isFactionWork } from "../../Work/FactionWork";
+import { canAccessBitNodeFeature } from "../../BitNode/BitNodeUtils";
+import type { Result } from "@nsdefs";
 
-// Amount of negative karma needed to manage a gang in BitNodes other than 2
-const GangKarmaRequirement = -54000;
-
-export function canAccessGang(this: IPlayer): boolean {
+export function canAccessGang(this: PlayerObject): Result {
+  if (this.bitNodeOptions.disableGang) {
+    return { success: false, message: "Gang is disabled by advanced options." };
+  }
   if (this.bitNodeN === 2) {
-    return true;
+    return { success: true };
   }
-  if (SourceFileFlags[2] <= 0) {
-    return false;
+  if (this.activeSourceFileLvl(2) === 0) {
+    return { success: false, message: "You do not have Source-File 2." };
+  }
+  if (this.karma > GangConstants.GangKarmaRequirement) {
+    return {
+      success: false,
+      message: `Your karma must be less than or equal to ${GangConstants.GangKarmaRequirement}.`,
+    };
   }
 
-  return this.karma <= GangKarmaRequirement;
+  return { success: true };
 }
 
-export function getGangFaction(this: IPlayer): Faction {
+export function isAwareOfGang(this: PlayerObject): boolean {
+  return canAccessBitNodeFeature(2) && !this.bitNodeOptions.disableGang;
+}
+
+export function getGangFaction(this: PlayerObject): Faction {
   const gang = this.gang;
-  if (gang === null) {
-    throw new Error("Cannot get gang faction because player is not in a gang.");
-  }
+  if (gang === null) throw new Error("Cannot get gang faction because player is not in a gang.");
+
   const fac = Factions[gang.facName];
-  if (fac == null) {
-    throw new Error(`Gang has invalid faction name: ${gang.facName}`);
-  }
+  if (fac == null) throw new Error(`Gang has invalid faction name: ${gang.facName}`);
 
   return fac;
 }
 
-export function getGangName(this: IPlayer): string {
-  if (!this.inGang()) return "";
+export function getGangName(this: PlayerObject): FactionName | null {
   const gang = this.gang;
-  if (gang === null) {
-    throw new Error("Cannot get gang faction because player is not in a gang.");
-  }
-  return gang.facName;
+  return gang ? gang.facName : null;
 }
 
-export function hasGangWith(this: IPlayer, facName: string): boolean {
-  if (!this.inGang()) return false;
+export function hasGangWith(this: PlayerObject, facName: FactionName): boolean {
   const gang = this.gang;
-  if (gang === null) {
-    throw new Error("Cannot get gang faction because player is not in a gang.");
-  }
-  return gang.facName === facName;
+  return gang ? gang.facName === facName : false;
 }
 
-export function inGang(this: IPlayer): boolean {
-  if (this.gang == null || this.gang == undefined) {
-    return false;
+export function startGang(this: PlayerObject, factionName: FactionName, hacking: boolean): void {
+  if (isFactionWork(this.currentWork) && this.currentWork.factionName === factionName) {
+    this.finishWork(true);
   }
 
-  return this.gang instanceof Gang;
-}
-
-export function startGang(this: IPlayer, factionName: string, hacking: boolean): void {
   this.gang = new Gang(factionName, hacking);
 
   const fac = Factions[factionName];
@@ -65,4 +65,8 @@ export function startGang(this: IPlayer, factionName: string, hacking: boolean):
     throw new Error(`Invalid faction name when creating gang: ${factionName}`);
   }
   fac.playerReputation = 0;
+}
+
+export function inGang(this: PlayerObject) {
+  return Boolean(this.gang);
 }

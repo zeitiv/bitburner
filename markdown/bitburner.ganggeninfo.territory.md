@@ -4,9 +4,9 @@
 
 ## GangGenInfo.territory property
 
-Amount of territory held
+Amount of territory held, in the range 0-1
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 territory: number;

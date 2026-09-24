@@ -1,49 +1,23 @@
-import { ITerminal } from "../ITerminal";
-import { IRouter } from "../../ui/Router";
-import { IPlayer } from "../../PersonObjects/IPlayer";
+import { Terminal } from "../../Terminal";
+import { Player } from "@player";
 import { BaseServer } from "../../Server/BaseServer";
 import { Programs } from "../../Programs/Programs";
+import { ProgramFilePath } from "../../Paths/ProgramFilePath";
+import { getRecordKeys } from "../../Types/Record";
 
-export function runProgram(
-  terminal: ITerminal,
-  router: IRouter,
-  player: IPlayer,
-  server: BaseServer,
-  args: (string | number | boolean)[],
-): void {
-  if (args.length < 1) {
-    return;
-  }
-
+export function runProgram(path: ProgramFilePath, args: (string | number | boolean)[], server: BaseServer): void {
   // Check if you have the program on your computer. If you do, execute it, otherwise
   // display an error message
-  const programName = args[0] + "";
+  const programLowered = path.toLowerCase();
+  // Support lowercase even though it's an enum
 
-  if (!player.hasProgram(programName)) {
-    terminal.error(
-      `No such (exe, script, js, ns, or cct) file! (Only programs that exist on your home computer or scripts on ${
-        player.getCurrentServer().hostname
-      } can be run)`,
+  const realProgramName = getRecordKeys(Programs).find((name) => name.toLowerCase() === programLowered);
+  const programPresentOnServer = server.programs.find((name) => name.toLowerCase() === programLowered);
+  if (!realProgramName || (!Player.hasProgram(realProgramName) && !programPresentOnServer)) {
+    Terminal.error(
+      `No such (js, jsx, ts, tsx, script, cct, or exe) file! (Only finished programs that exist on your home computer or scripts on ${server.hostname} can be run)`,
     );
     return;
   }
-
-  if (args.length < 1) {
-    return;
-  }
-
-  for (const program of Object.values(Programs)) {
-    if (program.name.toLocaleLowerCase() === programName.toLocaleLowerCase()) {
-      program.run(
-        router,
-        terminal,
-        player,
-        server,
-        args.slice(1).map((arg) => arg + ""),
-      );
-      return;
-    }
-  }
-
-  terminal.error("Invalid executable. Cannot be run");
+  Programs[realProgramName].run(args.map(String), server);
 }

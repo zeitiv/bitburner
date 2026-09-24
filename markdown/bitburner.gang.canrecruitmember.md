@@ -6,12 +6,12 @@
 
 Check if you can recruit a new gang member.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 canRecruitMember(): boolean;
 ```
-<b>Returns:</b>
+**Returns:**
 
 boolean
 
@@ -21,5 +21,7 @@ True if a member can currently be recruited, false otherwise.
 
 RAM cost: 1 GB
 
-Returns boolean indicating whether a member can currently be recruited
+Returns a boolean indicating whether a member can currently be recruited.
+
+Once you have successfully created a gang by using the function [createGang](./bitburner.gang.creategang.md)<!-- -->, you can immediately recruit a small number of members to your gang. After you have recruited the founding members, to recruit another member you must increase your respect. The more members you want to recruit, the more respect you require. If your gang has the maximum number of members, then this function would return false.
 

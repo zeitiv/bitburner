@@ -6,19 +6,49 @@
 
 Go to a location.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-goToLocation(locationName: string): boolean;
+goToLocation(locationName: LocationName): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  locationName | string | Name of the location. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+locationName
+
+
+</td><td>
+
+[LocationName](./bitburner.locationname.md)
+
+
+</td><td>
+
+Name of the location.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 boolean
 

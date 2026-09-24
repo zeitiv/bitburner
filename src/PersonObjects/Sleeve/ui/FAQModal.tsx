@@ -2,6 +2,7 @@ import React from "react";
 
 import { Modal } from "../../../ui/React/Modal";
 import Typography from "@mui/material/Typography";
+import { FactionName } from "@enums";
 
 interface IProps {
   open: boolean;
@@ -70,15 +71,8 @@ export function FAQModal({ open, onClose }: IProps): React.ReactElement {
         <br />
         <Typography>
           Only one of your sleeves can work for a given company/faction a time. To clarify further, if you have two
-          sleeves they can work for two different companies, but they cannot both work for the same company.
-        </Typography>
-        <br />
-        <br />
-        <Typography variant="h4">Why did my Sleeve stop working?</Typography>
-        <br />
-        <Typography>
-          Sleeves are subject to the same time restrictions as you. This means that they automatically stop working at a
-          company after 8 hours, and stop working for a faction after 20 hours.
+          sleeves they can work for two different companies/factions, but they cannot both work for the same
+          company/faction.
         </Typography>
         <br />
         <br />
@@ -90,27 +84,39 @@ export function FAQModal({ open, onClose }: IProps): React.ReactElement {
         <Typography variant="h4">Why can't I buy the X Augmentation for my sleeve?</Typography>
         <br />
         <Typography>
-          Certain Augmentations, like Bladeburner-specific ones and NeuroFlux Governor, are not available for sleeves.
+          Certain Augmentations, like {FactionName.Bladeburners}-specific ones and NeuroFlux Governor, are not available
+          for sleeves. You also need enough current reputation on some faction that offers that Augmentation.
         </Typography>
         <br />
         <br />
         <Typography variant="h4">Do sleeves get reset when installing Augmentations or switching BitNodes?</Typography>
         <br />
-        <Typography>Sleeves are reset when switching BitNodes, but not when installing Augmentations.</Typography>
+        <Typography>
+          Sleeves are reset when switching BitNodes, but not when installing Augmentations. However installing
+          Augmentations on a sleeve does reset their stats.
+        </Typography>
         <br />
         <br />
         <Typography variant="h4">What is Memory?</Typography>
         <br />
         <Typography>
-          Sleeve memory dictates what a sleeve's synchronization will be when its reset by switching BitNodes. For
+          Sleeve memory dictates what a sleeve's synchronization will be when it's reset by switching BitNodes. For
           example, if a sleeve has a memory of 25, then when you switch BitNodes its synchronization will initially be
           set to 25, rather than 1.
         </Typography>
         <br />
         <br />
         <Typography>
-          Memory can only be increased by purchasing upgrades from The Covenant. It is a persistent stat, meaning it
-          never gets resets back to 1. The maximum possible value for a sleeve's memory is 100.
+          Memory can only be increased by purchasing upgrades from {FactionName.TheCovenant}. It is a persistent stat,
+          meaning it never gets resets back to 1. The maximum possible value for a sleeve's memory is 100.
+        </Typography>
+        <br />
+        <br />
+        <Typography variant="h4">What is bonus time?</Typography>
+        <br />
+        <Typography>
+          Sleeves accumulate bonus time when they idle or when you open the game after being offline. They use bonus
+          time to reduce the time requirement of their tasks so that they can complete their tasks faster.
         </Typography>
       </>
     </Modal>

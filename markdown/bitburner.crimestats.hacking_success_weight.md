@@ -4,9 +4,9 @@
 
 ## CrimeStats.hacking\_success\_weight property
 
-hacking level impact on success change of the crime
+Impact of hacking level on success chance of the crime
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 hacking_success_weight: number;

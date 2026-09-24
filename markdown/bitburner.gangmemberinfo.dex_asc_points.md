@@ -4,7 +4,9 @@
 
 ## GangMemberInfo.dex\_asc\_points property
 
-<b>Signature:</b>
+Total Dexterity Ascension points accumulated
+
+**Signature:**
 
 ```typescript
 dex_asc_points: number;

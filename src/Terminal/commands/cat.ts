@@ -1,58 +1,36 @@
-import { ITerminal } from "../ITerminal";
-import { IRouter } from "../../ui/Router";
-import { IPlayer } from "../../PersonObjects/IPlayer";
+import { Terminal } from "../../Terminal";
 import { BaseServer } from "../../Server/BaseServer";
 import { showMessage } from "../../Message/MessageHelpers";
 import { showLiterature } from "../../Literature/LiteratureHelpers";
 import { dialogBoxCreate } from "../../ui/React/DialogBox";
+import { hasScriptExtension } from "../../Paths/ScriptFilePath";
+import { hasTextExtension } from "../../Paths/TextFilePath";
+import { isMember } from "../../utils/EnumHelper";
 
-export function cat(
-  terminal: ITerminal,
-  router: IRouter,
-  player: IPlayer,
-  server: BaseServer,
-  args: (string | number | boolean)[],
-): void {
-  if (args.length !== 1) {
-    terminal.error("Incorrect usage of cat command. Usage: cat [file]");
-    return;
-  }
+export function cat(args: (string | number | boolean)[], server: BaseServer): void {
+  if (args.length !== 1) return Terminal.error("Incorrect usage of cat command. Usage: cat [file]");
+
   const relative_filename = args[0] + "";
-  const filename = terminal.getFilepath(relative_filename);
-  if (!filename.endsWith(".msg") && !filename.endsWith(".lit") && !filename.endsWith(".txt") && !filename.endsWith(".script") && !filename.endsWith(".js") && !filename.endsWith(".ns")) {
-    terminal.error(
-      "Only .msg, .txt, .lit, .script, .js, and .ns files are viewable with cat (filename must end with .msg, .txt, .lit, .script, .js, or .ns)",
+  const path = Terminal.getFilepath(relative_filename);
+  if (!path) return Terminal.error(`Invalid filename: ${relative_filename}`);
+
+  if (hasScriptExtension(path) || hasTextExtension(path)) {
+    const file = server.getContentFile(path);
+    if (!file) return Terminal.error(`No file at path ${path}`);
+    return dialogBoxCreate(`${file.filename}\n\n${file.content}`);
+  }
+  if (!path.endsWith(".msg") && !path.endsWith(".lit")) {
+    return Terminal.error(
+      "Invalid file extension. Filename must end with .msg, .lit, a script extension (.js, .jsx, .ts, .tsx) or a text extension (.txt, .json, .css)",
     );
-    return;
   }
 
-  if (filename.endsWith(".msg") || filename.endsWith(".lit")) {
-    for (let i = 0; i < server.messages.length; ++i) {
-      if (filename.endsWith(".lit") && server.messages[i] === filename) {
-        const file = server.messages[i];
-        if (file.endsWith(".msg")) throw new Error(".lit file should not be a .msg");
-        showLiterature(file);
-        return;
-      } else if (filename.endsWith(".msg")) {
-        const file = server.messages[i];
-        if (file !== filename) continue;
-        showMessage(file);
-        return;
-      }
-    }
-  } else if (filename.endsWith(".txt")) {
-    const txt = terminal.getTextFile(player, relative_filename);
-    if (txt != null) {
-      txt.show();
-      return;
-    }
-  } else if (filename.endsWith(".script") || filename.endsWith(".js") || filename.endsWith(".ns")) {
-    const script = terminal.getScript(player, relative_filename);
-    if (script != null) {
-      dialogBoxCreate(`${script.filename}<br /><br />${script.code}`);
-      return;
-    }
+  // Message
+  if (isMember("MessageFilename", path)) {
+    if (server.messages.includes(path)) return showMessage(path);
   }
-
-  terminal.error(`No such file ${filename}`);
+  if (isMember("LiteratureName", path)) {
+    if (server.messages.includes(path)) return showLiterature(path);
+  }
+  Terminal.error(`No file at path ${path}`);
 }

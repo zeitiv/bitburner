@@ -1,13 +1,70 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
-const { app, Menu, clipboard, dialog, shell } = require("electron");
+const { app, Menu, dialog, shell } = require("electron");
 const log = require("electron-log");
-const Config = require("electron-config");
-const api = require("./api-server");
+const Store = require("electron-store");
 const utils = require("./utils");
 const storage = require("./storage");
-const config = new Config();
+const store = new Store();
+const { steamworksClient } = require("./steamworksUtils");
+
+/** @import {LogLevel} from "electron-log" */
+/**
+ * @param {*} window
+ * @param {"file-log-level" | "console-log-level"} configKey
+ * @param {LogLevel} logLevel
+ * @returns {*}
+ */
+function createLogLevelMenuItem(window, configKey, logLevel) {
+  return {
+    label: logLevel,
+    type: "checkbox",
+    checked: store.get(configKey) === logLevel,
+    click: () => {
+      if (configKey === "file-log-level") {
+        log.transports.file.level = logLevel;
+      } else {
+        log.transports.console.level = logLevel;
+      }
+      store.set(configKey, logLevel);
+      refreshMenu(window);
+    },
+  };
+}
 
 function getMenu(window) {
+  const canZoomIn = utils.getZoomFactor() <= 2;
+  const zoomIn = () => {
+    const currentZoom = utils.getZoomFactor();
+    const newZoom = currentZoom + 0.1;
+    if (newZoom <= 2.0) {
+      utils.setZoomFactor(window, newZoom);
+      refreshMenu(window);
+    } else {
+      log.log("Max zoom out");
+      utils.writeToast(window, "Cannot zoom in anymore", "warning");
+    }
+  };
+
+  const canZoomOut = utils.getZoomFactor() >= 0.5;
+  const zoomOut = () => {
+    const currentZoom = utils.getZoomFactor();
+    const newZoom = currentZoom - 0.1;
+    if (newZoom >= 0.5) {
+      utils.setZoomFactor(window, newZoom);
+      refreshMenu(window);
+    } else {
+      log.log("Max zoom in");
+      utils.writeToast(window, "Cannot zoom out anymore", "warning");
+    }
+  };
+
+  const canResetZoom = utils.getZoomFactor() !== 1;
+  const resetZoom = () => {
+    utils.setZoomFactor(window, 1);
+    refreshMenu(window);
+    log.log("Reset zoom");
+  };
+
   return Menu.buildFromTemplate([
     {
       label: "File",
@@ -22,7 +79,7 @@ function getMenu(window) {
         },
         {
           label: "Export Scripts",
-          click: async () => window.webContents.send("trigger-scripts-export"),
+          click: () => window.webContents.send("trigger-scripts-export"),
         },
         {
           type: "separator",
@@ -37,12 +94,12 @@ function getMenu(window) {
               log.error(error);
               utils.writeToast(window, "Could not load last save from disk", "error", 5000);
             }
-          }
+          },
         },
         {
           label: "Load From File",
           click: async () => {
-            const defaultPath = await storage.getSaveFolder(window);
+            const defaultPath = storage.getSaveFolder(window);
             const result = await dialog.showOpenDialog(window, {
               title: "Load From File",
               defaultPath: defaultPath,
@@ -51,9 +108,7 @@ function getMenu(window) {
                 { name: "Game Saves", extensions: ["json", "json.gz", "txt"] },
                 { name: "All", extensions: ["*"] },
               ],
-              properties: [
-                "openFile", "dontAddToRecent",
-              ]
+              properties: ["openFile", "dontAddToRecent"],
             });
             if (result.canceled) return;
             const file = result.filePaths[0];
@@ -65,34 +120,23 @@ function getMenu(window) {
               log.error(error);
               utils.writeToast(window, "Could not load save from disk", "error", 5000);
             }
-          }
+          },
         },
         {
           label: "Load From Steam Cloud",
           enabled: storage.isCloudEnabled(),
           click: async () => {
             try {
-              const saveGame = await storage.getSteamCloudSaveString();
-              await storage.pushSaveGameForImport(window, saveGame, false);
+              const saveData = await storage.getSteamCloudSaveData();
+              storage.pushSaveGameForImport(window, saveData, false);
             } catch (error) {
               log.error(error);
               utils.writeToast(window, "Could not load from Steam Cloud", "error", 5000);
             }
-          }
+          },
         },
         {
           type: "separator",
-        },
-        {
-          label: "Compress Disk Saves (.gz)",
-          type: "checkbox",
-          checked: storage.isSaveCompressionEnabled(),
-          click: (menuItem) => {
-            storage.setSaveCompressionConfig(menuItem.checked);
-            utils.writeToast(window,
-              `${menuItem.checked ? "Enabled" : "Disabled"} Save Compression`, "info", 5000);
-            refreshMenu(window);
-          },
         },
         {
           label: "Auto-Save to Disk",
@@ -100,31 +144,38 @@ function getMenu(window) {
           checked: storage.isAutosaveEnabled(),
           click: (menuItem) => {
             storage.setAutosaveConfig(menuItem.checked);
-            utils.writeToast(window,
-              `${menuItem.checked ? "Enabled" : "Disabled"} Auto-Save to Disk`, "info", 5000);
+            utils.writeToast(window, `${menuItem.checked ? "Enabled" : "Disabled"} Auto-Save to Disk`, "info", 5000);
             refreshMenu(window);
           },
         },
         {
           label: "Auto-Save to Steam Cloud",
           type: "checkbox",
-          enabled: !global.greenworksError,
+          enabled: steamworksClient !== undefined,
           checked: storage.isCloudEnabled(),
           click: (menuItem) => {
             storage.setCloudEnabledConfig(menuItem.checked);
-            utils.writeToast(window,
-              `${menuItem.checked ? "Enabled" : "Disabled"} Auto-Save to Steam Cloud`, "info", 5000);
+            utils.writeToast(
+              window,
+              `${menuItem.checked ? "Enabled" : "Disabled"} Auto-Save to Steam Cloud`,
+              "info",
+              5000,
+            );
             refreshMenu(window);
           },
         },
         {
           label: "Restore Newest on Load",
           type: "checkbox",
-          checked: config.get("onload-restore-newest", true),
+          checked: store.get("onload-restore-newest", true),
           click: (menuItem) => {
-            config.set("onload-restore-newest", menuItem.checked);
-            utils.writeToast(window,
-              `${menuItem.checked ? "Enabled" : "Disabled"} Restore Newest on Load`, "info", 5000);
+            store.set("onload-restore-newest", menuItem.checked);
+            utils.writeToast(
+              window,
+              `${menuItem.checked ? "Enabled" : "Disabled"} Restore Newest on Load`,
+              "info",
+              5000,
+            );
             refreshMenu(window);
           },
         },
@@ -140,8 +191,8 @@ function getMenu(window) {
             },
             {
               label: "Open Saves Directory",
-              click: async () => {
-                const path = await storage.getSaveFolder(window);
+              click: () => {
+                const path = storage.getSaveFolder(window);
                 shell.openPath(path);
               },
             },
@@ -153,7 +204,7 @@ function getMenu(window) {
               label: "Open Data Directory",
               click: () => shell.openPath(app.getPath("userData")),
             },
-          ]
+          ],
         },
         {
           type: "separator",
@@ -162,7 +213,7 @@ function getMenu(window) {
           label: "Quit",
           click: () => app.quit(),
         },
-      ]
+      ],
     },
     {
       label: "Edit",
@@ -177,24 +228,10 @@ function getMenu(window) {
       ],
     },
     {
-      label: "Reloads",
+      label: "View",
       submenu: [
         {
-          label: "Reload",
-          accelerator: "f5",
-          click: () => window.loadFile("index.html"),
-        },
-        {
-          label: "Reload & Kill All Scripts",
-          click: () => utils.reloadAndKill(window, true),
-        },
-      ],
-    },
-    {
-      label: "Fullscreen",
-      submenu: [
-        {
-          label: "Toggle",
+          label: "Fullscreen",
           accelerator: "f9",
           click: (() => {
             let full = false;
@@ -204,113 +241,82 @@ function getMenu(window) {
             };
           })(),
         },
-      ],
-    },
-    {
-      label: "API Server",
-      submenu: [
         {
-          label: api.isListening() ? 'Disable Server' : 'Enable Server',
-          click: (async () => {
-            let success = false;
-            try {
-              await api.toggleServer();
-              success = true;
-            } catch (error) {
-              log.error(error);
-              utils.showErrorBox('Error Toggling Server', error);
-            }
-            if (success && api.isListening()) {
-              utils.writeToast(window, "Started API Server", "success");
-            } else if (success && !api.isListening()) {
-              utils.writeToast(window, "Stopped API Server", "success");
-            } else {
-              utils.writeToast(window, 'Error Toggling Server', "error");
-            }
-            refreshMenu(window);
-          })
+          type: "separator",
         },
-        {
-          label: api.isAutostart() ? 'Disable Autostart' : 'Enable Autostart',
-          click: (async () => {
-            api.toggleAutostart();
-            if (api.isAutostart()) {
-              utils.writeToast(window, "Enabled API Server Autostart", "success");
-            } else {
-              utils.writeToast(window, "Disabled API Server Autostart", "success");
-            }
-            refreshMenu(window);
-          })
-        },
-        {
-          label: 'Copy Auth Token',
-          click: (async () => {
-            const token = api.getAuthenticationToken();
-            log.log('Wrote authentication token to clipboard');
-            clipboard.writeText(token);
-            utils.writeToast(window, "Copied Authentication Token to Clipboard", "info");
-          })
-        },
-        {
-          type: 'separator',
-        },
-        {
-          label: 'Information',
-          click: () => {
-            dialog.showMessageBox({
-              type: 'info',
-              title: 'Bitburner > API Server Information',
-              message: 'The API Server is used to write script files to your in-game home.',
-              detail: 'There is an official Visual Studio Code extension that makes use of that feature.\n\n' +
-                'It allows you to write your script file in an external IDE and have them pushed over to the game automatically.\n' +
-                'If you want more information, head over to: https://github.com/bitburner-official/bitburner-vscode.',
-                buttons: ['Dismiss', 'Open Extension Link (GitHub)'],
-                defaultId: 0,
-                cancelId: 0,
-                noLink: true,
-            }).then(({response}) => {
-              if (response === 1) {
-                utils.openExternal('https://github.com/bitburner-official/bitburner-vscode');
-              }
-            });
-          }
-        }
-      ]
-    },
-    {
-      label: "Zoom",
-      submenu: [
         {
           label: "Zoom In",
-          enabled: utils.getZoomFactor() <= 2,
+          enabled: canZoomIn,
           accelerator: "CommandOrControl+numadd",
-          click: () => {
-            const currentZoom = utils.getZoomFactor();
-            const newZoom = currentZoom + 0.1;
-            if (newZoom <= 2.0) {
-              utils.setZoomFactor(window, newZoom);
-              refreshMenu(window);
-            } else {
-              log.log('Max zoom out')
-              utils.writeToast(window, "Cannot zoom in anymore", "warning");
-            }
-          },
+          click: zoomIn,
+        },
+        {
+          label: "Zoom In (non numpad)",
+          enabled: canZoomIn,
+          visible: false,
+          accelerator: "CommandOrControl+Plus",
+          acceleratorWorksWhenHidden: true,
+          click: zoomIn,
         },
         {
           label: "Zoom Out",
-          enabled: utils.getZoomFactor() >= 0.5,
+          enabled: canZoomOut,
           accelerator: "CommandOrControl+numsub",
-          click: () => {
-            const currentZoom = utils.getZoomFactor();
-            const newZoom = currentZoom - 0.1;
-            if (newZoom >= 0.5) {
-              utils.setZoomFactor(window, newZoom);
-              refreshMenu(window);
+          click: zoomOut,
+        },
+        {
+          label: "Zoom Out (non numpad)",
+          enabled: canZoomOut,
+          accelerator: "CommandOrControl+-",
+          visible: false,
+          acceleratorWorksWhenHidden: true,
+          click: zoomOut,
+        },
+        {
+          label: "Reset Zoom",
+          enabled: canResetZoom,
+          accelerator: "CommandOrControl+num0",
+          click: resetZoom,
+        },
+        {
+          label: "Reset Zoom (non numpad)",
+          enabled: canResetZoom,
+          accelerator: "CommandOrControl+0",
+          visible: false,
+          acceleratorWorksWhenHidden: true,
+          click: resetZoom,
+        },
+        {
+          type: "separator",
+        },
+        {
+          label: "Autohide top menu",
+          type: "checkbox",
+          checked: storage.isMenuHideEnabled(),
+          click: (menuItem) => {
+            storage.setMenuHideConfig(menuItem.checked);
+            window.setAutoHideMenuBar(menuItem.checked);
+            if (menuItem.checked) {
+              window.setMenuBarVisibility(false);
             } else {
-              log.log('Max zoom in')
-              utils.writeToast(window, "Cannot zoom out anymore", "warning");
+              window.setMenuBarVisibility(true);
             }
+            refreshMenu(window);
           },
+        },
+      ],
+    },
+    {
+      label: "Reloads",
+      submenu: [
+        {
+          label: "Reload",
+          accelerator: "f5",
+          click: () => window.loadFile("index.html"),
+        },
+        {
+          label: "Reload && Kill All Scripts",
+          click: () => utils.reloadAndKill(window, true),
         },
       ],
     },
@@ -318,20 +324,50 @@ function getMenu(window) {
       label: "Debug",
       submenu: [
         {
+          label: "File Log Level",
+          submenu: [
+            createLogLevelMenuItem(window, "file-log-level", "error"),
+            createLogLevelMenuItem(window, "file-log-level", "warn"),
+            createLogLevelMenuItem(window, "file-log-level", "info"),
+            createLogLevelMenuItem(window, "file-log-level", "verbose"),
+            createLogLevelMenuItem(window, "file-log-level", "debug"),
+            createLogLevelMenuItem(window, "file-log-level", "silly"),
+          ],
+        },
+        {
+          label: "Console Log Level",
+          submenu: [
+            createLogLevelMenuItem(window, "console-log-level", "error"),
+            createLogLevelMenuItem(window, "console-log-level", "warn"),
+            createLogLevelMenuItem(window, "console-log-level", "info"),
+            createLogLevelMenuItem(window, "console-log-level", "verbose"),
+            createLogLevelMenuItem(window, "console-log-level", "debug"),
+            createLogLevelMenuItem(window, "console-log-level", "silly"),
+          ],
+        },
+        {
+          type: "separator",
+        },
+        {
           label: "Activate",
+          accelerator: "f12",
           click: () => window.webContents.openDevTools(),
         },
         {
           label: "Delete Steam Cloud Data",
-          enabled: !global.greenworksError,
-          click: async () => {
+          enabled: steamworksClient !== undefined,
+          click: () => {
+            if (steamworksClient === undefined || steamworksClient.cloud.listFiles().length === 0) {
+              log.info("There is no Steam cloud file");
+              return;
+            }
             try {
-              await storage.deleteCloudFile();
+              storage.deleteCloudFiles();
             } catch (error) {
               log.error(error);
             }
-          }
-        }
+          },
+        },
       ],
     },
   ]);
@@ -342,5 +378,6 @@ function refreshMenu(window) {
 }
 
 module.exports = {
-  getMenu, refreshMenu,
-}
+  getMenu,
+  refreshMenu,
+};

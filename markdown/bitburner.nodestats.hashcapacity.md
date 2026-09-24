@@ -6,8 +6,8 @@
 
 Hash Capacity provided by this Node. Only applicable for Hacknet Servers
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-hashCapacity: number;
+hashCapacity?: number;
 ```

@@ -1,292 +1,316 @@
-/**
- * React component for displaying the player's multipliers on the Augmentation UI page
- */
+import { DoubleArrow } from "@mui/icons-material";
+import { List, ListItem, ListItemText, Paper, Typography } from "@mui/material";
 import * as React from "react";
-
-import { Player } from "../../Player";
-import { numeralWrapper } from "../../ui/numeralFormat";
+import { Multipliers, defaultMultipliers, mergeMultipliers } from "../../PersonObjects/Multipliers";
+import { currentNodeMults } from "../../BitNode/BitNodeMultipliers";
+import { Player } from "@player";
+import { Settings } from "../../Settings/Settings";
+import { formatPercent } from "../../ui/formatNumber";
 import { Augmentations } from "../Augmentations";
-import { Table, TableCell } from "../../ui/React/Table";
-import TableBody from "@mui/material/TableBody";
-import TableRow from "@mui/material/TableRow";
-import Typography from "@mui/material/Typography";
-import Box from "@mui/material/Box";
-import { BitNodeMultipliers } from "../../BitNode/BitNodeMultipliers";
+import { canAccessBitNodeFeature } from "../../BitNode/BitNodeUtils";
 
-function calculateAugmentedStats(): any {
-  const augP: any = {};
+function calculateAugmentedStats(): Multipliers {
+  let augP: Multipliers = defaultMultipliers();
   for (const aug of Player.queuedAugmentations) {
     const augObj = Augmentations[aug.name];
-    for (const mult of Object.keys(augObj.mults)) {
-      const v = augP[mult] ? augP[mult] : 1;
-      augP[mult] = v * augObj.mults[mult];
-    }
+    augP = mergeMultipliers(augP, augObj.mults);
   }
   return augP;
 }
 
-function Improvements({ r, m }: { r: number; m: number }): React.ReactElement {
-  if (r) {
-    return (
-      <>
-        <TableCell key="2">
-          <Typography>&nbsp;{"=>"}&nbsp;</Typography>
-        </TableCell>
-        <TableCell key="3">
-          <Typography>
-            {numeralWrapper.formatPercentage(r)} <BN5Stat base={r} mult={m} />
-          </Typography>
-        </TableCell>
-      </>
-    );
-  }
-  return <></>;
-}
-
-interface IBN5StatsProps {
+interface IBitNodeModifiedStatsProps {
   base: number;
   mult: number;
+  color: string;
 }
 
-function BN5Stat(props: IBN5StatsProps): React.ReactElement {
-  if (props.mult === 1) return <></>;
-  return <>({numeralWrapper.formatPercentage(props.base * props.mult)})</>;
+function customFormatPercent(value: number): string {
+  return formatPercent(value, 2, 100);
 }
 
-function MultiplierTable({ rows }: { rows: [string, number, number, number][] }): React.ReactElement {
+function BitNodeModifiedStats(props: IBitNodeModifiedStatsProps): React.ReactElement {
+  // If the player doesn't have access to SF5 feature or if the property isn't affected by BitNode mults
+  if (props.mult === 1 || !canAccessBitNodeFeature(5)) {
+    return <Typography color={props.color}>{customFormatPercent(props.base)}</Typography>;
+  }
+
   return (
-    <Table size="small" padding="none">
-      <TableBody>
-        {rows.map((r: any) => (
-          <TableRow key={r[0]}>
-            <TableCell key="0">
-              <Typography noWrap>{r[0]} multiplier:&nbsp;</Typography>
-            </TableCell>
-            <TableCell key="1" style={{ textAlign: "right" }}>
-              <Typography noWrap>
-                {numeralWrapper.formatPercentage(r[1])} <BN5Stat base={r[1]} mult={r[3]} />
-              </Typography>
-            </TableCell>
-            <Improvements r={r[2]} m={r[3]} />
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+    <Typography color={props.color}>
+      <span style={{ opacity: 0.5 }}>{customFormatPercent(props.base)}</span>{" "}
+      {customFormatPercent(props.base * props.mult)}
+    </Typography>
   );
 }
 
+interface MultiplierListItemData {
+  mult: string;
+  current: number;
+  augmented: number;
+  bnMult?: number;
+  color?: string;
+}
+
+interface IMultiplierListProps {
+  rows: MultiplierListItemData[];
+}
+
+function MultiplierList(props: IMultiplierListProps): React.ReactElement {
+  const listItems = props.rows
+    .map((data) => {
+      const { mult, current, augmented, bnMult = 1, color = Settings.theme.primary } = data;
+
+      if (!isNaN(augmented)) {
+        return (
+          <ListItem key={mult} disableGutters sx={{ py: 0 }}>
+            <ListItemText
+              sx={{ my: 0.1 }}
+              primary={
+                <Typography color={color}>
+                  <b>{mult}</b>
+                </Typography>
+              }
+              secondary={
+                <span style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
+                  <BitNodeModifiedStats base={current} mult={bnMult} color={color} />
+                  {current !== augmented && (
+                    <>
+                      <DoubleArrow fontSize="small" color="success" sx={{ mb: 0.5, mx: 1 }} />
+                      <BitNodeModifiedStats base={augmented} mult={bnMult} color={Settings.theme.success} />
+                    </>
+                  )}
+                </span>
+              }
+              disableTypography
+            />
+          </ListItem>
+        );
+      }
+      return;
+    })
+    .filter((i) => i !== undefined);
+
+  return listItems.length > 0 ? <List disablePadding>{listItems}</List> : <></>;
+}
+
+/** React component for displaying the player's multipliers on the Augmentation UI page */
 export function PlayerMultipliers(): React.ReactElement {
   const mults = calculateAugmentedStats();
 
-  function BladeburnerMults(): React.ReactElement {
-    if (!Player.canAccessBladeburner()) return <></>;
-    return (
-      <>
-        <MultiplierTable
-          rows={[
-            [
-              "Bladeburner Success Chance",
-              Player.bladeburner_success_chance_mult,
-              Player.bladeburner_success_chance_mult * mults.bladeburner_success_chance_mult,
-              1,
-            ],
-            [
-              "Bladeburner Max Stamina",
-              Player.bladeburner_max_stamina_mult,
-              Player.bladeburner_max_stamina_mult * mults.bladeburner_max_stamina_mult,
-              1,
-            ],
-            [
-              "Bladeburner Stamina Gain",
-              Player.bladeburner_stamina_gain_mult,
-              Player.bladeburner_stamina_gain_mult * mults.bladeburner_stamina_gain_mult,
-              1,
-            ],
-            [
-              "Bladeburner Field Analysis",
-              Player.bladeburner_analysis_mult,
-              Player.bladeburner_analysis_mult * mults.bladeburner_analysis_mult,
-              1,
-            ],
-          ]}
-        />
-        <br />
-      </>
+  const leftColData: MultiplierListItemData[] = [
+    ...[
+      {
+        mult: "Hacking Chance",
+        current: Player.mults.hacking_chance,
+        augmented: Player.mults.hacking_chance * mults.hacking_chance,
+      },
+      {
+        mult: "Hacking Speed",
+        current: Player.mults.hacking_speed,
+        augmented: Player.mults.hacking_speed * mults.hacking_speed,
+        bnMult: currentNodeMults.HackingSpeedMultiplier,
+      },
+      {
+        mult: "Hacking Money",
+        current: Player.mults.hacking_money,
+        augmented: Player.mults.hacking_money * mults.hacking_money,
+        bnMult: currentNodeMults.ScriptHackMoney,
+      },
+      {
+        mult: "Hacking Growth",
+        current: Player.mults.hacking_grow,
+        augmented: Player.mults.hacking_grow * mults.hacking_grow,
+      },
+      {
+        mult: "Hacking Level",
+        current: Player.mults.hacking,
+        augmented: Player.mults.hacking * mults.hacking,
+        bnMult: currentNodeMults.HackingLevelMultiplier,
+      },
+      {
+        mult: "Hacking Experience",
+        current: Player.mults.hacking_exp,
+        augmented: Player.mults.hacking_exp * mults.hacking_exp,
+        bnMult: currentNodeMults.HackExpGain,
+      },
+    ].map((data: MultiplierListItemData) =>
+      Object.defineProperty(data, "color", {
+        value: Settings.theme.hack,
+      }),
+    ),
+    ...[
+      {
+        mult: "Strength Level",
+        current: Player.mults.strength,
+        augmented: Player.mults.strength * mults.strength,
+        bnMult: currentNodeMults.StrengthLevelMultiplier,
+      },
+      {
+        mult: "Strength Experience",
+        current: Player.mults.strength_exp,
+        augmented: Player.mults.strength_exp * mults.strength_exp,
+      },
+      {
+        mult: "Defense Level",
+        current: Player.mults.defense,
+        augmented: Player.mults.defense * mults.defense,
+        bnMult: currentNodeMults.DefenseLevelMultiplier,
+      },
+      {
+        mult: "Defense Experience",
+        current: Player.mults.defense_exp,
+        augmented: Player.mults.defense_exp * mults.defense_exp,
+      },
+      {
+        mult: "Dexterity Level",
+        current: Player.mults.dexterity,
+        augmented: Player.mults.dexterity * mults.dexterity,
+        bnMult: currentNodeMults.DexterityLevelMultiplier,
+      },
+      {
+        mult: "Dexterity Experience",
+        current: Player.mults.dexterity_exp,
+        augmented: Player.mults.dexterity_exp * mults.dexterity_exp,
+      },
+      {
+        mult: "Agility Level",
+        current: Player.mults.agility,
+        augmented: Player.mults.agility * mults.agility,
+        bnMult: currentNodeMults.AgilityLevelMultiplier,
+      },
+      {
+        mult: "Agility Experience",
+        current: Player.mults.agility_exp,
+        augmented: Player.mults.agility_exp * mults.agility_exp,
+      },
+    ].map((data: MultiplierListItemData) =>
+      Object.defineProperty(data, "color", {
+        value: Settings.theme.combat,
+      }),
+    ),
+    {
+      mult: "Charisma Level",
+      current: Player.mults.charisma,
+      augmented: Player.mults.charisma * mults.charisma,
+      bnMult: currentNodeMults.CharismaLevelMultiplier,
+      color: Settings.theme.cha,
+    },
+    {
+      mult: "Charisma Experience",
+      current: Player.mults.charisma_exp,
+      augmented: Player.mults.charisma_exp * mults.charisma_exp,
+      color: Settings.theme.cha,
+    },
+  ];
+  const rightColData: MultiplierListItemData[] = [
+    {
+      mult: "Hacknet Production",
+      current: Player.mults.hacknet_node_money,
+      augmented: Player.mults.hacknet_node_money * mults.hacknet_node_money,
+      bnMult: currentNodeMults.HacknetNodeMoney,
+    },
+    {
+      mult: "Hacknet Purchase Cost",
+      current: Player.mults.hacknet_node_purchase_cost,
+      augmented: Player.mults.hacknet_node_purchase_cost * mults.hacknet_node_purchase_cost,
+    },
+    {
+      mult: "Hacknet RAM Upgrade Cost",
+      current: Player.mults.hacknet_node_ram_cost,
+      augmented: Player.mults.hacknet_node_ram_cost * mults.hacknet_node_ram_cost,
+    },
+    {
+      mult: "Hacknet Core Purchase Cost",
+      current: Player.mults.hacknet_node_core_cost,
+      augmented: Player.mults.hacknet_node_core_cost * mults.hacknet_node_core_cost,
+    },
+    {
+      mult: "Hacknet Level Upgrade Cost",
+      current: Player.mults.hacknet_node_level_cost,
+      augmented: Player.mults.hacknet_node_level_cost * mults.hacknet_node_level_cost,
+    },
+    {
+      mult: "Company Reputation Gain",
+      current: Player.mults.company_rep,
+      augmented: Player.mults.company_rep * mults.company_rep,
+      bnMult: currentNodeMults.CompanyWorkRepGain,
+      color: Settings.theme.combat,
+    },
+    {
+      mult: "Faction Reputation Gain",
+      current: Player.mults.faction_rep,
+      augmented: Player.mults.faction_rep * mults.faction_rep,
+      bnMult: currentNodeMults.FactionWorkRepGain,
+      color: Settings.theme.combat,
+    },
+    {
+      mult: "Salary",
+      current: Player.mults.work_money,
+      augmented: Player.mults.work_money * mults.work_money,
+      bnMult: currentNodeMults.CompanyWorkMoney,
+      color: Settings.theme.money,
+    },
+    {
+      mult: "Crime Success Chance",
+      current: Player.mults.crime_success,
+      augmented: Player.mults.crime_success * mults.crime_success,
+      bnMult: currentNodeMults.CrimeSuccessRate,
+      color: Settings.theme.combat,
+    },
+    {
+      mult: "Crime Money",
+      current: Player.mults.crime_money,
+      augmented: Player.mults.crime_money * mults.crime_money,
+      bnMult: currentNodeMults.CrimeMoney,
+      color: Settings.theme.money,
+    },
+    {
+      mult: "Darknet Money",
+      current: Player.mults.dnet_money,
+      augmented: Player.mults.dnet_money * mults.dnet_money,
+      bnMult: currentNodeMults.DarknetMoneyMultiplier,
+      color: Settings.theme.money,
+    },
+  ];
+
+  if (Player.canAccessBladeburner() && currentNodeMults.BladeburnerRank > 0) {
+    rightColData.push(
+      {
+        mult: "Bladeburner Success Chance",
+        current: Player.mults.bladeburner_success_chance,
+        augmented: Player.mults.bladeburner_success_chance * mults.bladeburner_success_chance,
+      },
+      {
+        mult: "Bladeburner Max Stamina",
+        current: Player.mults.bladeburner_max_stamina,
+        augmented: Player.mults.bladeburner_max_stamina * mults.bladeburner_max_stamina,
+      },
+      {
+        mult: "Bladeburner Stamina Gain",
+        current: Player.mults.bladeburner_stamina_gain,
+        augmented: Player.mults.bladeburner_stamina_gain * mults.bladeburner_stamina_gain,
+      },
+      {
+        mult: "Bladeburner Field Analysis",
+        current: Player.mults.bladeburner_analysis,
+        augmented: Player.mults.bladeburner_analysis * mults.bladeburner_analysis,
+      },
     );
   }
 
   return (
-    <>
-      <Typography variant="h4">Multipliers</Typography>
-      <Box mx={2}>
-        <MultiplierTable
-          rows={[
-            ["Hacking Chance ", Player.hacking_chance_mult, Player.hacking_chance_mult * mults.hacking_chance_mult, 1],
-            ["Hacking Speed ", Player.hacking_speed_mult, Player.hacking_speed_mult * mults.hacking_speed_mult, 1],
-            ["Hacking Money ", Player.hacking_money_mult, Player.hacking_money_mult * mults.hacking_money_mult, 1],
-            ["Hacking Growth ", Player.hacking_grow_mult, Player.hacking_grow_mult * mults.hacking_grow_mult, 1],
-          ]}
-        />
-        <br />
-
-        <MultiplierTable
-          rows={[
-            [
-              "Hacking Level ",
-              Player.hacking_mult,
-              Player.hacking_mult * mults.hacking_mult,
-              BitNodeMultipliers.HackingLevelMultiplier,
-            ],
-            [
-              "Hacking Experience ",
-              Player.hacking_exp_mult,
-              Player.hacking_exp_mult * mults.hacking_exp_mult,
-              BitNodeMultipliers.HackExpGain,
-            ],
-          ]}
-        />
-        <br />
-
-        <MultiplierTable
-          rows={[
-            [
-              "Strength Level ",
-              Player.strength_mult,
-              Player.strength_mult * mults.strength_mult,
-              BitNodeMultipliers.StrengthLevelMultiplier,
-            ],
-            ["Strength Experience ", Player.strength_exp_mult, Player.strength_exp_mult * mults.strength_exp_mult, 1],
-          ]}
-        />
-        <br />
-
-        <MultiplierTable
-          rows={[
-            [
-              "Defense Level ",
-              Player.defense_mult,
-              Player.defense_mult * mults.defense_mult,
-              BitNodeMultipliers.DefenseLevelMultiplier,
-            ],
-            ["Defense Experience ", Player.defense_exp_mult, Player.defense_exp_mult * mults.defense_exp_mult, 1],
-          ]}
-        />
-        <br />
-
-        <MultiplierTable
-          rows={[
-            [
-              "Dexterity Level ",
-              Player.dexterity_mult,
-              Player.dexterity_mult * mults.dexterity_mult,
-              BitNodeMultipliers.DexterityLevelMultiplier,
-            ],
-            [
-              "Dexterity Experience ",
-              Player.dexterity_exp_mult,
-              Player.dexterity_exp_mult * mults.dexterity_exp_mult,
-              1,
-            ],
-          ]}
-        />
-        <br />
-
-        <MultiplierTable
-          rows={[
-            [
-              "Agility Level ",
-              Player.agility_mult,
-              Player.agility_mult * mults.agility_mult,
-              BitNodeMultipliers.AgilityLevelMultiplier,
-            ],
-            ["Agility Experience ", Player.agility_exp_mult, Player.agility_exp_mult * mults.agility_exp_mult, 1],
-          ]}
-        />
-        <br />
-
-        <MultiplierTable
-          rows={[
-            [
-              "Charisma Level ",
-              Player.charisma_mult,
-              Player.charisma_mult * mults.charisma_mult,
-              BitNodeMultipliers.CharismaLevelMultiplier,
-            ],
-            ["Charisma Experience ", Player.charisma_exp_mult, Player.charisma_exp_mult * mults.charisma_exp_mult, 1],
-          ]}
-        />
-        <br />
-
-        <MultiplierTable
-          rows={[
-            [
-              "Hacknet Node production ",
-              Player.hacknet_node_money_mult,
-              Player.hacknet_node_money_mult * mults.hacknet_node_money_mult,
-              BitNodeMultipliers.HacknetNodeMoney,
-            ],
-            [
-              "Hacknet Node purchase cost ",
-              Player.hacknet_node_purchase_cost_mult,
-              Player.hacknet_node_purchase_cost_mult * mults.hacknet_node_purchase_cost_mult,
-              1,
-            ],
-            [
-              "Hacknet Node RAM upgrade cost ",
-              Player.hacknet_node_ram_cost_mult,
-              Player.hacknet_node_ram_cost_mult * mults.hacknet_node_ram_cost_mult,
-              1,
-            ],
-            [
-              "Hacknet Node Core purchase cost ",
-              Player.hacknet_node_core_cost_mult,
-              Player.hacknet_node_core_cost_mult * mults.hacknet_node_core_cost_mult,
-              1,
-            ],
-            [
-              "Hacknet Node level upgrade cost ",
-              Player.hacknet_node_level_cost_mult,
-              Player.hacknet_node_level_cost_mult * mults.hacknet_node_level_cost_mult,
-              1,
-            ],
-          ]}
-        />
-        <br />
-
-        <MultiplierTable
-          rows={[
-            ["Company reputation gain ", Player.company_rep_mult, Player.company_rep_mult * mults.company_rep_mult, 1],
-            [
-              "Faction reputation gain ",
-              Player.faction_rep_mult,
-              Player.faction_rep_mult * mults.faction_rep_mult,
-              BitNodeMultipliers.FactionWorkRepGain,
-            ],
-            [
-              "Salary ",
-              Player.work_money_mult,
-              Player.work_money_mult * mults.work_money_mult,
-              BitNodeMultipliers.CompanyWorkMoney,
-            ],
-          ]}
-        />
-        <br />
-
-        <MultiplierTable
-          rows={[
-            ["Crime success ", Player.crime_success_mult, Player.crime_success_mult * mults.crime_success_mult, 1],
-            [
-              "Crime money ",
-              Player.crime_money_mult,
-              Player.crime_money_mult * mults.crime_money_mult,
-              BitNodeMultipliers.CrimeMoney,
-            ],
-          ]}
-        />
-        <br />
-
-        <BladeburnerMults />
-      </Box>
-    </>
+    <Paper
+      sx={{
+        p: 1,
+        maxHeight: 400,
+        overflowY: "scroll",
+        display: "flex",
+        flexDirection: "column",
+        flexWrap: "wrap",
+        gap: 1,
+      }}
+    >
+      <MultiplierList rows={leftColData} />
+      <MultiplierList rows={rightColData} />
+    </Paper>
   );
 }

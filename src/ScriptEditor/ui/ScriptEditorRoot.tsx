@@ -1,409 +1,295 @@
-/* eslint-disable @typescript-eslint/no-non-null-assertion */
-import React, { useState, useEffect, useRef, useMemo } from "react";
-import Editor, { Monaco } from "@monaco-editor/react";
+import type { ContentFilePath } from "../../Paths/ContentFile";
+
+import React, { useEffect, useRef } from "react";
 import * as monaco from "monaco-editor";
 
-type IStandaloneCodeEditor = monaco.editor.IStandaloneCodeEditor;
-type ITextModel = monaco.editor.ITextModel;
-import { OptionsModal } from "./OptionsModal";
-import { Options } from "./Options";
-import { isValidFilePath } from "../../Terminal/DirectoryHelpers";
-import { IPlayer } from "../../PersonObjects/IPlayer";
-import { IRouter } from "../../ui/Router";
-import { dialogBoxCreate } from "../../ui/React/DialogBox";
-import { isScriptFilename } from "../../Script/isScriptFilename";
-import { Script } from "../../Script/Script";
-import { TextFile } from "../../TextFile";
-import { calculateRamUsage, checkInfiniteLoop } from "../../Script/RamCalculations";
-import { RamCalculationErrorCode } from "../../Script/RamCalculationErrorCodes";
-import { numeralWrapper } from "../../ui/numeralFormat";
-import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
+import type * as acorn from "acorn";
+import * as walk from "acorn-walk";
+import { extendAcornWalkForTypeScriptNodes } from "../../ThirdParty/acorn-typescript-walk";
+import { extend as extendAcornWalkForJsxNodes } from "acorn-jsx-walk";
 
-import { NetscriptFunctions } from "../../NetscriptFunctions";
-import { WorkerScript } from "../../Netscript/WorkerScript";
+import { Editor } from "./Editor";
+
+import { Router } from "../../ui/GameRoot";
+import { Page } from "../../ui/Router";
+import { dialogBoxCreate } from "../../ui/React/DialogBox";
+import { checkInfiniteLoop } from "../../Script/RamCalculations";
+
 import { Settings } from "../../Settings/Settings";
 import { iTutorialNextStep, ITutorial, iTutorialSteps } from "../../InteractiveTutorial";
 import { debounce } from "lodash";
-import { saveObject } from "../../SaveObject";
-import { loadThemes } from "./themes";
 import { GetServer } from "../../Server/AllServers";
 
-import Button from "@mui/material/Button";
-import Typography from "@mui/material/Typography";
-import Link from "@mui/material/Link";
-import Box from "@mui/material/Box";
-import SettingsIcon from "@mui/icons-material/Settings";
-import SyncIcon from '@mui/icons-material/Sync';
-import CloseIcon from '@mui/icons-material/Close';
-import Table from "@mui/material/Table";
-import TableCell from "@mui/material/TableCell";
-import TableRow from "@mui/material/TableRow";
-import TableBody from "@mui/material/TableBody";
 import { PromptEvent } from "../../ui/React/PromptManager";
-import { Modal } from "../../ui/React/Modal";
 
-import libSource from "!!raw-loader!../NetscriptDefinitions.d.ts";
-import { Tooltip } from "@mui/material";
+import { useRerender } from "../../ui/React/hooks";
+
+import { isUnsavedFile, getServerCode, makeModel, saveScript } from "./utils";
+import { OpenScript } from "./OpenScript";
+import { Tabs } from "./Tabs";
+import { Toolbar } from "./Toolbar";
+import { NoOpenScripts } from "./NoOpenScripts";
+import { ScriptEditorContextProvider, useScriptEditorContext } from "./ScriptEditorContext";
+import { useVimEditor } from "./useVimEditor";
+import { useCallback } from "react";
+import { type AST, getFileType, getModuleScript, parseAST } from "../../utils/ScriptTransformer";
+import { RamCalculationErrorCode } from "../../Script/RamCalculationErrorCodes";
+import { hasScriptExtension, isLegacyScript, type ScriptFilePath } from "../../Paths/ScriptFilePath";
+import type { BaseServer } from "../../Server/BaseServer";
+import {
+  convertKeyboardEventToKeyCombination,
+  CurrentKeyBindings,
+  determineKeyBindingTypes,
+  ScriptEditorAction,
+} from "../../utils/KeyBindingUtils";
+import { createRunningScriptInstance, startWorkerScript } from "../../NetscriptWorker";
+import type { PositiveInteger } from "../../types";
+import { openScripts } from "../EditorData";
+
+// Extend acorn-walk to support TypeScript nodes.
+extendAcornWalkForTypeScriptNodes(walk.base);
+
+// Extend acorn-walk to support JSX nodes.
+extendAcornWalkForJsxNodes(walk.base);
+
+type IStandaloneCodeEditor = monaco.editor.IStandaloneCodeEditor;
 
 interface IProps {
   // Map of filename -> code
-  files: Record<string, string>;
+  files: Map<ContentFilePath, string>;
   hostname: string;
-  player: IPlayer;
-  router: IRouter;
   vim: boolean;
 }
 
-// TODO: try to removve global symbols
-let symbolsLoaded = false;
-let symbols: string[] = [];
-export function SetupTextEditor(): void {
-  const ns = NetscriptFunctions({} as WorkerScript);
-
-  // Populates symbols for text editor
-  function populate(ns: any): string[] {
-    let symbols: string[] = [];
-    const keys = Object.keys(ns);
-    for (const key of keys) {
-      if (typeof ns[key] === "object") {
-        symbols.push(key);
-        symbols = symbols.concat(populate(ns[key]));
-      }
-      if (typeof ns[key] === "function") {
-        symbols.push(key);
-      }
-    }
-
-    return symbols;
-  }
-
-  symbols = populate(ns);
-
-  const exclude = ["heart", "break", "exploit", "bypass", "corporation", "alterReality"];
-  symbols = symbols.filter((symbol: string) => !exclude.includes(symbol)).sort();
-}
-
-// Holds all the data for a open script
-class OpenScript {
-  fileName: string;
-  code: string;
-  hostname: string;
-  lastPosition: monaco.Position;
-  model: ITextModel;
-
-  constructor(fileName: string, code: string, hostname: string, lastPosition: monaco.Position, model: ITextModel) {
-    this.fileName = fileName;
-    this.code = code;
-    this.hostname = hostname;
-    this.lastPosition = lastPosition;
-    this.model = model;
-  }
-}
-
-let openScripts: OpenScript[] = [];
 let currentScript: OpenScript | null = null;
 
-// Called every time script editor is opened
-export function Root(props: IProps): React.ReactElement {
-  const setRerender = useState(false)[1];
-  function rerender(): void {
-    setRerender((o) => !o);
-  }
+function Root(props: IProps): React.ReactElement {
+  const rerender = useRerender();
   const editorRef = useRef<IStandaloneCodeEditor | null>(null);
-  const monacoRef = useRef<Monaco | null>(null);
-  const vimStatusRef = useRef<HTMLElement>(null);
-  const [vimEditor, setVimEditor] = useState<any>(null);
-  const [editor, setEditor] = useState<IStandaloneCodeEditor | null>(null);
 
-  const [ram, setRAM] = useState("RAM: ???");
-  const [ramEntries, setRamEntries] = useState<string[][]>([["???", ""]]);
-  const [updatingRam, setUpdatingRam] = useState(false);
-  const [decorations, setDecorations] = useState<string[]>([]);
-
-  const [optionsOpen, setOptionsOpen] = useState(false);
-  const [options, setOptions] = useState<Options>({
-    theme: Settings.MonacoTheme,
-    insertSpaces: Settings.MonacoInsertSpaces,
-    fontSize: Settings.MonacoFontSize,
-    wordWrap: Settings.MonacoWordWrap,
-    vim: props.vim || Settings.MonacoVim,
-  });
-
-  const [ramInfoOpen, setRamInfoOpen] = useState(false);
-
-  // Prevent Crash if script is open on deleted server
-  openScripts = openScripts.filter((script) => {
-    return GetServer(script.hostname) !== null;
-  })
-  if (currentScript && (GetServer(currentScript.hostname) === null)) {
-    currentScript = openScripts[0];
-    if (currentScript === undefined) currentScript = null;
-  }
-
-
-  const [dimensions, setDimensions] = useState({
-    height: window.innerHeight,
-    width: window.innerWidth,
-  });
-  useEffect(() => {
-    const debouncedHandleResize = debounce(function handleResize() {
-      setDimensions({
-        height: window.innerHeight,
-        width: window.innerWidth,
-      });
-    }, 250);
-
-    window.addEventListener("resize", debouncedHandleResize);
-
-    return () => {
-      window.removeEventListener("resize", debouncedHandleResize);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (currentScript !== null) {
-      updateRAM(currentScript.code);
-    }
-  }, []);
-
-  useEffect(() => {
-    function keydown(event: KeyboardEvent): void {
-      if (Settings.DisableHotkeys) return;
-      //Ctrl + b
-      if (event.code == "KeyB" && (event.ctrlKey || event.metaKey)) {
-        event.preventDefault();
-        props.router.toTerminal();
-      }
-
-      // CTRL/CMD + S
-      if (event.code == "KeyS" && (event.ctrlKey || event.metaKey)) {
-        event.preventDefault();
-        event.stopPropagation();
-        save();
-      }
-    }
-    document.addEventListener("keydown", keydown);
-    return () => document.removeEventListener("keydown", keydown);
-  });
-
-  useEffect(() => {
-    // setup monaco-vim
-    if (options.vim && editor && !vimEditor) {
-      try {
-        // This library is not typed
-        // @ts-expect-error
-        window.require(["monaco-vim"], function (MonacoVim: any) {
-          setVimEditor(MonacoVim.initVimMode(editor, vimStatusRef.current));
-          MonacoVim.VimMode.Vim.defineEx("write", "w", function () {
-            // your own implementation on what you want to do when :w is pressed
-            save();
-          });
-          MonacoVim.VimMode.Vim.defineEx("quit", "q", function () {
-            props.router.toTerminal();
-          });
-          // "wqriteandquit" is not a typo, prefix must be found in full string
-          MonacoVim.VimMode.Vim.defineEx("wqriteandquit", "wq", function () {
-            save();
-            props.router.toTerminal();
-          });
-          editor.focus();
-        });
-      } catch { }
-    } else if (!options.vim) {
-      // Whem vim mode is disabled
-      vimEditor?.dispose();
-      setVimEditor(null);
-    }
-
-    return () => {
-      vimEditor?.dispose();
-    };
-  }, [options, editorRef, editor, vimEditor]);
-
-  // Generates a new model for the script
-  function regenerateModel(script: OpenScript): void {
-    if (monacoRef.current !== null) {
-      script.model = monacoRef.current.editor.createModel(
-        script.code,
-        script.fileName.endsWith(".txt") ? "plaintext" : "javascript",
-      );
-    }
-  }
-
-  const debouncedSetRAM = useMemo(
-    () =>
-      debounce((s, e) => {
-        setRAM(s);
-        setRamEntries(e);
-        setUpdatingRam(false);
-      }, 300),
-    [],
-  );
-
-  async function updateRAM(newCode: string): Promise<void> {
-    if (currentScript != null && currentScript.fileName.endsWith(".txt")) {
-      debouncedSetRAM("N/A", [["N/A", ""]]);
+  // This is the workaround for a bug in monaco-editor: https://github.com/microsoft/monaco-editor/issues/4455
+  const removeOutlineOfEditor = useCallback(() => {
+    if (!editorRef.current) {
       return;
     }
-    setUpdatingRam(true);
-    const codeCopy = newCode + "";
-    const ramUsage = await calculateRamUsage(props.player, codeCopy, props.player.getCurrentServer().scripts);
-    if (ramUsage.cost > 0) {
-      const entries = ramUsage.entries?.sort((a, b) => b.cost - a.cost) ?? [];
-      const entriesDisp = [];
-      for (const entry of entries) {
-        entriesDisp.push([`${entry.name} (${entry.type})`, numeralWrapper.formatRAM(entry.cost)]);
-      }
-
-      debouncedSetRAM("RAM: " + numeralWrapper.formatRAM(ramUsage.cost), entriesDisp);
+    const containerDomNode = editorRef.current.getContainerDomNode();
+    const elements = containerDomNode.getElementsByClassName("monaco-editor");
+    if (elements.length === 0) {
       return;
     }
-    switch (ramUsage.cost) {
-      case RamCalculationErrorCode.ImportError: {
-        debouncedSetRAM("RAM: Import Error", [["Import Error", ""]]);
-        break;
-      }
-      case RamCalculationErrorCode.URLImportError: {
-        debouncedSetRAM("RAM: HTTP Import Error", [["HTTP Import Error", ""]]);
-        break;
-      }
-      case RamCalculationErrorCode.SyntaxError:
-      default: {
-        debouncedSetRAM("RAM: Syntax Error", [["Syntax Error", ""]]);
-        break;
-      }
+    const editorElement = elements[0];
+    (editorElement as HTMLElement).style.outline = "none";
+  }, [editorRef]);
+
+  /**
+   * The TypeScript compiler needs time to perform type-checking, so in some edge cases, the editor shows the 2792 error
+   * ("Cannot find module") even after we created the required models. For example, let's say "ts.ts" script imports
+   * "sum" function from "sum.js". The flow is like this:
+   * - The player opens "ts.ts". The editor opens with a model for "ts.ts".
+   * - TSC starts performing type-checking. This action is asynchronous.
+   * - makeModelsForImports is called to dynamically create models for imported modules. We create a model for "sum.js".
+   * After this model is created, it's synced to both language workers (check "onDidCreateModel" code in
+   * src\ScriptEditor\ScriptEditor.ts).
+   * - Before the model of "sum.js" is synced properly, TSC finishes typechecking. At this point, it cannot find
+   * relevant data of "sum.js", so it thinks that "sum.js" is not loaded.
+   * - The editor shows an error marker at the import code of "sum.js".
+   *
+   * The error markers will disappear when the player edits the code (the model is updated when the code is changed), so
+   * this is not a big problem. Nonetheless, we will still work around this problem to minimize the chance of showing
+   * wrong error markers. In order to do that, we check error markers after a short delay (2 seconds); if there is a
+   * false-positive error marker, we will reload the model. Reloading the model will force the type-checking to run
+   * again.
+   */
+  const reloadModelOfCurrentScript = debounce(() => {
+    if (!currentScript || !editorRef.current) {
+      return;
     }
-    return new Promise<void>(() => undefined);
-  }
-
-  // Formats the code
-  function beautify(): void {
-    if (editorRef.current === null) return;
-    editorRef.current.getAction("editor.action.formatDocument").run();
-  }
-
-  // How to load function definition in monaco
-  // https://github.com/Microsoft/monaco-editor/issues/1415
-  // https://microsoft.github.io/monaco-editor/api/modules/monaco.languages.html
-  // https://www.npmjs.com/package/@monaco-editor/react#development-playground
-  // https://microsoft.github.io/monaco-editor/playground.html#extending-language-services-custom-languages
-  // https://github.com/threehams/typescript-error-guide/blob/master/stories/components/Editor.tsx#L11-L39
-  // https://blog.checklyhq.com/customizing-monaco/
-  // Before the editor is mounted
-  function beforeMount(monaco: any): void {
-    if (symbolsLoaded) return;
-    // Setup monaco auto completion
-    symbolsLoaded = true;
-    monaco.languages.registerCompletionItemProvider("javascript", {
-      provideCompletionItems: () => {
-        const suggestions = [];
-        for (const symbol of symbols) {
-          suggestions.push({
-            label: symbol,
-            kind: monaco.languages.CompletionItemKind.Function,
-            insertText: symbol,
-            insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          });
-        }
-        return { suggestions: suggestions };
-      },
+    const markers = monaco.editor.getModelMarkers({
+      resource: currentScript.model.uri,
     });
+    let needToReloadModel = false;
+    for (const marker of markers) {
+      // 2792: "Cannot find module" error
+      if (marker.code !== "2792") {
+        continue;
+      }
+      needToReloadModel = true;
+      break;
+    }
+    if (needToReloadModel) {
+      const currentModel = editorRef.current.getModel();
+      // Save the current cursor position. The position resets when the model is changed.
+      const currentPosition = editorRef.current.getPosition();
+      // Reload the model.
+      currentModel?.setValue(currentModel.getValue());
+      // Restore the saved position.
+      if (currentPosition) {
+        editorRef.current.setPosition(currentPosition);
+      }
+    }
+  }, 2000);
 
-    (async function () {
-      // We have to improve the default js language otherwise theme sucks
-      const l = await monaco.languages
-        .getLanguages()
-        .find((l: any) => l.id === "javascript")
-        .loader();
-      // replaced the bare tokens with regexes surrounded by \b, e.g. \b{token}\b which matches a word-break on either side
-      // this prevents the highlighter from highlighting pieces of variables that start with a reserved token name
-      l.language.tokenizer.root.unshift([new RegExp('\\bns\\b'), { token: "ns" }]);
-      for (const symbol of symbols) l.language.tokenizer.root.unshift([new RegExp(`\\b${symbol}\\b`), { token: "netscriptfunction" }]);
-      const otherKeywords = ["let", "const", "var", "function"];
-      const otherKeyvars = ["true", "false", "null", "undefined"];
-      otherKeywords.forEach((k) => l.language.tokenizer.root.unshift([new RegExp(`\\b${k}\\b`), { token: "otherkeywords" }]));
-      otherKeyvars.forEach((k) => l.language.tokenizer.root.unshift([new RegExp(`\\b${k}\\b`), { token: "otherkeyvars" }]));
-      l.language.tokenizer.root.unshift([new RegExp('\\bthis\\b'), { token: "this" }]);
-    })();
-
-    const source = (libSource + "").replace(/export /g, "");
-    monaco.languages.typescript.javascriptDefaults.addExtraLib(source, "netscript.d.ts");
-    monaco.languages.typescript.typescriptDefaults.addExtraLib(source, "netscript.d.ts");
-    loadThemes(monaco);
-  }
-
-  // When the editor is mounted
-  function onMount(editor: IStandaloneCodeEditor, monaco: Monaco): void {
-    // Required when switching between site navigation (e.g. from Script Editor -> Terminal and back)
-    // the `useEffect()` for vim mode is called before editor is mounted.
-    setEditor(editor);
-
-    editorRef.current = editor;
-    monacoRef.current = monaco;
-
-    if (editorRef.current === null || monacoRef.current === null) return;
-
-    if (!props.files && currentScript !== null) {
-      // Open currentscript
-      regenerateModel(currentScript);
-      editorRef.current.setModel(currentScript.model);
-      editorRef.current.setPosition(currentScript.lastPosition);
-      editorRef.current.revealLineInCenter(currentScript.lastPosition.lineNumber);
-      updateRAM(currentScript.code);
-      editorRef.current.focus();
+  function makeModelsForImports(ast: AST, server: BaseServer): void {
+    if (!currentScript) {
       return;
     }
-    if (props.files) {
-      const files = Object.entries(props.files);
+    // Skipping processing if the current file is not a script or it's a legacy script.
+    if (!hasScriptExtension(currentScript.path) || isLegacyScript(currentScript.path)) {
+      return;
+    }
+    // Dynamically load imported scripts.
+    walk.simple(
+      ast as acorn.Node, // Pretend that ast is an acorn node
+      {
+        ImportDeclaration: (node: acorn.ImportDeclaration) => {
+          if (typeof node.source.value !== "string" || !currentScript) {
+            return;
+          }
+          const importedScript = getModuleScript(
+            node.source.value,
+            currentScript.path as ScriptFilePath,
+            server.scripts,
+          );
+          /**
+           * We use openScripts to store all opened files when the player opens them in the editor. When they edit code,
+           * the changed code is in openScripts, regardless of whether they save it. When the player switches from the
+           * editor tab to another tab, all models are disposed, so the next time they open the editor, this function
+           * will load imported scripts. However, if the player did not save their code, loaded scripts would not
+           * contain changed code. Therefore, for each loaded script, we need to check if it is in openScripts. If it
+           * is, we use the script content in openScripts.
+           */
+          let code = importedScript.code;
+          for (const openScript of openScripts) {
+            if (openScript.hostname !== importedScript.server || openScript.path !== importedScript.filename) {
+              continue;
+            }
+            code = openScript.code;
+          }
+          makeModel(importedScript.server, importedScript.filename, code);
+        },
+      },
+    );
+    // Reload the model to force the type-checking to run again.
+    reloadModelOfCurrentScript();
+  }
 
-      if (!files.length) {
-        editorRef.current.focus();
+  const { options, showRAMError, updateRAM, startUpdatingRAM, finishUpdatingRAM } = useScriptEditorContext();
+
+  let decorations: monaco.editor.IEditorDecorationsCollection | undefined;
+
+  const beautify = useCallback(async (): Promise<void> => {
+    const action = editorRef.current?.getAction("editor.action.formatDocument");
+    if (action == null) {
+      return;
+    }
+    return action.run().catch((error) => console.error(error));
+  }, []);
+
+  const save = useCallback(async () => {
+    if (currentScript === null) {
+      console.error("currentScript is null when it shouldn't be. Unable to save script");
+      return;
+    }
+
+    const preSave = options.beautifyOnSave ? beautify : () => Promise.resolve();
+
+    // this is duplicate code with saving later.
+    if (ITutorial.isRunning && ITutorial.currStep === iTutorialSteps.TerminalEditScript) {
+      //Make sure filename + code properly follow tutorial
+      if (currentScript.path !== "n00dles.js") {
+        dialogBoxCreate("Don't change the script name for now.");
+        return;
+      }
+      const cleanCode = currentScript.code.replace(/\s/g, "");
+      const expectedCleanCode = `/**@param{NS}ns*/exportasyncfunctionmain(ns){while(true){awaitns.hack("n00dles");}}`;
+      if (!cleanCode.includes(expectedCleanCode)) {
+        dialogBoxCreate("Please copy and paste the code from the tutorial!");
         return;
       }
 
-      for (const [filename, code] of files) {
-        // Check if file is already opened
-        const openScript = openScripts.find(
-          (script) => script.fileName === filename && script.hostname === props.hostname,
-        );
-        if (openScript) {
-          // Script is already opened
-          if (openScript.model === undefined || openScript.model === null || openScript.model.isDisposed()) {
-            regenerateModel(openScript);
-          }
+      //Save the script
+      await preSave();
+      saveScript(currentScript);
+      Router.toPage(Page.Terminal);
 
-          currentScript = openScript;
-          editorRef.current.setModel(openScript.model);
-          editorRef.current.setPosition(openScript.lastPosition);
-          editorRef.current.revealLineInCenter(openScript.lastPosition.lineNumber);
-          updateRAM(openScript.code);
-        } else {
-          // Open script
-          const newScript = new OpenScript(
-            filename,
-            code,
-            props.hostname,
-            new monacoRef.current.Position(0, 0),
-            monacoRef.current.editor.createModel(code, filename.endsWith(".txt") ? "plaintext" : "javascript"),
-          );
-          openScripts.push(newScript);
-          currentScript = { ...newScript };
-          editorRef.current.setModel(newScript.model);
-          updateRAM(newScript.code);
-        }
-      }
+      iTutorialNextStep();
+
+      return;
+    }
+    await preSave();
+    saveScript(currentScript);
+    rerender();
+  }, [rerender, options.beautifyOnSave, beautify]);
+
+  const run = useCallback(async () => {
+    if (currentScript === null) {
+      return;
+    }
+    // Check if "currentScript" is a script. It may be a text file.
+    if (!hasScriptExtension(currentScript.path)) {
+      dialogBoxCreate(`Cannot run ${currentScript.path}. It is not a script.`);
+      return;
+    }
+    // Check if the current script's server is valid.
+    const server = GetServer(currentScript.hostname);
+    if (server === null) {
+      return;
     }
 
-    editorRef.current.focus();
-  }
+    // Always save before doing anything else.
+    await save();
 
-  function infLoop(newCode: string): void {
-    if (editorRef.current === null || currentScript === null) return;
-    if (!currentScript.fileName.endsWith(".ns") && !currentScript.fileName.endsWith(".js")) return;
-    const awaitWarning = checkInfiniteLoop(newCode);
-    if (awaitWarning !== -1) {
-      const newDecorations = editorRef.current.deltaDecorations(decorations, [
-        {
+    const result = createRunningScriptInstance(
+      server,
+      currentScript.path,
+      { threads: 1 as PositiveInteger, temporary: false, preventDuplicates: false },
+      [],
+    );
+    if (!result.success) {
+      dialogBoxCreate(result.message);
+      return;
+    }
+    startWorkerScript(result.runningScript, server);
+  }, [save]);
+
+  useEffect(() => {
+    async function keydown(event: KeyboardEvent) {
+      if (Settings.DisableHotkeys) {
+        return;
+      }
+      const keyBindingTypes = determineKeyBindingTypes(CurrentKeyBindings, convertKeyboardEventToKeyCombination(event));
+      if (keyBindingTypes.has(ScriptEditorAction.Save)) {
+        event.preventDefault();
+        event.stopPropagation();
+        await save();
+      }
+      if (keyBindingTypes.has(ScriptEditorAction.GoToTerminal)) {
+        event.preventDefault();
+        Router.toPage(Page.Terminal);
+      }
+      if (keyBindingTypes.has(ScriptEditorAction.Run)) {
+        event.preventDefault();
+        await run();
+      }
+    }
+    const listener = (event: KeyboardEvent) => {
+      keydown(event).catch((error) => console.error(error));
+    };
+    document.addEventListener("keydown", listener);
+    return () => document.removeEventListener("keydown", listener);
+  }, [save, run]);
+
+  function infLoop(ast: AST, code: string): void {
+    if (editorRef.current === null || currentScript === null || isLegacyScript(currentScript.path)) {
+      return;
+    }
+    if (!decorations) {
+      decorations = editorRef.current.createDecorationsCollection();
+    }
+    const possibleLines = checkInfiniteLoop(ast, code);
+    if (possibleLines.length !== 0) {
+      decorations.set(
+        possibleLines.map((awaitWarning) => ({
           range: {
             startLineNumber: awaitWarning,
             startColumn: 1,
@@ -414,242 +300,161 @@ export function Root(props: IProps): React.ReactElement {
             isWholeLine: true,
             glyphMarginClassName: "myGlyphMarginClass",
             glyphMarginHoverMessage: {
-              value: "Possible infinite loop, await something.",
+              value:
+                "Possible infinite loop, await something. If this is a false positive, use `// @ignore-infinite` to suppress.",
             },
           },
-        },
-      ]);
-      setDecorations(newDecorations);
+        })),
+      );
     } else {
-      const newDecorations = editorRef.current.deltaDecorations(decorations, []);
-      setDecorations(newDecorations);
+      decorations.clear();
     }
+  }
+
+  const debouncedCodeParsing = debounce((newCode: string) => {
+    let server;
+    if (!currentScript || !hasScriptExtension(currentScript.path)) {
+      showRAMError();
+      return;
+    }
+    if (!(server = GetServer(currentScript.hostname))) {
+      showRAMError({
+        errorCode: RamCalculationErrorCode.InvalidServer,
+        errorMessage: `Server ${currentScript.hostname} does not exist`,
+      });
+      return;
+    }
+    let ast;
+    try {
+      ast = parseAST(currentScript.path, currentScript.hostname, newCode, getFileType(currentScript.path));
+      makeModelsForImports(ast, server);
+    } catch (error) {
+      showRAMError({
+        errorCode: RamCalculationErrorCode.SyntaxError,
+        errorMessage: error instanceof Error ? error.message : String(error),
+      });
+      return;
+    }
+    infLoop(ast, newCode);
+    updateRAM(ast, currentScript.path, server);
+    finishUpdatingRAM();
+  }, 300);
+
+  const parseCode = (newCode: string) => {
+    startUpdatingRAM();
+    debouncedCodeParsing(newCode);
+  };
+
+  // When the editor is mounted
+  function onMount(editor: IStandaloneCodeEditor): void {
+    // Required when switching between site navigation (e.g. from Script Editor -> Terminal and back)
+    // the `useEffect()` for vim mode is called before editor is mounted.
+    editorRef.current = editor;
+
+    // Open current script. This happens when the player switch tabs and open the editor tab.
+    if (props.files.size === 0 && currentScript !== null) {
+      currentScript.regenerateModel();
+      editorRef.current.setModel(currentScript.model);
+      editorRef.current.setPosition(currentScript.lastPosition);
+      editorRef.current.revealLineInCenter(currentScript.lastPosition.lineNumber);
+      parseCode(currentScript.code);
+      editorRef.current.focus();
+      return;
+    }
+
+    // This happens when the player opens scripts by using nano/vim.
+    for (const [filename, code] of props.files) {
+      // Check if file is already opened
+      const openScript = openScripts.find((script) => script.path === filename && script.hostname === props.hostname);
+      if (openScript) {
+        // Script is already opened
+        if (openScript.model === undefined || openScript.model === null || openScript.model.isDisposed()) {
+          openScript.regenerateModel();
+        }
+
+        currentScript = openScript;
+        editorRef.current.setModel(openScript.model);
+        editorRef.current.setPosition(openScript.lastPosition);
+        editorRef.current.revealLineInCenter(openScript.lastPosition.lineNumber);
+        parseCode(openScript.code);
+      } else {
+        // Open script
+        const newScript = new OpenScript(
+          filename,
+          code,
+          props.hostname,
+          new monaco.Position(0, 0),
+          makeModel(props.hostname, filename, code),
+          props.vim,
+        );
+        openScripts.push(newScript);
+        currentScript = newScript;
+        editorRef.current.setModel(newScript.model);
+        parseCode(newScript.code);
+      }
+    }
+
+    editorRef.current.focus();
   }
 
   // When the code is updated within the editor
   function updateCode(newCode?: string): void {
     if (newCode === undefined) return;
-    updateRAM(newCode);
+    // parseCode includes ram check and infinite loop detection
+    parseCode(newCode);
     if (editorRef.current === null) return;
     const newPos = editorRef.current.getPosition();
     if (newPos === null) return;
     if (currentScript !== null) {
-      currentScript = { ...currentScript, code: newCode, lastPosition: newPos };
-      const curIndex = openScripts.findIndex(
-        (script) =>
-          currentScript !== null &&
-          script.fileName === currentScript.fileName &&
-          script.hostname === currentScript.hostname,
-      );
-      const newArr = [...openScripts];
-      const tempScript = currentScript;
-      tempScript.code = newCode;
-      newArr[curIndex] = tempScript;
-      openScripts = [...newArr];
+      currentScript.code = newCode;
+      currentScript.lastPosition = newPos;
     }
-    try {
-      infLoop(newCode);
-    } catch (err) { }
   }
 
-  function saveScript(scriptToSave: OpenScript): void {
-    const server = GetServer(scriptToSave.hostname);
-    if (server === null) throw new Error("Server should not be null but it is.");
-    if (isScriptFilename(scriptToSave.fileName)) {
-      //If the current script already exists on the server, overwrite it
-      for (let i = 0; i < server.scripts.length; i++) {
-        if (scriptToSave.fileName == server.scripts[i].filename) {
-          server.scripts[i].saveScript(
-            props.player,
-            scriptToSave.fileName,
-            scriptToSave.code,
-            props.player.currentServer,
-            server.scripts,
-          );
-          if (Settings.SaveGameOnFileSave) saveObject.saveGame();
-          props.router.toTerminal();
-          return;
-        }
-      }
-
-      //If the current script does NOT exist, create a new one
-      const script = new Script();
-      script.saveScript(
-        props.player,
-        scriptToSave.fileName,
-        scriptToSave.code,
-        props.player.currentServer,
-        server.scripts,
-      );
-      server.scripts.push(script);
-    } else if (scriptToSave.fileName.endsWith(".txt")) {
-      for (let i = 0; i < server.textFiles.length; ++i) {
-        if (server.textFiles[i].fn === scriptToSave.fileName) {
-          server.textFiles[i].write(scriptToSave.code);
-          if (Settings.SaveGameOnFileSave) saveObject.saveGame();
-          props.router.toTerminal();
-          return;
-        }
-      }
-      const textFile = new TextFile(scriptToSave.fileName, scriptToSave.code);
-      server.textFiles.push(textFile);
-    } else {
-      dialogBoxCreate("Invalid filename. Must be either a script (.script, .js, or .ns) or " + " or text file (.txt)");
-      return;
-    }
-
-    if (Settings.SaveGameOnFileSave) saveObject.saveGame();
-    props.router.toTerminal();
-  }
-
-  function save(): void {
-    if (currentScript === null) {
-      console.error("currentScript is null when it shouldn't be. Unable to save script");
-      return;
-    }
-    // this is duplicate code with saving later.
-    if (ITutorial.isRunning && ITutorial.currStep === iTutorialSteps.TerminalTypeScript) {
-      //Make sure filename + code properly follow tutorial
-      if (currentScript.fileName !== "n00dles.script") {
-        dialogBoxCreate("Leave the script name as 'n00dles.script'!");
-        return;
-      }
-      if (currentScript.code.replace(/\s/g, "").indexOf("while(true){hack('n00dles');}") == -1) {
-        dialogBoxCreate("Please copy and paste the code from the tutorial!");
-        return;
-      }
-
-      //Save the script
-      saveScript(currentScript);
-
-      iTutorialNextStep();
-
-      return;
-    }
-
-    if (currentScript.fileName == "") {
-      dialogBoxCreate("You must specify a filename!");
-      return;
-    }
-
-    if (!isValidFilePath(currentScript.fileName)) {
-      dialogBoxCreate(
-        "Script filename can contain only alphanumerics, hyphens, and underscores, and must end with an extension.",
-      );
-      return;
-    }
-
-    const server = GetServer(currentScript.hostname);
-    if (server === null) throw new Error("Server should not be null but it is.");
-    if (isScriptFilename(currentScript.fileName)) {
-      //If the current script already exists on the server, overwrite it
-      for (let i = 0; i < server.scripts.length; i++) {
-        if (currentScript.fileName == server.scripts[i].filename) {
-          server.scripts[i].saveScript(
-            props.player,
-            currentScript.fileName,
-            currentScript.code,
-            props.player.currentServer,
-            server.scripts,
-          );
-          if (Settings.SaveGameOnFileSave) saveObject.saveGame();
-          return;
-        }
-      }
-
-      //If the current script does NOT exist, create a new one
-      const script = new Script();
-      script.saveScript(
-        props.player,
-        currentScript.fileName,
-        currentScript.code,
-        props.player.currentServer,
-        server.scripts,
-      );
-      server.scripts.push(script);
-    } else if (currentScript.fileName.endsWith(".txt")) {
-      for (let i = 0; i < server.textFiles.length; ++i) {
-        if (server.textFiles[i].fn === currentScript.fileName) {
-          server.textFiles[i].write(currentScript.code);
-          if (Settings.SaveGameOnFileSave) saveObject.saveGame();
-          return;
-        }
-      }
-      const textFile = new TextFile(currentScript.fileName, currentScript.code);
-      server.textFiles.push(textFile);
-    } else {
-      dialogBoxCreate("Invalid filename. Must be either a script (.script, .js, or .ns) or " + " or text file (.txt)");
-      return;
-    }
-
-    if (Settings.SaveGameOnFileSave) saveObject.saveGame();
-  }
-
-  function reorder(list: Array<OpenScript>, startIndex: number, endIndex: number): OpenScript[] {
-    const result = Array.from(list);
-    const [removed] = result.splice(startIndex, 1);
-    result.splice(endIndex, 0, removed);
-
-    return result;
-  }
-
-  function onDragEnd(result: any): void {
-    // Dropped outside of the list
-    if (!result.destination) {
-      result;
-      return;
-    }
-
-    const items = reorder(openScripts, result.source.index, result.destination.index);
-
-    openScripts = items;
+  function currentTabIndex(): number | undefined {
+    if (currentScript) return openScripts.findIndex((openScript) => currentScript === openScript);
+    return undefined;
   }
 
   function onTabClick(index: number): void {
     if (currentScript !== null) {
+      // Save the current position of the cursor.
+      const currentPosition = editorRef.current?.getPosition();
+      if (currentPosition) {
+        currentScript.lastPosition = currentPosition;
+      }
       // Save currentScript to openScripts
-      const curIndex = openScripts.findIndex(
-        (script) =>
-          currentScript !== null &&
-          script.fileName === currentScript.fileName &&
-          script.hostname === currentScript.hostname,
-      );
-      openScripts[curIndex] = currentScript;
+      const curIndex = currentTabIndex();
+      if (curIndex !== undefined) {
+        openScripts[curIndex] = currentScript;
+      }
     }
 
-    currentScript = { ...openScripts[index] };
+    currentScript = openScripts[index];
 
     if (editorRef.current !== null && openScripts[index] !== null) {
-      if (openScripts[index].model === undefined || openScripts[index].model.isDisposed()) {
-        regenerateModel(openScripts[index]);
+      if (!currentScript.model || currentScript.model.isDisposed()) {
+        currentScript.regenerateModel();
       }
-      editorRef.current.setModel(openScripts[index].model);
-
-      editorRef.current.setPosition(openScripts[index].lastPosition);
-      editorRef.current.revealLineInCenter(openScripts[index].lastPosition.lineNumber);
-      updateRAM(openScripts[index].code);
+      editorRef.current.setModel(currentScript.model);
+      editorRef.current.setPosition(currentScript.lastPosition);
+      editorRef.current.revealLineInCenter(currentScript.lastPosition.lineNumber);
+      parseCode(currentScript.code);
       editorRef.current.focus();
     }
+    removeOutlineOfEditor();
   }
 
   function onTabClose(index: number): void {
     // See if the script on the server is up to date
     const closingScript = openScripts[index];
-    const savedScriptIndex = openScripts.findIndex(
-      (script) => script.fileName === closingScript.fileName && script.hostname === closingScript.hostname,
-    );
-    let savedScriptCode = "";
-    if (savedScriptIndex !== -1) {
-      savedScriptCode = openScripts[savedScriptIndex].code;
-    }
-    const server = GetServer(closingScript.hostname);
-    if (server === null) throw new Error(`Server '${closingScript.hostname}' should not be null, but it is.`);
+    const savedScriptCode = closingScript.code;
+    const wasCurrentScript = openScripts[index] === currentScript;
 
-    const serverScriptIndex = server.scripts.findIndex((script) => script.filename === closingScript.fileName);
-    if (serverScriptIndex === -1 || savedScriptCode !== server.scripts[serverScriptIndex as number].code) {
+    if (isUnsavedFile(openScripts, index)) {
       PromptEvent.emit({
-        txt: "Do you want to save changes to " + closingScript.fileName + "?",
-        resolve: (result: boolean) => {
+        txt: `Do you want to save changes to ${closingScript.path} on ${closingScript.hostname}?`,
+        resolve: (result: boolean | string) => {
           if (result) {
             // Save changes
             closingScript.code = savedScriptCode;
@@ -658,68 +463,62 @@ export function Root(props: IProps): React.ReactElement {
         },
       });
     }
+    //unmounting the editor will dispose all, doesnt hurt to dispose on close aswell
+    closingScript.model.dispose();
+    openScripts.splice(index, 1);
+    if (openScripts.length === 0) {
+      currentScript = null;
+      Router.toPage(Page.Terminal);
+      return;
+    }
 
-    if (openScripts.length > 1) {
-      openScripts = openScripts.filter((value, i) => i !== index);
-
-      let indexOffset = -1;
-      if (openScripts[index + indexOffset] === undefined) {
-        indexOffset = 1;
-        if (openScripts[index + indexOffset] === undefined) {
-          indexOffset = 0;
-        }
-      }
-
-      // Change current script if we closed it
+    // Change current script if we closed it
+    if (wasCurrentScript) {
+      //Keep the same index unless we were on the last script
+      const indexOffset = openScripts.length === index ? -1 : 0;
       currentScript = openScripts[index + indexOffset];
       if (editorRef.current !== null) {
-        if (
-          openScripts[index + indexOffset].model === undefined ||
-          openScripts[index + indexOffset].model === null ||
-          openScripts[index + indexOffset].model.isDisposed()
-        ) {
-          regenerateModel(openScripts[index + indexOffset]);
+        if (!currentScript.model || currentScript.model.isDisposed()) {
+          currentScript.regenerateModel();
         }
-
-        editorRef.current.setModel(openScripts[index + indexOffset].model);
-        editorRef.current.setPosition(openScripts[index + indexOffset].lastPosition);
-        editorRef.current.revealLineInCenter(openScripts[index + indexOffset].lastPosition.lineNumber);
+        editorRef.current.setModel(currentScript.model);
+        editorRef.current.setPosition(currentScript.lastPosition);
+        editorRef.current.revealLineInCenter(currentScript.lastPosition.lineNumber);
+        parseCode(currentScript.code);
         editorRef.current.focus();
       }
-      rerender();
-    } else {
-      // No more scripts are open
-      openScripts = [];
-      currentScript = null;
-      props.router.toTerminal();
     }
+    rerender();
+    removeOutlineOfEditor();
   }
 
   function onTabUpdate(index: number): void {
     const openScript = openScripts[index];
-    const serverScriptCode = getServerCode(index);
+    const serverScriptCode = getServerCode(openScripts, index);
     if (serverScriptCode === null) return;
 
     if (openScript.code !== serverScriptCode) {
       PromptEvent.emit({
-        txt: "Do you want to overwrite the current editor content with the contents of " +
-          openScript.fileName + " on the server? This cannot be undone.",
-        resolve: (result: boolean) => {
+        txt:
+          "Do you want to overwrite the current editor content with the contents of " +
+          openScript.path +
+          " on the server? This cannot be undone.",
+        resolve: (result: boolean | string) => {
           if (result) {
             // Save changes
             openScript.code = serverScriptCode;
 
             // Switch to target tab
-            onTabClick(index)
+            onTabClick(index);
 
             if (editorRef.current !== null && openScript !== null) {
               if (openScript.model === undefined || openScript.model.isDisposed()) {
-                regenerateModel(openScript);
+                openScript.regenerateModel();
               }
               editorRef.current.setModel(openScript.model);
 
               editorRef.current.setValue(openScript.code);
-              updateRAM(openScript.code);
+              parseCode(openScript.code);
               editorRef.current.focus();
             }
           }
@@ -728,221 +527,90 @@ export function Root(props: IProps): React.ReactElement {
     }
   }
 
-  function dirty(index: number): string {
-    const openScript = openScripts[index];
-    const serverScriptCode = getServerCode(index);
-    if (serverScriptCode === null) return " *";
-
-    // The server code is stored with its starting & trailing whitespace removed
-    const openScriptFormatted = Script.formatCode(openScript.code);
-    return serverScriptCode !== openScriptFormatted ? " *" : "";
+  function onOpenNextTab(step: number): void {
+    // Go to the next tab (to the right). Wraps around when at the rightmost tab
+    const currIndex = currentTabIndex();
+    if (currIndex !== undefined) {
+      const nextIndex = (currIndex + step) % openScripts.length;
+      onTabClick(nextIndex);
+    }
   }
 
-  function getServerCode(index: number): string | null {
-    const openScript = openScripts[index];
-    const server = GetServer(openScript.hostname);
-    if (server === null) throw new Error(`Server '${openScript.hostname}' should not be null, but it is.`);
-
-    const serverScript = server.scripts.find((s) => s.filename === openScript.fileName);
-    return serverScript?.code ?? null;
+  function onOpenPreviousTab(step: number): void {
+    // Go to the previous tab (to the left). Wraps around when at the leftmost tab
+    const currIndex = currentTabIndex();
+    if (currIndex !== undefined) {
+      let nextIndex = currIndex - step;
+      while (nextIndex < 0) {
+        nextIndex += openScripts.length;
+      }
+      onTabClick(nextIndex);
+    }
   }
 
-  // Toolbars are roughly 112px:
-  //  8px body margin top
-  //  38.5px filename tabs
-  //  5px padding for top of editor
-  //  44px bottom tool bar + 16px margin
-  //  + vim bar 34px
-  const editorHeight = dimensions.height - (130 + (options.vim ? 34 : 0));
+  function onUnmountEditor() {
+    if (!currentScript) {
+      return;
+    }
+    // Save the current position of the cursor.
+    const currentPosition = editorRef.current?.getPosition();
+    if (currentPosition) {
+      currentScript.lastPosition = currentPosition;
+    }
+  }
+
+  const { statusBarRef } = useVimEditor({
+    editor: editorRef.current,
+    vim: currentScript !== null ? currentScript.vimMode : props.vim,
+    onSave: save,
+    onOpenNextTab,
+    onOpenPreviousTab,
+  });
+
+  useEffect(() => {
+    if (currentScript !== null) {
+      const tabIndex = currentTabIndex();
+      if (typeof tabIndex === "number") onTabClick(tabIndex);
+      parseCode(currentScript.code);
+    }
+    // disable eslint because we want to run this only once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <>
-      <div style={{ display: currentScript !== null ? "block" : "none", height: "100%", width: "100%" }}>
-        <DragDropContext onDragEnd={onDragEnd}>
-          <Droppable droppableId="tabs" direction="horizontal">
-            {(provided, snapshot) => (
-              <Box
-                maxWidth="1640px"
-                display="flex"
-                flexDirection="row"
-                alignItems="center"
-                whiteSpace="nowrap"
-                ref={provided.innerRef}
-                {...provided.droppableProps}
-                style={{
-                  backgroundColor: snapshot.isDraggingOver
-                    ? Settings.theme.backgroundsecondary
-                    : Settings.theme.backgroundprimary,
-                  overflowX: "scroll",
-                }}
-              >
-                {openScripts.map(({ fileName, hostname }, index) => {
-                  const iconButtonStyle = {
-                    maxWidth: "25px",
-                    minWidth: "25px",
-                    minHeight: '38.5px',
-                    maxHeight: '38.5px',
-                    ...(currentScript?.fileName === openScripts[index].fileName ? {
-                      background: Settings.theme.button,
-                      borderColor: Settings.theme.button,
-                      color: Settings.theme.primary
-                    } : {
-                      background: Settings.theme.backgroundsecondary,
-                      borderColor: Settings.theme.backgroundsecondary,
-                      color: Settings.theme.secondary
-                    })
-                  };
-                  return (
-                    <Draggable
-                      key={fileName + hostname}
-                      draggableId={fileName + hostname}
-                      index={index}
-                      disableInteractiveElementBlocking={true}
-                    >
-                      {(provided) => (
-                        <div
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          {...provided.dragHandleProps}
-                          style={{
-                            ...provided.draggableProps.style,
-                            marginRight: "5px",
-                            flexShrink: 0,
-                            border: '1px solid ' + Settings.theme.well,
-                          }}
-                        >
-                          <Button
-                            onClick={() => onTabClick(index)}
-                            onMouseDown={e => {
-                              e.preventDefault();
-                              if (e.button === 1) onTabClose(index);
-                            }}
-                            style={{
-                              ...(currentScript?.fileName === openScripts[index].fileName ? {
-                                background: Settings.theme.button,
-                                borderColor: Settings.theme.button,
-                                color: Settings.theme.primary
-                              } : {
-                                background: Settings.theme.backgroundsecondary,
-                                borderColor: Settings.theme.backgroundsecondary,
-                                color: Settings.theme.secondary
-                              })
-                            }}
-                          >
-                            {hostname}:~/{fileName} {dirty(index)}
-                          </Button>
-                          <Tooltip title="Overwrite editor content with saved file content">
-                            <Button onClick={() => onTabUpdate(index)} style={iconButtonStyle} >
-                              <SyncIcon fontSize='small' />
-                            </Button>
-                          </Tooltip>
-                          <Button onClick={() => onTabClose(index)} style={iconButtonStyle}>
-                            <CloseIcon fontSize='small' />
-                          </Button>
-                        </div>
-                      )}
-                    </Draggable>
-                  )
-                })}
-                {provided.placeholder}
-              </Box>
-            )}
-          </Droppable>
-        </DragDropContext>
-        <div style={{ paddingBottom: "5px" }} />
-        <Editor
-          beforeMount={beforeMount}
-          onMount={onMount}
-          loading={<Typography>Loading script editor!</Typography>}
-          height={`${editorHeight}px`}
-          defaultLanguage="javascript"
-          defaultValue={""}
-          onChange={updateCode}
-          theme={options.theme}
-          options={{ ...options, glyphMargin: true }}
-        />
-
-        <Box
-          ref={vimStatusRef}
-          className="monaco-editor"
-          display="flex"
-          flexDirection="row"
-          sx={{ p: 1 }}
-          alignItems="center"
-        ></Box>
-
-        <Box display="flex" flexDirection="row" sx={{ m: 1 }} alignItems="center">
-          <Button startIcon={<SettingsIcon />} onClick={() => setOptionsOpen(true)} sx={{ mr: 1 }}>Options</Button>
-          <Button onClick={beautify}>Beautify</Button>
-          <Button color={updatingRam ? "secondary" : "primary"} sx={{ mx: 1 }} onClick={() => { setRamInfoOpen(true) }}>
-            {ram}
-          </Button>
-          <Button onClick={save}>Save (Ctrl/Cmd + s)</Button>
-          <Button onClick={props.router.toTerminal}>Close (Ctrl/Cmd + b)</Button>
-          <Typography sx={{ mx: 1 }}>
-            {" "}
-            Documentation:{" "}
-            <Link target="_blank" href="https://bitburner.readthedocs.io/en/latest/index.html">
-              Basic
-            </Link>{" "}
-            |
-            <Link target="_blank" href="https://github.com/danielyxie/bitburner/blob/dev/markdown/bitburner.ns.md">
-              Full
-            </Link>
-          </Typography>
-        </Box>
-        <OptionsModal
-          open={optionsOpen}
-          onClose={() => setOptionsOpen(false)}
-          options={{
-            theme: Settings.MonacoTheme,
-            insertSpaces: Settings.MonacoInsertSpaces,
-            fontSize: Settings.MonacoFontSize,
-            wordWrap: Settings.MonacoWordWrap,
-            vim: Settings.MonacoVim,
-          }}
-          save={(options: Options) => {
-            setOptions(options);
-            Settings.MonacoTheme = options.theme;
-            Settings.MonacoInsertSpaces = options.insertSpaces;
-            Settings.MonacoFontSize = options.fontSize;
-            Settings.MonacoWordWrap = options.wordWrap;
-            Settings.MonacoVim = options.vim;
-          }}
-        />
-        <Modal open={ramInfoOpen} onClose={() => setRamInfoOpen(false)}>
-          <Table>
-            <TableBody>
-              {ramEntries.map(([n, r]) => (
-                <React.Fragment key={n + r}>
-                  <TableRow>
-                    <TableCell sx={{ color: Settings.theme.primary }}>{n}</TableCell>
-                    <TableCell align="right" sx={{ color: Settings.theme.primary }}>{r}</TableCell>
-                  </TableRow>
-                </React.Fragment>
-              ))}
-            </TableBody>
-          </Table>
-        </Modal>
-      </div>
       <div
         style={{
-          display: currentScript !== null ? "none" : "flex",
+          display: currentScript !== null ? "flex" : "none",
           height: "100%",
           width: "100%",
-          justifyContent: "center",
-          alignItems: "center",
+          flexDirection: "column",
         }}
       >
-        <span style={{ color: Settings.theme.primary, fontSize: "20px", textAlign: "center" }}>
-          <Typography variant="h4">No open files</Typography>
-          <Typography variant="h5">
-            Use <code>nano FILENAME</code> in
-            <br />
-            the terminal to open files
-          </Typography>
-        </span>
+        <Tabs
+          scripts={openScripts}
+          currentScript={currentScript}
+          onTabClick={onTabClick}
+          onTabClose={onTabClose}
+          onTabUpdate={onTabUpdate}
+        />
+        <div style={{ flex: "0 0 5px" }} />
+        <Editor onMount={onMount} onChange={updateCode} onUnmount={onUnmountEditor} />
+
+        {statusBarRef.current}
+
+        <Toolbar onSave={save} onRun={run} editor={editorRef.current} onBeautify={beautify} />
       </div>
+      {!currentScript && <NoOpenScripts />}
     </>
+  );
+}
+
+// Called every time script editor is opened
+export function ScriptEditorRoot(props: IProps) {
+  return (
+    <ScriptEditorContextProvider>
+      <Root {...props} />
+    </ScriptEditorContextProvider>
   );
 }

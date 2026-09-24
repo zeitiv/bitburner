@@ -4,7 +4,9 @@
 
 ## GangMemberInfo.def\_asc\_mult property
 
-<b>Signature:</b>
+Defense multiplier from ascensions
+
+**Signature:**
 
 ```typescript
 def_asc_mult: number;

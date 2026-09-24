@@ -6,19 +6,49 @@
 
 Get stats related to a crime.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getCrimeStats(crime: string): CrimeStats;
+getCrimeStats(crime: CrimeType): CrimeStats;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  crime | string | Name of crime. Not case-sensitive |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+crime
+
+
+</td><td>
+
+[CrimeType](./bitburner.crimetype.md)
+
+
+</td><td>
+
+Name of crime.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 [CrimeStats](./bitburner.crimestats.md)
 

@@ -6,24 +6,69 @@
 
 Apply for a job at a company.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-applyToCompany(companyName: string, field: string): boolean;
+applyToCompany(companyName: CompanyName, field: JobField): JobName | null;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  companyName | string | Name of company to apply to. |
-|  field | string | Field to which you want to apply. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
 
-boolean
 
-True if the player successfully get a job/promotion, and false otherwise.
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+companyName
+
+
+</td><td>
+
+[CompanyName](./bitburner.companyname.md)
+
+
+</td><td>
+
+Name of company to apply to.
+
+
+</td></tr>
+<tr><td>
+
+field
+
+
+</td><td>
+
+[JobField](./bitburner.jobfield.md)
+
+
+</td><td>
+
+Field to which you want to apply.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
+
+[JobName](./bitburner.jobname.md) \| null
+
+Job name if the player successfully get a job/promotion, and null otherwise.
 
 ## Remarks
 
@@ -31,5 +76,5 @@ RAM cost: 3 GB \* 16/4/1
 
 This function will automatically try to apply to the specified company for a position in the specified field. This function can also be used to apply for promotions by specifying the company and field you are already employed at.
 
-This function will return true if you successfully get a job/promotion, and false otherwise. Note that if you are trying to use this function to apply for a promotion and you don’t get one, it will return false.
+This function will return the job name if you successfully get a job/promotion, and null otherwise. Note that if you are trying to use this function to apply for a promotion and don’t get one, the function will return null.
 

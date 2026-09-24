@@ -4,26 +4,71 @@
 
 ## NS.hack() method
 
-Steal a servers money.
+Steal a server's money.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-hack(host: string, opts?: BasicHGWOptions): Promise<number>;
+hack(host?: string, opts?: BasicHGWOptions): Promise<number>;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  host | string | Hostname of the target server to hack. |
-|  opts | [BasicHGWOptions](./bitburner.basichgwoptions.md) | Optional parameters for configuring function behavior. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+host
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Hostname/IP of the target server to hack. Optional. Defaults to current server if not provided.
+
+
+</td></tr>
+<tr><td>
+
+opts
+
+
+</td><td>
+
+[BasicHGWOptions](./bitburner.basichgwoptions.md)
+
+
+</td><td>
+
+_(Optional)_ Optional parameters for configuring function behavior.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 Promise&lt;number&gt;
 
-The amount of money stolen if the hack is successful, and zero otherwise.
+A promise that resolves to the amount of money stolen (which is zero if the hack is unsuccessful).
 
 ## Remarks
 
@@ -33,23 +78,12 @@ Function that is used to try and hack servers to steal money and gain hacking ex
 
 A script can hack a server from anywhere. It does not need to be running on the same server to hack that server. For example, you can create a script that hacks the `foodnstuff` server and run that script on any server in the game.
 
-A successful `hack()` on a server will raise that server’s security level by 0.002.
+A successful `hack()` on a server will raise that server’s security level by 0.002 per thread. You can use [hackAnalyzeSecurity](./bitburner.ns.hackanalyzesecurity.md) to calculate the security increase for a number of threads.
 
-## Example 1
-
-
-```ts
-// NS1:
-var earnedMoney = hack("foodnstuff");
-earnedMoney = earnedMoney + hack("foodnstuff", { threads: 5 }); // Only use 5 threads to hack
-```
-
-## Example 2
+## Example
 
 
-```ts
-// NS2:
+```js
 let earnedMoney = await ns.hack("foodnstuff");
-earnedMoney += await ns.hack("foodnstuff", { threads: 5 }); // Only use 5 threads to hack
 ```
 

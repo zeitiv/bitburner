@@ -1,32 +1,50 @@
 import React from "react";
 import Button from "@mui/material/Button";
 
-import { purchaseTorRouter } from "../LocationsHelpers";
+import { dialogBoxCreate } from "../../ui/React/DialogBox";
 
 import { CONSTANTS } from "../../Constants";
-import { IPlayer } from "../../PersonObjects/IPlayer";
+import { Player } from "@player";
 
 import { Money } from "../../ui/React/Money";
+import { getTorRouter } from "../../Server/ServerHelpers";
 
-type IProps = {
-  p: IPlayer;
+/** Attempt to purchase a TOR router using the button. */
+export function purchaseTorRouter(): void {
+  if (Player.hasTorRouter()) {
+    dialogBoxCreate(`You already have a TOR Router!`);
+    return;
+  }
+  if (!Player.canAfford(CONSTANTS.TorRouterCost)) {
+    dialogBoxCreate("You cannot afford to purchase the TOR router!");
+    return;
+  }
+  Player.loseMoney(CONSTANTS.TorRouterCost, "other");
+
+  getTorRouter();
+  dialogBoxCreate(
+    "You have purchased a TOR router!\n" +
+      "You now have access to the dark web from your home computer.\n" +
+      `Use the "buy" command in the terminal to purchase programs.`,
+  );
+}
+
+interface IProps {
   rerender: () => void;
-};
+}
 
 export function TorButton(props: IProps): React.ReactElement {
   function buy(): void {
-    purchaseTorRouter(props.p);
+    purchaseTorRouter();
     props.rerender();
   }
 
-  if (props.p.hasTorRouter()) {
-    return <Button>TOR Router - Purchased</Button>;
-  }
+  const hasTorRouter = Player.hasTorRouter();
 
   return (
-    <Button disabled={!props.p.canAfford(CONSTANTS.TorRouterCost)} onClick={buy}>
+    <Button disabled={!Player.canAfford(CONSTANTS.TorRouterCost) || hasTorRouter} onClick={buy}>
       Purchase TOR router -&nbsp;
-      <Money money={CONSTANTS.TorRouterCost} player={props.p} />
+      {hasTorRouter ? "Purchased" : <Money money={CONSTANTS.TorRouterCost} forPurchase={true} />}
     </Button>
   );
 }

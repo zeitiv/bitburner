@@ -6,64 +6,111 @@
 
 Copy file between servers.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-scp(files: string | string[], destination: string): Promise<boolean>;
+scp(files: string | string[], destination: string, source?: string): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  files | string \| string\[\] | Filename or an array of filenames of script/literature files to copy. |
-|  destination | string | Host of the destination server, which is the server to which the file will be copied. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
 
-Promise&lt;boolean&gt;
 
-True if the script/literature file is successfully copied over and false otherwise. If the files argument is an array then this function will return true if at least one of the files in the array is successfully copied.
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+files
+
+
+</td><td>
+
+string \| string\[\]
+
+
+</td><td>
+
+Filename or an array of filenames of text/script/literature files to copy. Note that if a file is located in a subdirectory, the filename must include the leading `/`<!-- -->.
+
+
+</td></tr>
+<tr><td>
+
+destination
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Hostname/IP of the destination server, which is the server to which the file will be copied.
+
+
+</td></tr>
+<tr><td>
+
+source
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Hostname/IP of the source server, which is the server from which the file will be copied. This argument is optional and if it’s omitted the source will be the current server.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
+
+boolean
+
+True if the file is successfully copied over and false otherwise. If the files argument is an array then this function will return false if any of the operations failed.
 
 ## Remarks
 
 RAM cost: 0.6 GB
 
-Copies a script or literature (.lit) file(s) to another server. The files argument can be either a string specifying a single file to copy, or an array of strings specifying multiple files to copy.
+Copies text, script or literature (.lit) file(s) to another server. The files argument can be either a string specifying a single file to copy, or an array of strings specifying multiple files to copy.
 
 ## Example 1
 
 
-```ts
-// NS1:
+```js
 //Copies foo.lit from the helios server to the home computer:
-scp("foo.lit", "helios", "home");
+ns.scp("foo.lit", "home", "helios" );
 
 //Tries to copy three files from rothman-uni to home computer:
-files = ["foo1.lit", "foo2.script", "foo3.script"];
-scp(files, "rothman-uni", "home");
+const files = ["foo1.lit", "foo2.txt", "foo3.js"];
+ns.scp(files, "home", "rothman-uni");
 ```
 
 ## Example 2
 
 
-```ts
-// NS2:
-//Copies foo.lit from the helios server to the home computer:
-await ns.scp("foo.lit", "helios", "home");
-
-//Tries to copy three files from rothman-uni to home computer:
-files = ["foo1.lit", "foo2.script", "foo3.script"];
-await ns.scp(files, "rothman-uni", "home");
-```
-
-## Example 3
-
-
-```ts
-//ns2, copies files from home to a target server
+```js
 const server = ns.args[0];
-const files = ["hack.js","weaken.js","grow.js"];
-await ns.scp(files, "home", server);
+const files = ["hack.js", "weaken.js", "grow.js"];
+ns.scp(files, server, "home");
 ```
+For darknet servers: The destination requires a session, but unlike [exec](./bitburner.ns.exec.md)<!-- -->, does not require a direct connection — scp works at any distance. The source server has no darknet requirements (no session or connection needed). Use [dnet.authenticate](./bitburner.darknet.authenticate.md) (requires direct connection) or [dnet.connectToSession](./bitburner.darknet.connecttosession.md) (at any distance) to establish a session.
 

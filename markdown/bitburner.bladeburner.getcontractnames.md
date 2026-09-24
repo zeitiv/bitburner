@@ -6,20 +6,20 @@
 
 List all contracts.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getContractNames(): string[];
+getContractNames(): BladeburnerContractName[];
 ```
-<b>Returns:</b>
+**Returns:**
 
-string\[\]
+[BladeburnerContractName](./bitburner.bladeburnercontractname.md)<!-- -->\[\]
 
 Array of strings containing the names of all Bladeburner contracts.
 
 ## Remarks
 
-RAM cost: 0.4 GB
+RAM cost: 0 GB
 
 Returns an array of strings containing the names of all Bladeburner contracts.
 

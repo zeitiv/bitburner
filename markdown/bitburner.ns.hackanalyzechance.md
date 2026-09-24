@@ -6,19 +6,49 @@
 
 Get the chance of successfully hacking a server.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-hackAnalyzeChance(host: string): number;
+hackAnalyzeChance(host?: string): number;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  host | string | Hostname of the target server. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+host
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Hostname/IP of the target server. Optional. Defaults to current server if not provided.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 
@@ -30,5 +60,7 @@ RAM cost: 1 GB
 
 Returns the chance you have of successfully hacking the specified server.
 
-This returned value is in decimal form, not percentage.
+This returned value is in the range 0-1.
+
+Like other basic hacking analysis functions, this calculation uses the current status of the player and server. To calculate using hypothetical server or player status, obtain access to the Formulas API and use [formulas.hacking.hackChance](./bitburner.hackingformulas.hackchance.md)<!-- -->.
 

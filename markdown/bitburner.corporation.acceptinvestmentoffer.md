@@ -4,20 +4,20 @@
 
 ## Corporation.acceptInvestmentOffer() method
 
-Accept investment based on you companies current valuation
+Accept the investment offer. The value of offer is based on current corporation valuation.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 acceptInvestmentOffer(): boolean;
 ```
-<b>Returns:</b>
+**Returns:**
 
 boolean
 
-An offer of investment
+true if you successfully accept the offer, false if not
 
 ## Remarks
 
-Is based on current valuation and will not honer a specific Offer
+RAM cost: 20 GB
 

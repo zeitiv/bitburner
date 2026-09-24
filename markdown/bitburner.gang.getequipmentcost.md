@@ -6,7 +6,7 @@
 
 Get cost of equipment.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 getEquipmentCost(equipName: string): number;
@@ -14,11 +14,41 @@ getEquipmentCost(equipName: string): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  equipName | string | Name of equipment. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+equipName
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of equipment.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 
@@ -29,4 +59,6 @@ Cost to purchase the specified Equipment/Augmentation (number). Infinity for inv
 RAM cost: 2 GB
 
 Get the amount of money it takes to purchase a piece of Equipment or an Augmentation. If an invalid Equipment/Augmentation is specified, this function will return Infinity.
+
+This function already takes equipmentCostMult from [GangGenInfo](./bitburner.ganggeninfo.md) into account.
 

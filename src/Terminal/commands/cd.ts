@@ -1,45 +1,14 @@
-import { ITerminal } from "../ITerminal";
-import { IRouter } from "../../ui/Router";
-import { IPlayer } from "../../PersonObjects/IPlayer";
+import { Terminal } from "../../Terminal";
 import { BaseServer } from "../../Server/BaseServer";
+import { directoryExistsOnServer, resolveDirectory } from "../../Paths/Directory";
 
-import { evaluateDirectoryPath, removeTrailingSlash } from "../DirectoryHelpers";
-
-export function cd(
-  terminal: ITerminal,
-  router: IRouter,
-  player: IPlayer,
-  server: BaseServer,
-  args: (string | number | boolean)[],
-): void {
-  if (args.length > 1) {
-    terminal.error("Incorrect number of arguments. Usage: cd [dir]");
-  } else {
-    let dir = args.length === 1 ? args[0] + "" : "/";
-
-    let evaledDir: string | null = "";
-    if (dir === "/") {
-      evaledDir = "/";
-    } else {
-      // Ignore trailing slashes
-      dir = removeTrailingSlash(dir);
-
-      evaledDir = evaluateDirectoryPath(dir, terminal.cwd());
-      if (evaledDir === null || evaledDir === "") {
-        terminal.error("Invalid path. Failed to change directories");
-        return;
-      }
-
-      const server = player.getCurrentServer();
-      if (
-        !server.scripts.some((script) => script.filename.startsWith(evaledDir + "")) &&
-        !server.textFiles.some((file) => file.fn.startsWith(evaledDir + ""))
-      ) {
-        terminal.error("Invalid path. Failed to change directories");
-        return;
-      }
-    }
-
-    terminal.setcwd(evaledDir);
-  }
+export function cd(args: (string | number | boolean)[], server: BaseServer): void {
+  if (args.length > 1) return Terminal.error("Incorrect number of arguments. Usage: cd [dir]");
+  // If no arg was provided, just use "/".
+  const userInput = String(args[0] ?? "/");
+  const targetDir = resolveDirectory(userInput, Terminal.currDir);
+  // Explicitly checking null due to root being ""
+  if (targetDir === null) return Terminal.error(`Could not resolve directory ${userInput}`);
+  if (!directoryExistsOnServer(targetDir, server)) return Terminal.error(`Directory ${targetDir} does not exist.`);
+  Terminal.setcwd(targetDir);
 }

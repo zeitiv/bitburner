@@ -6,8 +6,8 @@
 
 How much money currently resides on the server and can be hacked
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-moneyAvailable: number;
+moneyAvailable?: number;
 ```

@@ -4,25 +4,89 @@
 
 ## OfficeAPI.throwParty() method
 
-Throw a party for your employees
+Throw a party for your employees.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-throwParty(divisionName: string, cityName: string, costPerEmployee: number): Promise<number>;
+throwParty(divisionName: string, city: CityName, costPerEmployee: number): number;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  divisionName | string | Name of the division |
-|  cityName | string | Name of the city |
-|  costPerEmployee | number | Amount to spend per employee. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
 
-Promise&lt;number&gt;
 
-Amount of happiness increased.
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+divisionName
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the division
+
+
+</td></tr>
+<tr><td>
+
+city
+
+
+</td><td>
+
+[CityName](./bitburner.cityname.md)
+
+
+</td><td>
+
+Name of the city
+
+
+</td></tr>
+<tr><td>
+
+costPerEmployee
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Amount to spend per employee.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
+
+number
+
+Multiplier for morale, or zero on failure
+
+## Remarks
+
+RAM cost: 20 GB
 

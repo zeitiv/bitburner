@@ -4,7 +4,9 @@
 
 ## GangMemberInfo.cha\_exp property
 
-<b>Signature:</b>
+Current charisma experience
+
+**Signature:**
 
 ```typescript
 cha_exp: number;

@@ -6,21 +6,85 @@
 
 Queue a toast (bottom-right notification).
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-toast(msg: any, variant?: string, duration?: number | null): void;
+toast(msg: string, variant?: ToastVariant, duration?: number | null): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  msg | any | Message in the toast. |
-|  variant | string | Type of toast, must be one of success, info, warning, error. Defaults to success. |
-|  duration | number \| null | Duration of toast in ms. Can also be <code>null</code> to create a persistent toast. Defaults to 2000 |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+msg
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Message in the toast.
+
+
+</td></tr>
+<tr><td>
+
+variant
+
+
+</td><td>
+
+[ToastVariant](./bitburner.toastvariant.md)
+
+
+</td><td>
+
+_(Optional)_ Type of toast. Must be one of success, info, warning, error. Defaults to success.
+
+
+</td></tr>
+<tr><td>
+
+duration
+
+
+</td><td>
+
+number \| null
+
+
+</td><td>
+
+_(Optional)_ Duration of toast in ms. Can also be `null` to create a persistent toast. Defaults to 2000.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 void
+
+## Remarks
+
+RAM cost: 0 GB
 

@@ -6,7 +6,7 @@
 
 Prints one or more values or variables to the Terminal.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 tprint(...args: any[]): void;
@@ -14,15 +14,47 @@ tprint(...args: any[]): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  args | any\[\] | Value(s) to be printed. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+args
+
+
+</td><td>
+
+any\[\]
+
+
+</td><td>
+
+Value(s) to be printed.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 void
 
 ## Remarks
 
 RAM cost: 0 GB
+
+See [print](./bitburner.ns.print.md) for how to add color to your printed strings.
 

@@ -6,19 +6,65 @@
 
 Terminate all scripts on a server.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-killall(host?: string): boolean;
+killall(host?: string, safetyGuard?: boolean): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  host | string | IP or hostname of the server on which to kill all scripts. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+host
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Hostname/IP of the server on which to kill all scripts. Optional. Defaults to current server if not provided.
+
+
+</td></tr>
+<tr><td>
+
+safetyGuard
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+_(Optional)_ Skips the script that calls this function
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 boolean
 

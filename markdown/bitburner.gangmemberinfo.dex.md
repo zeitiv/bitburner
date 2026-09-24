@@ -4,7 +4,9 @@
 
 ## GangMemberInfo.dex property
 
-<b>Signature:</b>
+Dexterity skill level
+
+**Signature:**
 
 ```typescript
 dex: number;

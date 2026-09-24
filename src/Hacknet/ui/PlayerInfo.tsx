@@ -7,47 +7,55 @@
 import React from "react";
 
 import { hasHacknetServers } from "../HacknetHelpers";
-import { IPlayer } from "../../PersonObjects/IPlayer";
+import { Player } from "@player";
 import { Money } from "../../ui/React/Money";
 import { MoneyRate } from "../../ui/React/MoneyRate";
 import { HashRate } from "../../ui/React/HashRate";
 import { Hashes } from "../../ui/React/Hashes";
-import Typography from "@mui/material/Typography";
+import { Paper, Typography } from "@mui/material";
+import { StatsTable } from "../../ui/React/StatsTable";
+import { Tooltip } from "@mui/material";
 
 interface IProps {
   totalProduction: number;
-  player: IPlayer;
 }
 
 export function PlayerInfo(props: IProps): React.ReactElement {
-  const hasServers = hasHacknetServers(props.player);
+  const hasServers = hasHacknetServers();
 
-  let prod;
+  const rows: React.ReactNode[][] = [];
+  rows.push(["Money Spent:", <Money key="money" money={-Player.moneySourceA.hacknet_expenses || 0} />]);
+  rows.push(["Money Produced:", <Money key="money" money={Player.moneySourceA.hacknet} />]);
   if (hasServers) {
-    prod = <HashRate hashes={props.totalProduction} />;
+    rows.push([
+      "Hashes:",
+      <span key={"hashes"}>
+        <Hashes hashes={Player.hashManager.hashes} /> / <Hashes hashes={Player.hashManager.capacity} />
+      </span>,
+    ]);
+    rows.push([
+      "Hash Rate:",
+      <Tooltip
+        key="moneyRate"
+        title={
+          <Typography>
+            <MoneyRate money={(props.totalProduction * 1e6) / 4} /> if sold for money
+          </Typography>
+        }
+      >
+        <span>
+          <HashRate key="hashRate" hashes={props.totalProduction} />
+        </span>
+      </Tooltip>,
+    ]);
   } else {
-    prod = <MoneyRate money={props.totalProduction} />;
+    rows.push(["Production Rate:", <MoneyRate key="moneyRate" money={props.totalProduction} />]);
   }
 
   return (
-    <>
-      <Typography>
-        Money:
-        <Money money={props.player.money} />
-      </Typography>
-
-      {hasServers && (
-        <>
-          <Typography>
-            Hashes: <Hashes hashes={props.player.hashManager.hashes} /> /{" "}
-            <Hashes hashes={props.player.hashManager.capacity} />
-          </Typography>
-        </>
-      )}
-
-      <Typography>
-        Total Hacknet {hasServers ? "Server" : "Node"} Production: {prod}
-      </Typography>
-    </>
+    <Paper sx={{ display: "inline-block", padding: "0.5em 1em", margin: "0.5em 0" }}>
+      <Typography variant="h6">Hacknet Summary</Typography>
+      <StatsTable rows={rows} textAlign="left" />
+    </Paper>
   );
 }

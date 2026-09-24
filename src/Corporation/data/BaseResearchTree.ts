@@ -1,16 +1,13 @@
 // Defines the ResearchTree that is common to all Corporation Industries
 // i.e. all Industries have these types of Research available to unlock
+import { CorpResearchName } from "@nsdefs";
 import { Research } from "../Research";
 import { ResearchMap } from "../ResearchMap";
 import { ResearchTree, Node } from "../ResearchTree";
 
-function makeNode(name: string): Node {
-  const research: Research | null = ResearchMap[name];
-  if (research == null) {
-    throw new Error(`Invalid research name: ${name}`);
-  }
-
-  return new Node({ text: research.name, cost: research.cost });
+function makeNode(name: CorpResearchName): Node {
+  const research: Research = ResearchMap[name];
+  return new Node({ researchName: research.name, cost: research.cost });
 }
 
 // Creates the Nodes for the BaseResearchTree.
@@ -20,7 +17,6 @@ function createBaseResearchTreeNodes(): Node {
   const autoBrew: Node = makeNode("AutoBrew");
   const autoParty: Node = makeNode("AutoPartyManager");
   const autoDrugs: Node = makeNode("Automatic Drug Administration");
-  const bulkPurchasing: Node = makeNode("Bulk Purchasing");
   const cph4: Node = makeNode("CPH4 Injections");
   const drones: Node = makeNode("Drones");
   const dronesAssembly: Node = makeNode("Drones - Assembly");
@@ -28,7 +24,6 @@ function createBaseResearchTreeNodes(): Node {
   const goJuice: Node = makeNode("Go-Juice");
   const hrRecruitment: Node = makeNode("HRBuddy-Recruitment");
   const hrTraining: Node = makeNode("HRBuddy-Training");
-  const joywire: Node = makeNode("JoyWire");
   const marketta1: Node = makeNode("Market-TA.I");
   const marketta2: Node = makeNode("Market-TA.II");
   const overclock: Node = makeNode("Overclock");
@@ -50,10 +45,8 @@ function createBaseResearchTreeNodes(): Node {
   rootNode.addChild(autoBrew);
   rootNode.addChild(autoParty);
   rootNode.addChild(autoDrugs);
-  rootNode.addChild(bulkPurchasing);
   rootNode.addChild(drones);
   rootNode.addChild(hrRecruitment);
-  rootNode.addChild(joywire);
   rootNode.addChild(marketta1);
   rootNode.addChild(overclock);
   rootNode.addChild(scAssemblers);

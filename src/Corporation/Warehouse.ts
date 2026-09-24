@@ -1,16 +1,19 @@
+import type { Corporation } from "./Corporation";
+import type { Division } from "./Division";
+
+import { Player } from "@player";
+import { CorpMaterialName, CorpSmartSupplyOption } from "@nsdefs";
+import { CityName, CorpUnlockName } from "@enums";
 import { Material } from "./Material";
-import { ICorporation } from "./ICorporation";
-import { IIndustry } from "./IIndustry";
-import { MaterialSizes } from "./MaterialSizes";
-import { IMap } from "../types";
-import { Generic_fromJSON, Generic_toJSON, Reviver } from "../utils/JSONReviver";
-import { exceptionAlert } from "../utils/helpers/exceptionAlert";
+import { MaterialInfo } from "./MaterialInfo";
+import { Generic_fromJSON, Generic_toJSON, IReviverValue, constructorsForReviver } from "../utils/JSONReviver";
+import { materialNames } from "./data/Constants";
+import { createFullRecordFromEntries, getRecordEntries } from "../Types/Record";
 
 interface IConstructorParams {
-  corp?: ICorporation;
-  industry?: IIndustry;
-  loc?: string;
-  size?: number;
+  division: Division;
+  loc: CityName;
+  size: number;
 }
 
 export class Warehouse {
@@ -18,13 +21,13 @@ export class Warehouse {
   level = 1;
 
   // City that this Warehouse is in
-  loc: string;
+  city = CityName.Sector12;
 
   // Map of Materials held by this Warehouse
-  materials: IMap<Material>;
+  materials = createFullRecordFromEntries(materialNames.map((matName) => [matName, new Material({ name: matName })]));
 
   // Maximum amount warehouse can hold
-  size: number;
+  size = 0;
 
   // Amount of space currently used by warehouse
   sizeUsed = 0;
@@ -32,52 +35,25 @@ export class Warehouse {
   // Whether Smart Supply is enabled for this Industry (the Industry that this Warehouse is for)
   smartSupplyEnabled = false;
 
-  // Decide if smart supply should use the materials already in the warehouse when deciding on the amount to buy.
-  smartSupplyUseLeftovers: { [key: string]: boolean | undefined } = {};
+  // Decide if smart supply should use the amount of materials imported into account when deciding on the amount to buy.
+  smartSupplyOptions = createFullRecordFromEntries<CorpMaterialName, CorpSmartSupplyOption>(
+    materialNames.map((matName) => [matName, "leftovers"]),
+  );
 
   // Stores the amount of product to be produced. Used for Smart Supply unlock.
   // The production tracked by smart supply is always based on the previous cycle,
   // so it will always trail the "true" production by 1 cycle
   smartSupplyStore = 0;
 
-  constructor(params: IConstructorParams = {}) {
-    this.loc = params.loc ? params.loc : "";
-    this.size = params.size ? params.size : 0;
-
-    this.materials = {
-      Water: new Material({ name: "Water" }),
-      Energy: new Material({ name: "Energy" }),
-      Food: new Material({ name: "Food" }),
-      Plants: new Material({ name: "Plants" }),
-      Metal: new Material({ name: "Metal" }),
-      Hardware: new Material({ name: "Hardware" }),
-      Chemicals: new Material({ name: "Chemicals" }),
-      Drugs: new Material({ name: "Drugs" }),
-      Robots: new Material({ name: "Robots" }),
-      AICores: new Material({ name: "AI Cores" }),
-      RealEstate: new Material({ name: "Real Estate" }),
-    };
-
-    this.smartSupplyUseLeftovers = {
-      Water: true,
-      Energy: true,
-      Food: true,
-      Plants: true,
-      Metal: true,
-      Hardware: true,
-      Chemicals: true,
-      Drugs: true,
-      Robots: true,
-      AICores: true,
-      RealEstate: true,
-    };
-
-    if (params.corp && params.industry) {
-      this.updateSize(params.corp, params.industry);
-    }
+  constructor(params: IConstructorParams | null = null) {
+    const corp = Player.corporation;
+    if (!corp || params === null) return;
+    this.city = params.loc;
+    this.size = params.size;
+    this.updateSize(corp, params.division);
 
     // Default smart supply to being enabled if the upgrade is unlocked
-    if (params.corp?.unlockUpgrades[1]) {
+    if (corp.unlocks.has(CorpUnlockName.SmartSupply)) {
       this.smartSupplyEnabled = true;
     }
   }
@@ -85,35 +61,30 @@ export class Warehouse {
   // Re-calculate how much space is being used by this Warehouse
   updateMaterialSizeUsed(): void {
     this.sizeUsed = 0;
-    for (const matName of Object.keys(this.materials)) {
-      const mat = this.materials[matName];
-      if (MaterialSizes.hasOwnProperty(matName)) {
-        this.sizeUsed += mat.qty * MaterialSizes[matName];
-      }
+    for (const [matName, mat] of getRecordEntries(this.materials)) {
+      this.sizeUsed += mat.stored * MaterialInfo[matName].size;
     }
     if (this.sizeUsed > this.size) {
-      console.warn("Warehouse size used greater than capacity, something went wrong");
+      console.warn(
+        `Warehouse size used greater than capacity, something went wrong. sizeUsed: ${this.sizeUsed}. size: ${this.size}`,
+        this,
+      );
     }
   }
 
-  updateSize(corporation: ICorporation, industry: IIndustry): void {
-    try {
-      this.size = this.level * 100 * corporation.getStorageMultiplier() * industry.getStorageMultiplier();
-    } catch (e: any) {
-      exceptionAlert(e);
-    }
+  updateSize(corporation: Corporation, division: Division): void {
+    this.size = this.level * 100 * corporation.getStorageMultiplier() * division.getStorageMultiplier();
   }
 
   // Serialize the current object to a JSON save state.
-  toJSON(): any {
+  toJSON(): IReviverValue {
     return Generic_toJSON("Warehouse", this);
   }
 
-  // Initiatizes a Warehouse object from a JSON save state.
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-  static fromJSON(value: any): Warehouse {
+  // Initializes a Warehouse object from a JSON save state.
+  static fromJSON(value: IReviverValue): Warehouse {
     return Generic_fromJSON(Warehouse, value.data);
   }
 }
 
-Reviver.constructors.Warehouse = Warehouse;
+constructorsForReviver.Warehouse = Warehouse;

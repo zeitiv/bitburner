@@ -6,16 +6,16 @@
 
 Purchase the TOR router.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 purchaseTor(): boolean;
 ```
-<b>Returns:</b>
+**Returns:**
 
 boolean
 
-True if actions is successful, false otherwise.
+True if action is successful or if you already own TOR router, false otherwise.
 
 ## Remarks
 

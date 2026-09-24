@@ -4,9 +4,9 @@
 
 ## GangMemberAscension.cha property
 
-Charisma multiplier gained from ascending
+Factor by which the charisma ascension multiplier was increased (newMult / oldMult)
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 cha: number;
