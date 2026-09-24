@@ -129,7 +129,9 @@ export function SidebarRoot(props: { page: Page }): React.ReactElement {
   const isSettingUpKeyBindings = useRef(false);
   useCycleRerender();
   const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
+  // noSsr: this is a client-only app, so read the real match on first render instead of
+  // useMediaQuery's SSR-safe `false` default (which would race the `open` state initializer below).
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"), { noSsr: true });
 
   let flash: Page | null = null;
   switch (ITutorial.currStep) {
