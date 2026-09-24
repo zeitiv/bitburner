@@ -104,7 +104,9 @@ const closedMixin = (theme: Theme): CSSObject => ({
   },
 });
 
-const Drawer = styled(MuiDrawer, { shouldForwardProp: (prop) => prop !== "open" })(({ theme, open }) => ({
+// `open` must actually reach MuiDrawer (not just this styled wrapper's CSS): the permanent
+// variant ignores it, but the mobile temporary/overlay variant relies on it to mount at all.
+const Drawer = styled(MuiDrawer)(({ theme, open }) => ({
   width: theme.spacing(31),
   whiteSpace: "nowrap",
   boxSizing: "border-box",
