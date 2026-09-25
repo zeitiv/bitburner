@@ -1,160 +1,113 @@
-/**
- * Class representing a script file.
- *
- * This does NOT represent a script that is actively running and
- * being evaluated. See RunningScript for that
- */
-import { calculateRamUsage, RamUsageEntry } from "./RamCalculations";
-import { ScriptUrl } from "./ScriptUrl";
-
-import { Generic_fromJSON, Generic_toJSON, Reviver } from "../utils/JSONReviver";
+import type { BaseServer } from "../Server/BaseServer";
+import { calculateRamUsage, type RamUsageEntry } from "./RamCalculations";
+import type { LoadedModule, ScriptURL } from "./LoadedModule";
+import { Generic_fromJSON, Generic_toJSON, type IReviverValue, constructorsForReviver } from "../utils/JSONReviver";
 import { roundToTwo } from "../utils/helpers/roundToTwo";
-import { IPlayer } from "../PersonObjects/IPlayer";
+import { RamCostConstants } from "../Netscript/RamCostGenerator";
+import type { ScriptFilePath } from "../Paths/ScriptFilePath";
+import { ContentFile } from "../Paths/ContentFile";
 
-let globalModuleSequenceNumber = 0;
-
-interface ScriptReference {
-  filename: string;
+/** A script file as a file on a server.
+ * For the execution of a script, see RunningScript and WorkerScript */
+export class Script extends ContentFile {
+  code: string;
+  filename: ScriptFilePath;
   server: string;
-}
 
-export class Script {
-  // Code for this script
-  code = "";
+  // Ram calculation, only exists after first poll of ram cost after updating
+  ramUsage: number | null = null;
+  ramUsageEntries: RamUsageEntry[] = [];
+  ramCalculationError: string | null = null;
 
-  // Filename for the script file
-  filename = "";
+  // Runtime data that only exists when the script has been initiated. Cleared when script or a dependency script is updated.
+  mod: LoadedModule | null = null;
+  /** Scripts that directly import this one. Stored so we can invalidate these dependent scripts when this one is invalidated. */
+  dependents = new Set<Script>();
+  /**
+   * Scripts that we directly or indirectly import, including ourselves.
+   * Stored only so RunningScript can use it, to translate urls in error messages.
+   * Because RunningScript uses the reference directly (to reduce object copies), it must be immutable.
+   */
+  dependencies = new Map<ScriptURL, Script>();
 
-  // url of the script if any, only for NS2.
-  url = "";
-
-  // The dynamic module generated for this script when it is run.
-  // This is only applicable for NetscriptJS
-  module: any = "";
-
-  // The timestamp when when the script was last updated.
-  moduleSequenceNumber: number;
-
-  // Only used with NS2 scripts; the list of dependency script filenames. This is constructed
-  // whenever the script is first evaluated, and therefore may be out of date if the script
-  // has been updated since it was last run.
-  dependencies: ScriptUrl[] = [];
-  dependents: ScriptReference[] = [];
-
-  // Amount of RAM this Script requres to run
-  ramUsage = 0;
-  ramUsageEntries?: RamUsageEntry[];
-
-  // hostname of server that this script is on.
-  server = "";
-
-  constructor(player: IPlayer | null = null, fn = "", code = "", server = "", otherScripts: Script[] = []) {
-    this.filename = fn;
-    this.code = code;
-    this.ramUsage = 0;
-    this.server = server; // hostname of server this script is on
-    this.module = "";
-    this.moduleSequenceNumber = ++globalModuleSequenceNumber;
-    if (this.code !== "" && player !== null) {
-      this.updateRamUsage(player, otherScripts);
-    }
+  get content() {
+    this.metadata.read();
+    return this.code;
+  }
+  set content(newCode: string) {
+    this.metadata.edit();
+    if (this.code === newCode) return;
+    this.code = newCode;
+    this.invalidateModule();
   }
 
-  /**
-   * Download the script as a file
-   */
-  download(): void {
-    const filename = this.filename;
-    const file = new Blob([this.code], { type: "text/plain" });
-    const navigator = window.navigator as any;
-    if (navigator.msSaveOrOpenBlob) {
-      // IE10+
-      navigator.msSaveOrOpenBlob(file, filename);
-    } else {
-      // Others
-      const a = document.createElement("a"),
-        url = URL.createObjectURL(file);
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      setTimeout(function () {
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-      }, 0);
-    }
-  }
-
-  /**
-   * Marks this script as having been updated. It will be recompiled next time something tries
-   * to exec it.
-   */
-  markUpdated(): void {
-    this.module = "";
-    this.moduleSequenceNumber = ++globalModuleSequenceNumber;
-  }
-
-  /**
-   * Save a script from the script editor
-   * @param {string} code - The new contents of the script
-   * @param {Script[]} otherScripts - Other scripts on the server. Used to process imports
-   */
-  saveScript(player: IPlayer, filename: string, code: string, hostname: string, otherScripts: Script[]): void {
-    // Update code and filename
-    this.code = Script.formatCode(code);
-
+  constructor(filename = "default.js" as ScriptFilePath, code = "", server = "") {
+    super();
     this.filename = filename;
-    this.server = hostname;
-    this.updateRamUsage(player, otherScripts);
-    this.markUpdated();
-    for (const dependent of this.dependents) {
-      const [dependentScript] = otherScripts.filter(
-        (s) => s.filename === dependent.filename && s.server == dependent.server,
-      );
-      if (dependentScript !== null) dependentScript.markUpdated();
-    }
+    this.code = code;
+    this.server = server; // hostname of server this script is on
+  }
+
+  /** Invalidates the current script module and related data, e.g. when modifying the file. */
+  invalidateModule(): void {
+    // Always clear ram usage
+    this.ramUsage = null;
+    this.ramUsageEntries.length = 0;
+    this.ramCalculationError = null;
+    // Early return if there's already no URL
+    if (!this.mod) return;
+    this.mod = null;
+    for (const dependent of this.dependents) dependent.invalidateModule();
+    this.dependents.clear();
+    // This will be mutated in compile(), but is immutable after that.
+    // (No RunningScripts can access this copy before that point).
+    this.dependencies = new Map();
+  }
+
+  /** Gets the ram usage, while also attempting to update it if it's currently null */
+  getRamUsage(otherScripts: Map<ScriptFilePath, Script>): number | null {
+    if (this.ramUsage) return this.ramUsage;
+    this.updateRamUsage(otherScripts);
+    return this.ramUsage;
   }
 
   /**
    * Calculates and updates the script's RAM usage based on its code
    * @param {Script[]} otherScripts - Other scripts on the server. Used to process imports
    */
-  async updateRamUsage(player: IPlayer, otherScripts: Script[]): Promise<void> {
-    const res = await calculateRamUsage(player, this.code, otherScripts);
-    if (res.cost > 0) {
-      this.ramUsage = roundToTwo(res.cost);
-      this.ramUsageEntries = res.entries;
+  updateRamUsage(otherScripts: Map<ScriptFilePath, Script>): void {
+    const ramCalc = calculateRamUsage(this.code, this.filename, this.server, otherScripts);
+    if (ramCalc.cost && ramCalc.cost >= RamCostConstants.Base) {
+      this.ramUsage = roundToTwo(ramCalc.cost);
+      this.ramUsageEntries = ramCalc.entries;
+      this.ramCalculationError = null;
+      return;
     }
-    this.markUpdated();
+
+    this.ramUsage = null;
+    this.ramCalculationError = ramCalc.errorMessage ?? null;
   }
 
-  imports(): string[] {
-    return [];
+  /** Remove script from server. Fails if the provided server isn't the server for this script. */
+  deleteFromServer(server: BaseServer): boolean {
+    if (this.server !== server.hostname || server.isRunning(this.filename)) return false;
+    this.invalidateModule();
+    server.scripts.delete(this.filename);
+    return true;
   }
+
+  /** The keys that are relevant in a save file */
+  static savedKeys = ["code", "filename", "server", "metadata"] as const;
 
   // Serialize the current object to a JSON save state
-  toJSON(): any {
-    return Generic_toJSON("Script", this);
+  toJSON(): IReviverValue {
+    return Generic_toJSON("Script", this, Script.savedKeys);
   }
 
   // Initializes a Script Object from a JSON save state
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-  static fromJSON(value: any): Script {
-    const s = Generic_fromJSON(Script, value.data);
-    // Force the url to blank from the save data. Urls are not valid outside the current browser page load.
-    s.url = "";
-    s.dependents = [];
-    return s;
-  }
-
-  /**
-   * Formats code: Removes the starting & trailing whitespace
-   * @param {string} code - The code to format
-   * @returns The formatted code
-   */
-  static formatCode(code: string): string {
-    return code.replace(/^\s+|\s+$/g, "");
+  static fromJSON(value: IReviverValue): Script {
+    return Generic_fromJSON(Script, value.data, Script.savedKeys);
   }
 }
 
-Reviver.constructors.Script = Script;
+constructorsForReviver.Script = Script;

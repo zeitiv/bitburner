@@ -6,7 +6,7 @@
 
 Discontinue a product.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 discontinueProduct(divisionName: string, productName: string): void;
@@ -14,12 +14,61 @@ discontinueProduct(divisionName: string, productName: string): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  divisionName | string | Name of the division |
-|  productName | string | Name of the product |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+divisionName
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the division
+
+
+</td></tr>
+<tr><td>
+
+productName
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the product
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 void
+
+## Remarks
+
+RAM cost: 20 GB
 

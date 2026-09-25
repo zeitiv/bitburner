@@ -1,11 +1,26 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
-const fs = require('fs').promises;
-const path = require('path');
+const fs = require("fs").promises;
+const path = require("path");
+const { decodeBase64BytesToBytes, isBinaryFormat, isSteamCloudFormat } = require("../electron/saveDataBinaryFormat");
+
+async function decompress(data) {
+  const decompressedReadableStream = new Blob([data]).stream().pipeThrough(new DecompressionStream("gzip"));
+  return await new Response(decompressedReadableStream).text();
+}
 
 async function getSave(file) {
-  const data = await fs.readFile(file, 'utf8');
+  const data = await fs.readFile(file);
 
-  const save = JSON.parse(decodeURIComponent(escape(atob(data))));
+  let jsonSaveString;
+  if (isBinaryFormat(data)) {
+    jsonSaveString = await decompress(data);
+  } else if (isSteamCloudFormat(data)) {
+    jsonSaveString = await decompress(decodeBase64BytesToBytes(data));
+  } else {
+    jsonSaveString = decodeURIComponent(escape(atob(data)));
+  }
+
+  const save = JSON.parse(jsonSaveString);
   const saveData = save.data;
   let gameSave = {
     PlayerSave: JSON.parse(saveData.PlayerSave),
@@ -13,14 +28,13 @@ async function getSave(file) {
     FactionsSave: JSON.parse(saveData.FactionsSave),
     AliasesSave: JSON.parse(saveData.AliasesSave),
     GlobalAliasesSave: JSON.parse(saveData.GlobalAliasesSave),
-    MessagesSave: JSON.parse(saveData.MessagesSave),
     StockMarketSave: JSON.parse(saveData.StockMarketSave),
     SettingsSave: JSON.parse(saveData.SettingsSave),
     VersionSave: JSON.parse(saveData.VersionSave),
     LastExportBonus: JSON.parse(saveData.LastExportBonus),
     StaneksGiftSave: JSON.parse(saveData.StaneksGiftSave),
-    SaveTimestamp: new Date(parseInt(saveData.SaveTimestamp ?? '0', 10)).toLocaleString(),
-  }
+    SaveTimestamp: new Date(parseInt(saveData.SaveTimestamp ?? "0", 10)).toLocaleString(),
+  };
 
   const serverStrings = JSON.parse(saveData.AllServersSave);
   const servers = {};
@@ -38,9 +52,9 @@ async function getSave(file) {
 }
 
 async function main(input, output) {
-  const result = await getSave(input)
+  const result = await getSave(input);
   await fs.writeFile(output, JSON.stringify(result, null, 2));
-  return result
+  return result;
 }
 
 const input = path.resolve(process.argv[2]);
@@ -50,5 +64,5 @@ console.log(`Input: ${input}`);
 console.log(`Output: ${output}`);
 
 main(input, output).then(() => {
-  console.log('Done!');
-})
+  console.log("Done!");
+});

@@ -6,7 +6,7 @@
 
 Sets the current theme
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 setTheme(newTheme: UserInterfaceTheme): void;
@@ -14,11 +14,39 @@ setTheme(newTheme: UserInterfaceTheme): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  newTheme | UserInterfaceTheme |  |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+newTheme
+
+
+</td><td>
+
+[UserInterfaceTheme](./bitburner.userinterfacetheme.md)
+
+
+</td><td>
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 void
 
@@ -28,9 +56,8 @@ RAM cost: 0 GB
 
 ## Example
 
-Usage example (NS2)
 
-```ts
+```js
 const theme = ns.ui.getTheme();
 theme.primary = '#ff5500';
 ns.ui.setTheme(theme);

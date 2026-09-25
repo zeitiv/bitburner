@@ -6,7 +6,7 @@
 
 Install your purchased augmentations.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 installAugmentations(cbScript?: string): void;
@@ -14,11 +14,41 @@ installAugmentations(cbScript?: string): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  cbScript | string | This is a script that will automatically be run after Augmentations are installed (after the reset). This script will be run with no arguments and 1 thread. It must be located on your home computer. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+cbScript
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ This is a script that will automatically be run after Augmentations are installed (after the reset). This script will be run with no arguments and 1 thread. It must be located on your home computer.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 void
 
@@ -26,5 +56,5 @@ void
 
 RAM cost: 5 GB \* 16/4/1
 
-This function will automatically install your Augmentations, resetting the game as usual.
+This function will automatically install your Augmentations, resetting the game as usual. If you do not own any queued Augmentations then the game will not reset.
 

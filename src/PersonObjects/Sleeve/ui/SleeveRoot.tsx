@@ -1,49 +1,47 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
+
+import { Box, Typography, Button, Container } from "@mui/material";
+
+import { Player } from "@player";
 
 import { SleeveElem } from "./SleeveElem";
 import { FAQModal } from "./FAQModal";
-import { use } from "../../../ui/Context";
-
-import Typography from "@mui/material/Typography";
-import Button from "@mui/material/Button";
-import Link from "@mui/material/Link";
+import { useCycleRerender } from "../../../ui/React/hooks";
+import { Settings } from "../../../Settings/Settings";
 
 export function SleeveRoot(): React.ReactElement {
-  const player = use.Player();
   const [FAQOpen, setFAQOpen] = useState(false);
-  const setRerender = useState(false)[1];
-  function rerender(): void {
-    setRerender((old) => !old);
-  }
-
-  useEffect(() => {
-    const id = setInterval(rerender, 200);
-    return () => clearInterval(id);
-  }, []);
+  const rerender = useCycleRerender();
 
   return (
     <>
-      <Typography variant="h4">Sleeves</Typography>
-      <Typography>
-        Duplicate Sleeves are MK-V Synthoids (synthetic androids) into which your consciousness has been copied. In
-        other words, these Synthoids contain a perfect duplicate of your mind.
-        <br />
-        <br />
-        Sleeves can be used to perform different tasks synchronously.
-        <br />
-        <br />
-      </Typography>
+      <Container disableGutters maxWidth="md" sx={{ mx: 0 }}>
+        <Typography variant="h4">Sleeves</Typography>
+        <Typography>
+          Duplicate Sleeves are MK-V Synthoids (synthetic androids) into which your consciousness has been copied. In
+          other words, these Synthoids contain a perfect duplicate of your mind.
+          <br />
+          <br />
+          Sleeves can be used to perform different tasks simultaneously.
+          <br />
+          <br />
+        </Typography>
+        {Player.bitNodeOptions.disableSleeveExpAndAugmentation && (
+          <Typography color={Settings.theme.warning}>
+            You enabled the "Disable Sleeves' experience and augmentation" option. Your sleeves will not gain
+            experience, and they won't be able to install augmentations.
+            <br />
+            <br />
+          </Typography>
+        )}
+      </Container>
 
       <Button onClick={() => setFAQOpen(true)}>FAQ</Button>
-      <Link
-        target="_blank"
-        href="https://bitburner.readthedocs.io/en/latest/advancedgameplay/sleeves.html#duplicate-sleeves"
-      >
-        <Typography> Documentation</Typography>
-      </Link>
-      {player.sleeves.map((sleeve, i) => (
-        <SleeveElem key={i} rerender={rerender} sleeve={sleeve} />
-      ))}
+      <Box display="grid" sx={{ gridTemplateColumns: "repeat(2, 1fr)", mt: 1 }}>
+        {Player.sleeves.map((sleeve, i) => (
+          <SleeveElem key={i} rerender={rerender} sleeve={sleeve} />
+        ))}
+      </Box>
       <FAQModal open={FAQOpen} onClose={() => setFAQOpen(false)} />
     </>
   );

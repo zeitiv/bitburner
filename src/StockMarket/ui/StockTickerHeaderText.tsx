@@ -8,22 +8,22 @@ import * as React from "react";
 import { Stock } from "../Stock";
 import { TickerHeaderFormatData } from "../data/TickerHeaderFormatData";
 
-import { IPlayer } from "../../PersonObjects/IPlayer";
+import { Player } from "@player";
 import { Settings } from "../../Settings/Settings";
-import { numeralWrapper } from "../../ui/numeralFormat";
+import { formatMoney, formatPercent } from "../../ui/formatNumber";
 import Typography from "@mui/material/Typography";
+import { getDarknetVolatilityMult } from "../../DarkNet/effects/effects";
 
-type IProps = {
-  p: IPlayer;
+interface IProps {
   stock: Stock;
-};
+}
 
 const localesWithLongPriceFormat = ["cs", "lv", "pl", "ru"];
 
 export function StockTickerHeaderText(props: IProps): React.ReactElement {
   const stock = props.stock;
 
-  const stockPriceFormat = numeralWrapper.formatMoney(stock.price);
+  const stockPriceFormat = formatMoney(stock.price);
   const spacesAllottedForStockPrice = localesWithLongPriceFormat.includes(Settings.Locale) ? 15 : 12;
   const spacesAfterStockName = " ".repeat(
     1 +
@@ -34,8 +34,9 @@ export function StockTickerHeaderText(props: IProps): React.ReactElement {
   const spacesBeforePrice = " ".repeat(spacesAllottedForStockPrice - stockPriceFormat.length);
 
   let hdrText = `${stock.name}${spacesAfterStockName}${stock.symbol} -${spacesBeforePrice}${stockPriceFormat}`;
-  if (props.p.has4SData) {
-    hdrText += ` - Volatility: ${numeralWrapper.formatPercentage(stock.mv / 100)} - Price Forecast: `;
+  if (Player.has4SData) {
+    const volatility = stock.mv * getDarknetVolatilityMult(stock.symbol);
+    hdrText += ` - Volatility: ${formatPercent(volatility / 100)} - Price Forecast: `;
     let plusOrMinus = stock.b; // True for "+", false for "-"
     if (stock.otlkMag < 0) {
       plusOrMinus = !plusOrMinus;
@@ -46,11 +47,11 @@ export function StockTickerHeaderText(props: IProps): React.ReactElement {
     // hdrText += ` - ${stock.getAbsoluteForecast()} / ${stock.otlkMagForecast}`;
   }
 
-  let color = "primary";
+  let color = Settings.theme.success;
   if (stock.lastPrice === stock.price) {
-    color = "secondary";
+    color = Settings.theme.secondary;
   } else if (stock.lastPrice > stock.price) {
-    color = "error";
+    color = Settings.theme.error;
   }
 
   return (

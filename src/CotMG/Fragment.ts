@@ -1,4 +1,5 @@
-import { FragmentType } from "./FragmentType";
+import type { FragmentType } from "@nsdefs";
+import { FragmentTypeEnum, Effect } from "./FragmentType";
 import { Shapes } from "./data/Shapes";
 
 export const Fragments: Fragment[] = [];
@@ -9,13 +10,15 @@ export class Fragment {
   type: FragmentType;
   power: number;
   limit: number;
+  effect: string;
 
-  constructor(id: number, shape: boolean[][], type: FragmentType, power: number, limit: number) {
+  constructor(id: number, shape: boolean[][], type: FragmentType, power: number, limit: number, effect: string) {
     this.id = id;
     this.shape = shape;
     this.type = type;
     this.power = power;
     this.limit = limit;
+    this.effect = effect;
   }
 
   fullAt(x: number, y: number, rotation: number): boolean {
@@ -47,8 +50,8 @@ export class Fragment {
     return this.shape[0].length;
   }
 
-  // List of direct neighboors of this fragment.
-  neighboors(rotation: number): number[][] {
+  // List of direct neighbors of this fragment.
+  neighbors(rotation: number): number[][] {
     const candidates: number[][] = [];
 
     const add = (x: number, y: number): void => {
@@ -58,7 +61,7 @@ export class Fragment {
     };
     for (let y = 0; y < this.height(rotation); y++) {
       for (let x = 0; x < this.width(rotation); x++) {
-        // This cell is full, add all it's neighboors.
+        // This cell is full, add all it's neighbors.
         if (!this.fullAt(x, y, rotation)) continue;
         add(x - 1, y);
         add(x + 1, y);
@@ -76,13 +79,7 @@ export class Fragment {
   }
 
   copy(): Fragment {
-    return new Fragment(
-      this.id,
-      this.shape.map((a) => a.slice()),
-      this.type,
-      this.power,
-      this.limit,
-    );
+    return Object.assign({}, this);
   }
 }
 
@@ -100,27 +97,31 @@ export function FragmentById(id: number): Fragment | null {
     new Fragment(
       0, // id
       Shapes.S,
-      FragmentType.Hacking, // type
+      FragmentTypeEnum.Hacking,
       1,
       1, // limit
+      Effect(FragmentTypeEnum.Hacking),
+      //Effect(FragmentType.Hacking],
     ),
   );
   Fragments.push(
     new Fragment(
       1, // id
       Shapes.Z,
-      FragmentType.Hacking, // type
+      FragmentTypeEnum.Hacking,
       1,
       1, // limit
+      Effect(FragmentTypeEnum.Hacking),
     ),
   );
   Fragments.push(
     new Fragment(
       5, // id
       Shapes.T,
-      FragmentType.HackingSpeed, // type
+      FragmentTypeEnum.HackingSpeed,
       1.3,
       1, // limit
+      Effect(FragmentTypeEnum.HackingSpeed),
     ),
   );
 
@@ -128,117 +129,130 @@ export function FragmentById(id: number): Fragment | null {
     new Fragment(
       6, // id
       Shapes.I,
-      FragmentType.HackingMoney, // type
+      FragmentTypeEnum.HackingMoney,
       2, // power
       1, // limit
+      Effect(FragmentTypeEnum.HackingMoney),
     ),
   );
   Fragments.push(
     new Fragment(
       7, // id
       Shapes.J,
-      FragmentType.HackingGrow, // type
+      FragmentTypeEnum.HackingGrow,
       0.5, // power
       1, // limit
+      Effect(FragmentTypeEnum.HackingGrow),
     ),
   );
   Fragments.push(
     new Fragment(
       10, // id
       Shapes.T,
-      FragmentType.Strength, // type
+      FragmentTypeEnum.Strength,
       2, // power
       1, // limit
+      Effect(FragmentTypeEnum.Strength),
     ),
   );
   Fragments.push(
     new Fragment(
       12, // id
       Shapes.L,
-      FragmentType.Defense, // type
+      FragmentTypeEnum.Defense,
       2, // power
       1, // limit
+      Effect(FragmentTypeEnum.Defense),
     ),
   );
   Fragments.push(
     new Fragment(
       14, // id
       Shapes.L,
-      FragmentType.Dexterity, // type
+      FragmentTypeEnum.Dexterity,
       2, // power
       1, // limit
+      Effect(FragmentTypeEnum.Dexterity),
     ),
   );
   Fragments.push(
     new Fragment(
       16, // id
       Shapes.S,
-      FragmentType.Agility, // type
+      FragmentTypeEnum.Agility,
       2, // power
       1, // limit
+      Effect(FragmentTypeEnum.Agility),
     ),
   );
   Fragments.push(
     new Fragment(
       18, // id
       Shapes.S,
-      FragmentType.Charisma, // type
+      FragmentTypeEnum.Charisma,
       3, // power
       1, // limit
+      Effect(FragmentTypeEnum.Charisma),
     ),
   );
   Fragments.push(
     new Fragment(
       20, // id
       Shapes.I,
-      FragmentType.HacknetMoney, // type
+      FragmentTypeEnum.HacknetMoney,
       1, // power
       1, // limit
+      Effect(FragmentTypeEnum.HacknetMoney),
     ),
   );
   Fragments.push(
     new Fragment(
       21, // id
       Shapes.O,
-      FragmentType.HacknetCost, // type
+      FragmentTypeEnum.HacknetCost,
       2, // power
       1, // limit
+      Effect(FragmentTypeEnum.HacknetCost),
     ),
   );
   Fragments.push(
     new Fragment(
       25, // id
       Shapes.J,
-      FragmentType.Rep, // type
+      FragmentTypeEnum.Rep,
       0.5, // power
       1, // limit
+      Effect(FragmentTypeEnum.Rep),
     ),
   );
   Fragments.push(
     new Fragment(
       27, // id
       Shapes.J,
-      FragmentType.WorkMoney, // type
+      FragmentTypeEnum.WorkMoney,
       10, // power
       1, // limit
+      Effect(FragmentTypeEnum.WorkMoney),
     ),
   );
   Fragments.push(
     new Fragment(
       28, // id
       Shapes.L,
-      FragmentType.Crime, // type
+      FragmentTypeEnum.Crime,
       2, // power
       1, // limit
+      Effect(FragmentTypeEnum.Crime),
     ),
   );
   Fragments.push(
     new Fragment(
       30, // id
       Shapes.S,
-      FragmentType.Bladeburner, // type
+      FragmentTypeEnum.Bladeburner,
       0.4, // power
       1, // limit
+      Effect(FragmentTypeEnum.Bladeburner),
     ),
   );
   Fragments.push(
@@ -250,9 +264,10 @@ export function FragmentById(id: number): Fragment | null {
         [X, X, _],
         [_, X, _],
       ],
-      FragmentType.Booster, // type
+      FragmentTypeEnum.Booster,
       1.1, // power
       99, // limit
+      Effect(FragmentTypeEnum.Booster),
     ),
   );
   Fragments.push(
@@ -263,9 +278,10 @@ export function FragmentById(id: number): Fragment | null {
         [X, X, X, X],
         [X, _, _, _],
       ],
-      FragmentType.Booster, // type
+      FragmentTypeEnum.Booster,
       1.1, // power
       99, // limit
+      Effect(FragmentTypeEnum.Booster),
     ),
   );
   Fragments.push(
@@ -276,9 +292,10 @@ export function FragmentById(id: number): Fragment | null {
         [_, X, X, X],
         [X, X, _, _],
       ],
-      FragmentType.Booster, // type
+      FragmentTypeEnum.Booster,
       1.1, // power
       99, // limit
+      Effect(FragmentTypeEnum.Booster),
     ),
   );
   Fragments.push(
@@ -289,9 +306,10 @@ export function FragmentById(id: number): Fragment | null {
         [X, X, X, _],
         [_, _, X, X],
       ],
-      FragmentType.Booster, // type
+      FragmentTypeEnum.Booster,
       1.1, // power
       99, // limit
+      Effect(FragmentTypeEnum.Booster),
     ),
   );
   Fragments.push(
@@ -303,9 +321,10 @@ export function FragmentById(id: number): Fragment | null {
         [_, X, _],
         [X, X, _],
       ],
-      FragmentType.Booster, // type
+      FragmentTypeEnum.Booster,
       1.1, // power
       99, // limit
+      Effect(FragmentTypeEnum.Booster),
     ),
   );
   Fragments.push(
@@ -317,9 +336,10 @@ export function FragmentById(id: number): Fragment | null {
         [_, X, X],
         [X, X, _],
       ],
-      FragmentType.Booster, // type
+      FragmentTypeEnum.Booster,
       1.1, // power
       99, // limit
+      Effect(FragmentTypeEnum.Booster),
     ),
   );
   Fragments.push(
@@ -331,9 +351,10 @@ export function FragmentById(id: number): Fragment | null {
         [X, X, X],
         [X, _, _],
       ],
-      FragmentType.Booster, // type
+      FragmentTypeEnum.Booster,
       1.1, // power
       99, // limit
+      Effect(FragmentTypeEnum.Booster),
     ),
   );
   Fragments.push(
@@ -345,12 +366,10 @@ export function FragmentById(id: number): Fragment | null {
         [X, X, X],
         [_, X, _],
       ],
-      FragmentType.Booster, // type
+      FragmentTypeEnum.Booster,
       1.1, // power
       99, // limit
+      Effect(FragmentTypeEnum.Booster),
     ),
   );
 })();
-
-export const NoneFragment = new Fragment(-2, [], FragmentType.None, 0, Infinity);
-export const DeleteFragment = new Fragment(-2, [], FragmentType.Delete, 0, Infinity);

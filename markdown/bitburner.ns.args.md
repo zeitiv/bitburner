@@ -6,17 +6,26 @@
 
 Arguments passed into the script.
 
-<b>Signature:</b>
+These arguments can be accessed as a normal array by using the `[]` operator (`args[0]`<!-- -->, `args[1]`<!-- -->, etc...). Arguments can be string, number, or boolean. Use `args.length` to get the number of arguments that were passed into a script.
+
+**Signature:**
 
 ```typescript
-readonly args: (string | number | boolean)[];
+readonly args: ScriptArg[];
 ```
 
-## Remarks
+## Example
 
-RAM cost: 0 GB
+`run example.js 7 text true`
 
-Arguments passed into a script can be accessed using a normal array using the \[\] operator (args\[0\], args\[1\], etc…).
-
-It is also possible to get the number of arguments that was passed into a script using: 'args.length' WARNING: Do not try to modify the args array. This will break the game.
+```js
+// example.js
+export async function main(ns) {
+  ns.tprint(ns.args.length) // 3
+  ns.tprint(ns.args[0]); // 7 (number)
+  ns.tprint(ns.args[1]); // "text" (string)
+  ns.tprint(ns.args[2]); // true (boolean)
+  ns.tprint(ns.args[3]); // undefined, because only 3 arguments were provided
+}
+```
 

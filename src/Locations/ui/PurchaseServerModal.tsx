@@ -1,46 +1,45 @@
-/**
- * React Component for the popup used to purchase a new server.
- */
 import React, { useState } from "react";
 import { purchaseServer } from "../../Server/ServerPurchases";
-import { numeralWrapper } from "../../ui/numeralFormat";
+import { formatRam } from "../../ui/formatNumber";
 import { Money } from "../../ui/React/Money";
 import { Modal } from "../../ui/React/Modal";
-import { use } from "../../ui/Context";
+import { Player } from "@player";
 import Typography from "@mui/material/Typography";
 import TextField from "@mui/material/TextField";
 import Button from "@mui/material/Button";
+import { KEY } from "../../utils/KeyboardEventKey";
 
 interface IProps {
   open: boolean;
   onClose: () => void;
   ram: number;
   cost: number;
-  rerender: () => void;
 }
 
+/** React Component for the popup used to purchase a new server. */
 export function PurchaseServerModal(props: IProps): React.ReactElement {
-  const player = use.Player();
   const [hostname, setHostname] = useState("");
 
   function tryToPurchaseServer(): void {
-    purchaseServer(hostname, props.ram, props.cost, player);
+    purchaseServer(hostname, props.ram);
     props.onClose();
   }
 
   function onKeyUp(event: React.KeyboardEvent<HTMLInputElement>): void {
-    if (event.keyCode === 13) tryToPurchaseServer();
+    if (event.key === KEY.ENTER) tryToPurchaseServer();
   }
 
   function onChange(event: React.ChangeEvent<HTMLInputElement>): void {
-    setHostname(event.target.value);
+    // Players may accidentally include whitespace in the hostname and later wonder why they cannot use the cloud APIs.
+    // For example, they intend the hostname to be "foobar", but type "foobar " or "foo bar" instead.
+    setHostname(event.target.value.replace(/\s+/g, ""));
   }
 
   return (
     <Modal open={props.open} onClose={props.onClose}>
       <Typography>
-        Would you like to purchase a new server with {numeralWrapper.formatRAM(props.ram)} of RAM for{" "}
-        <Money money={props.cost} player={player} />?
+        Would you like to purchase a new cloud server with {formatRam(props.ram)} of RAM for{" "}
+        <Money money={props.cost} forPurchase={true} />?
       </Typography>
       <br />
       <br />
@@ -55,7 +54,7 @@ export function PurchaseServerModal(props: IProps): React.ReactElement {
         placeholder="Unique Hostname"
         InputProps={{
           endAdornment: (
-            <Button onClick={tryToPurchaseServer} disabled={!player.canAfford(props.cost) || hostname === ""}>
+            <Button onClick={tryToPurchaseServer} disabled={!Player.canAfford(props.cost) || hostname === ""}>
               Buy
             </Button>
           ),

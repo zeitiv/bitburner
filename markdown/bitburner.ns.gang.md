@@ -4,15 +4,10 @@
 
 ## NS.gang property
 
-Namespace for gang functions.
+Namespace for [gang](./bitburner.gang.md) functions. Contains spoilers.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 readonly gang: Gang;
 ```
-
-## Remarks
-
-RAM cost: 0 GB
-

@@ -4,52 +4,87 @@
 
 ## NS.weaken() method
 
-Reduce a server security level.
+Reduce a server's security level.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-weaken(host: string, opts?: BasicHGWOptions): Promise<number>;
+weaken(host?: string, opts?: BasicHGWOptions): Promise<number>;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  host | string | Hostname of the target server to weaken. |
-|  opts | [BasicHGWOptions](./bitburner.basichgwoptions.md) | Optional parameters for configuring function behavior. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+host
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Hostname/IP of the target server to weaken. Optional. Defaults to current server if not provided.
+
+
+</td></tr>
+<tr><td>
+
+opts
+
+
+</td><td>
+
+[BasicHGWOptions](./bitburner.basichgwoptions.md)
+
+
+</td><td>
+
+_(Optional)_ Optional parameters for configuring function behavior.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 Promise&lt;number&gt;
 
-The amount by which the target server’s security level was decreased. This is equivalent to 0.05 multiplied by the number of script threads.
+A promise that resolves to the value by which security was reduced.
 
 ## Remarks
 
 RAM cost: 0.15 GB
 
-Use your hacking skills to attack a server’s security, lowering the server’s security level. The runtime for this command depends on your hacking level and the target server’s security level when this function is called. This function lowers the security level of the target server by 0.05.
+Use your hacking skills to attack a server’s security, lowering the server’s security level. The runtime for this function depends on your hacking level and the target server’s security level when this function is called.
 
-Like hack and grow, `weaken` can be called on any server, regardless of where the script is running. This command requires root access to the target server, but there is no required hacking level to run the command.
+This function usually lowers the security level of the target server by 0.05 per thread, and only in unusual situations does it do less. Use [weakenAnalyze](./bitburner.ns.weakenanalyze.md) to determine the exact value.
 
-## Example 1
+Like [hack](./bitburner.ns.hack.md) and [grow](./bitburner.ns.grow.md)<!-- -->, `weaken` can be called on any server, regardless of where the script is running. This function requires root access to the target server, but there is no required hacking level to run the function.
 
-
-```ts
-// NS1:
-var currentSecurity = getServerSecurityLevel("foodnstuff");
-currentSecurity = currentSecurity - weaken("foodnstuff");
-currentSecurity = currentSecurity - weaken("foodnstuff", { threads: 5 }); // Only use 5 threads to weaken
-```
-
-## Example 2
+## Example
 
 
-```ts
-// NS2:
+```js
 let currentSecurity = ns.getServerSecurityLevel("foodnstuff");
 currentSecurity -= await ns.weaken("foodnstuff");
-currentSecurity -= await ns.weaken("foodnstuff", { threads: 5 }); // Only use 5 threads to weaken
 ```
 

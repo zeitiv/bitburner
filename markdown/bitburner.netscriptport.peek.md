@@ -6,14 +6,14 @@
 
 Retrieve the first element from the port without removing it.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-peek(): string | number;
+peek(): any;
 ```
-<b>Returns:</b>
+**Returns:**
 
-string \| number
+any
 
 the data read
 

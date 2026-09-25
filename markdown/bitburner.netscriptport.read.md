@@ -6,14 +6,14 @@
 
 Shift an element out of the port.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-read(): string | number;
+read(): any;
 ```
-<b>Returns:</b>
+**Returns:**
 
-string \| number
+any
 
 the data read.
 

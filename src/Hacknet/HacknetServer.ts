@@ -1,12 +1,8 @@
-/**
- * Hacknet Servers - Reworked Hacknet Node mechanic for BitNode-9
- */
 import { CONSTANTS } from "../Constants";
 
 import { IHacknetNode } from "./IHacknetNode";
 
 import { BaseServer } from "../Server/BaseServer";
-import { RunningScript } from "../Script/RunningScript";
 import { HacknetServerConstants } from "./data/Constants";
 import {
   calculateHashGainRate,
@@ -16,20 +12,22 @@ import {
   calculateCacheUpgradeCost,
 } from "./formulas/HacknetServers";
 
+import { IPAddress } from "../Types/strings";
 import { createRandomIp } from "../utils/IPAddress";
 
-import { Generic_fromJSON, Generic_toJSON, Reviver } from "../utils/JSONReviver";
-import { IPlayer } from "../PersonObjects/IPlayer";
+import { IReviverValue, constructorsForReviver } from "../utils/JSONReviver";
+import { Player } from "@player";
 
-interface IConstructorParams {
+interface HacknetServerConstructorParams {
   adminRights?: boolean;
   hostname: string;
-  ip?: string;
+  ip?: IPAddress;
   isConnectedTo?: boolean;
   maxRam?: number;
   organizationName?: string;
 }
 
+/** Hacknet Servers - Reworked Hacknet Node mechanic for BitNode-9 */
 export class HacknetServer extends BaseServer implements IHacknetNode {
   // Cache level. Affects hash Capacity
   cache = 1;
@@ -52,10 +50,12 @@ export class HacknetServer extends BaseServer implements IHacknetNode {
   // Total number of hashes earned by this server
   totalHashesGenerated = 0;
 
-  // Flag indicating wehther this is a purchased server
+  // Flag indicating whether this is a server owned by the player (e.g., home, cloud servers, hacknet servers)
   purchasedByPlayer = true;
 
-  constructor(params: IConstructorParams = { hostname: "", ip: createRandomIp() }) {
+  isHacknetServer = true;
+
+  constructor(params: HacknetServerConstructorParams = { hostname: "", ip: createRandomIp() }) {
     super(params);
 
     this.maxRam = 1;
@@ -106,26 +106,16 @@ export class HacknetServer extends BaseServer implements IHacknetNode {
   }
 
   upgradeRam(levels: number, prodMult: number): boolean {
-    for (let i = 0; i < levels; ++i) {
-      this.maxRam *= 2;
-    }
+    this.maxRam *= Math.pow(2, levels);
     this.maxRam = Math.min(HacknetServerConstants.MaxRam, Math.round(this.maxRam));
     this.updateHashRate(prodMult);
 
     return true;
   }
 
-  // Whenever a script is run, we must update this server's hash rate
-  runScript(script: RunningScript, prodMult?: number): void {
-    super.runScript(script);
-    if (prodMult != null && typeof prodMult === "number") {
-      this.updateHashRate(prodMult);
-    }
-  }
-
-  updateRamUsed(ram: number, player: IPlayer): void {
-    super.updateRamUsed(ram, player);
-    this.updateHashRate(player.hacknet_node_money_mult);
+  updateRamUsed(ram: number): void {
+    super.updateRamUsed(ram);
+    this.updateHashRate(Player.mults.hacknet_node_money);
   }
 
   updateHashCapacity(): void {
@@ -145,15 +135,15 @@ export class HacknetServer extends BaseServer implements IHacknetNode {
   }
 
   // Serialize the current object to a JSON save state
-  toJSON(): any {
-    return Generic_toJSON("HacknetServer", this);
+  toJSON(): IReviverValue {
+    return this.toJSONBase("HacknetServer", includedKeys);
   }
 
   // Initializes a HacknetServer Object from a JSON save state
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-  static fromJSON(value: any): HacknetServer {
-    return Generic_fromJSON(HacknetServer, value.data);
+  static fromJSON(value: IReviverValue): HacknetServer {
+    return BaseServer.fromJSONBase(value, HacknetServer, includedKeys);
   }
 }
+const includedKeys = BaseServer.getIncludedKeys(HacknetServer);
 
-Reviver.constructors.HacknetServer = HacknetServer;
+constructorsForReviver.HacknetServer = HacknetServer;

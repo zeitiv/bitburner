@@ -6,7 +6,7 @@
 
 Get chance to win clash with other gang.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 getChanceToWinClash(gangName: string): number;
@@ -14,11 +14,41 @@ getChanceToWinClash(gangName: string): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  gangName | string | Target gang |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+gangName
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Target gang
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 
@@ -28,5 +58,5 @@ Chance you have to win a clash with the specified gang.
 
 RAM cost: 4 GB
 
-Returns the chance you have to win a clash with the specified gang. The chance is returned in decimal form, not percentage
+Returns the chance you have to win a clash with the specified gang. The chance is returned in the range 0-1.
 

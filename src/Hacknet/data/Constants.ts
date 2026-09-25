@@ -1,27 +1,8 @@
-export const HacknetNodeConstants: {
-  // Constants for Hacknet Node production
-  MoneyGainPerLevel: number;
-
-  // Constants for Hacknet Node purchase/upgrade costs
-  BaseCost: number;
-  LevelBaseCost: number;
-  RamBaseCost: number;
-  CoreBaseCost: number;
-
-  PurchaseNextMult: number;
-  UpgradeLevelMult: number;
-  UpgradeRamMult: number;
-  UpgradeCoreMult: number;
-
-  // Constants for max upgrade levels for Hacknet Nodes
-  MaxLevel: number;
-  MaxRam: number;
-  MaxCores: number;
-} = {
+export const HacknetNodeConstants = {
   MoneyGainPerLevel: 1.5,
 
   BaseCost: 1000,
-  LevelBaseCost: 1,
+  LevelBaseCost: 500,
   RamBaseCost: 30e3,
   CoreBaseCost: 500e3,
 
@@ -33,7 +14,7 @@ export const HacknetNodeConstants: {
   MaxLevel: 200,
   MaxRam: 64,
   MaxCores: 16,
-};
+} as const;
 
 export const PurchaseMultipliers: {
   [key: string]: number | "MAX" | undefined;
@@ -48,29 +29,7 @@ export const PurchaseMultipliers: {
   MAX: "MAX",
 };
 
-export const HacknetServerConstants: {
-  // Constants for Hacknet Server stats/production
-  HashesPerLevel: number;
-
-  // Constants for Hacknet Server purchase/upgrade costs
-  BaseCost: number;
-  RamBaseCost: number;
-  CoreBaseCost: number;
-  CacheBaseCost: number;
-
-  PurchaseMult: number; // Multiplier for puchasing an additional Hacknet Server
-  UpgradeLevelMult: number; // Multiplier for cost when upgrading level
-  UpgradeRamMult: number; // Multiplier for cost when upgrading RAM
-  UpgradeCoreMult: number; // Multiplier for cost when buying another core
-  UpgradeCacheMult: number; // Multiplier for cost when upgrading cache
-  MaxServers: number; // Max number of Hacknet Servers you can own
-
-  // Constants for max upgrade levels for Hacknet Server
-  MaxLevel: number;
-  MaxRam: number;
-  MaxCores: number;
-  MaxCache: number;
-} = {
+export const HacknetServerConstants = {
   HashesPerLevel: 0.001,
 
   BaseCost: 50e3,
@@ -90,4 +49,4 @@ export const HacknetServerConstants: {
   MaxRam: 8192,
   MaxCores: 128,
   MaxCache: 15,
-};
+} as const;

@@ -1,22 +1,9 @@
-import { ITerminal } from "../ITerminal";
-import { IRouter } from "../../ui/Router";
-import { IPlayer } from "../../PersonObjects/IPlayer";
-import { BaseServer } from "../../Server/BaseServer";
+import { Terminal } from "../../Terminal";
 
-export function home(
-  terminal: ITerminal,
-  router: IRouter,
-  player: IPlayer,
-  server: BaseServer,
-  args: (string | number | boolean)[],
-): void {
+export function home(args: (string | number | boolean)[]): void {
   if (args.length !== 0) {
-    terminal.error("Incorrect usage of home command. Usage: home");
+    Terminal.error("Incorrect usage of home command. Usage: home");
     return;
   }
-  player.getCurrentServer().isConnectedTo = false;
-  player.currentServer = player.getHomeComputer().hostname;
-  player.getCurrentServer().isConnectedTo = true;
-  terminal.print("Connected to home");
-  terminal.setcwd("/");
+  Terminal.connectToServer("home");
 }

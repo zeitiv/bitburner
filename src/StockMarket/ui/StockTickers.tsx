@@ -10,35 +10,14 @@ import { StockTickersConfig, TickerDisplayMode } from "./StockTickersConfig";
 
 import { IStockMarket } from "../IStockMarket";
 import { Stock } from "../Stock";
-import { OrderTypes } from "../data/OrderTypes";
-import { PositionTypes } from "../data/PositionTypes";
+import { useRerender } from "../../ui/React/hooks";
 
-import { IPlayer } from "../../PersonObjects/IPlayer";
-import { EventEmitter } from "../../utils/EventEmitter";
-
-type txFn = (stock: Stock, shares: number) => boolean;
-type placeOrderFn = (
-  stock: Stock,
-  shares: number,
-  price: number,
-  ordType: OrderTypes,
-  posType: PositionTypes,
-) => boolean;
-
-type IProps = {
-  buyStockLong: txFn;
-  buyStockShort: txFn;
-  cancelOrder: (params: any) => void;
-  eventEmitterForReset?: EventEmitter<[]>;
-  p: IPlayer;
-  placeOrder: placeOrderFn;
-  sellStockLong: txFn;
-  sellStockShort: txFn;
+interface IProps {
   stockMarket: IStockMarket;
-};
+}
 
 export function StockTickers(props: IProps): React.ReactElement {
-  const setRerender = useState(false)[1];
+  const rerender = useRerender();
   const [tickerDisplayMode, setTickerDisplayMode] = useState(TickerDisplayMode.AllStocks);
   const [watchlistSymbols, setWatchlistSymbols] = useState<string[]>([]);
 
@@ -61,15 +40,11 @@ export function StockTickers(props: IProps): React.ReactElement {
     }
   }
 
-  function rerender(): void {
-    setRerender((old) => !old);
-  }
-
   const tickers: React.ReactElement[] = [];
   for (const stockMarketProp of Object.keys(props.stockMarket)) {
     const val = props.stockMarket[stockMarketProp];
     if (val instanceof Stock) {
-      // Skip if there's a filter and the stock isnt in that filter
+      // Skip if there's a filter and the stock isn't in that filter
       if (watchlistSymbols.length > 0 && !watchlistSymbols.includes(val.symbol)) {
         continue;
       }
@@ -79,28 +54,14 @@ export function StockTickers(props: IProps): React.ReactElement {
         orders = [];
       }
 
-      // Skip if we're in portfolio mode and the player doesnt own this or have any active orders
+      // Skip if we're in portfolio mode and the player doesn't own this or have any active orders
       if (tickerDisplayMode === TickerDisplayMode.Portfolio) {
         if (val.playerShares === 0 && val.playerShortShares === 0 && orders.length === 0) {
           continue;
         }
       }
 
-      tickers.push(
-        <StockTicker
-          buyStockLong={props.buyStockLong}
-          buyStockShort={props.buyStockShort}
-          cancelOrder={props.cancelOrder}
-          key={val.symbol}
-          orders={orders}
-          p={props.p}
-          placeOrder={props.placeOrder}
-          rerenderAllTickers={rerender}
-          sellStockLong={props.sellStockLong}
-          sellStockShort={props.sellStockShort}
-          stock={val}
-        />,
-      );
+      tickers.push(<StockTicker key={val.symbol} orders={orders} rerenderAllTickers={rerender} stock={val} />);
     }
   }
 

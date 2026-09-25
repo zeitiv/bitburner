@@ -6,18 +6,129 @@
 
 A single process on a server.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-export interface ProcessInfo 
+interface ProcessInfo 
 ```
 
 ## Properties
 
-|  Property | Type | Description |
-|  --- | --- | --- |
-|  [args](./bitburner.processinfo.args.md) | string\[\] | Script's arguments |
-|  [filename](./bitburner.processinfo.filename.md) | string | Script name. |
-|  [pid](./bitburner.processinfo.pid.md) | number | Process ID |
-|  [threads](./bitburner.processinfo.threads.md) | number | Number of threads script is running with |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[args](./bitburner.processinfo.args.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[ScriptArg](./bitburner.scriptarg.md)<!-- -->\[\]
+
+
+</td><td>
+
+Script's arguments
+
+
+</td></tr>
+<tr><td>
+
+[filename](./bitburner.processinfo.filename.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Script name.
+
+
+</td></tr>
+<tr><td>
+
+[pid](./bitburner.processinfo.pid.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Process ID
+
+
+</td></tr>
+<tr><td>
+
+[temporary](./bitburner.processinfo.temporary.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Whether this process is excluded from saves
+
+
+</td></tr>
+<tr><td>
+
+[threads](./bitburner.processinfo.threads.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Number of threads script is running with
+
+
+</td></tr>
+</tbody></table>
 

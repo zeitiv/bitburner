@@ -6,20 +6,85 @@
 
 Get estimate success chance of an action.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getActionEstimatedSuccessChance(type: string, name: string): [number, number];
+getActionEstimatedSuccessChance(
+    type: BladeburnerActionType,
+    name: BladeburnerActionName,
+    sleeveNumber?: number,
+  ): [number, number];
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  type | string | Type of action. |
-|  name | string | Name of action. Must be an exact match. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+type
+
+
+</td><td>
+
+[BladeburnerActionType](./bitburner.bladeburneractiontype.md)
+
+
+</td><td>
+
+Type of action.
+
+
+</td></tr>
+<tr><td>
+
+name
+
+
+</td><td>
+
+[BladeburnerActionName](./bitburner.bladeburneractionname.md)
+
+
+</td><td>
+
+Name of action. Must be an exact match.
+
+
+</td></tr>
+<tr><td>
+
+sleeveNumber
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Optional. Index of the sleeve to retrieve information.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 \[number, number\]
 
@@ -29,5 +94,5 @@ Estimated success chance for the specified action.
 
 RAM cost: 4 GB
 
-Returns the estimated success chance for the specified action. This chance is returned as a decimal value, NOT a percentage (e.g. if you have an estimated success chance of 80%, then this function will return 0.80, NOT 80).
+Returns the estimated success chance for the specified action. This chance is returned in the range 0-1. (e.g. if you have an estimated success chance of 80%, then this function will return 0.8, NOT 80). Returns 2 values, value\[0\] - MIN Chance, value\[1\] - MAX Chance
 

@@ -1,6 +1,3 @@
-/**
- * React Component for a single stock ticker in the Stock Market UI
- */
 import React, { useState } from "react";
 
 import { StockTickerHeaderText } from "./StockTickerHeaderText";
@@ -12,12 +9,12 @@ import { PlaceOrderModal } from "./PlaceOrderModal";
 import { Order } from "../Order";
 import { Stock } from "../Stock";
 import { getBuyTransactionCost, getSellTransactionGain, calculateBuyMaxAmount } from "../StockMarketHelpers";
-import { OrderTypes } from "../data/OrderTypes";
-import { PositionTypes } from "../data/PositionTypes";
+import { PositionType, OrderType } from "@enums";
+import { placeOrder } from "../StockMarket";
+import { buyStock, shortStock, sellStock, sellShort } from "../BuyingAndSelling";
 
-import { IPlayer } from "../../PersonObjects/IPlayer";
-import { SourceFileFlags } from "../../SourceFile/SourceFileFlags";
-import { numeralWrapper } from "../../ui/numeralFormat";
+import { Player } from "@player";
+import { formatShares } from "../../ui/formatNumber";
 import { Money } from "../../ui/React/Money";
 
 import { dialogBoxCreate } from "../../ui/React/DialogBox";
@@ -39,31 +36,16 @@ enum SelectorOrderType {
   Stop = "Stop Order",
 }
 
-type txFn = (stock: Stock, shares: number) => boolean;
-type placeOrderFn = (
-  stock: Stock,
-  shares: number,
-  price: number,
-  ordType: OrderTypes,
-  posType: PositionTypes,
-) => boolean;
-
-type IProps = {
-  buyStockLong: txFn;
-  buyStockShort: txFn;
-  cancelOrder: (params: any) => void;
+interface IProps {
   orders: Order[];
-  p: IPlayer;
-  placeOrder: placeOrderFn;
   rerenderAllTickers: () => void;
-  sellStockLong: txFn;
-  sellStockShort: txFn;
   stock: Stock;
-};
+}
 
+/** React Component for a single stock ticker in the Stock Market UI */
 export function StockTicker(props: IProps): React.ReactElement {
   const [orderType, setOrderType] = useState(SelectorOrderType.Market);
-  const [position, setPosition] = useState(PositionTypes.Long);
+  const [position, setPosition] = useState(PositionType.Long);
   const [qty, setQty] = useState("");
   const [open, setOpen] = useState(false);
   const [tickerOpen, setTicketOpen] = useState(false);
@@ -92,7 +74,7 @@ export function StockTicker(props: IProps): React.ReactElement {
 
     return (
       <>
-        Purchasing {numeralWrapper.formatShares(qty)} shares ({position === PositionTypes.Long ? "Long" : "Short"}
+        Purchasing {formatShares(qty)} shares ({position === PositionType.Long ? "Long" : "Short"}
         ) will cost <Money money={cost} />.
       </>
     );
@@ -109,14 +91,12 @@ export function StockTicker(props: IProps): React.ReactElement {
       return null;
     }
 
-    if (position === PositionTypes.Long) {
+    if (position === PositionType.Long) {
       if (qty > stock.playerShares) {
         return <>You do not have this many shares in the Long position</>;
       }
-    } else {
-      if (qty > stock.playerShortShares) {
-        return <>You do not have this many shares in the Short position</>;
-      }
+    } else if (qty > stock.playerShortShares) {
+      return <>You do not have this many shares in the Short position</>;
     }
 
     const cost = getSellTransactionGain(stock, qty, position);
@@ -126,8 +106,8 @@ export function StockTicker(props: IProps): React.ReactElement {
 
     return (
       <>
-        Selling {numeralWrapper.formatShares(qty)} shares ({position === PositionTypes.Long ? "Long" : "Short"}) will
-        result in a gain of <Money money={cost} />.
+        Selling {formatShares(qty)} shares ({position === PositionType.Long ? "Long" : "Short"}) will result in a gain
+        of <Money money={cost} />.
       </>
     );
   }
@@ -141,10 +121,10 @@ export function StockTicker(props: IProps): React.ReactElement {
 
     switch (orderType) {
       case SelectorOrderType.Market: {
-        if (position === PositionTypes.Short) {
-          props.buyStockShort(props.stock, shares);
+        if (position === PositionType.Short) {
+          shortStock(props.stock, shares);
         } else {
-          props.buyStockLong(props.stock, shares);
+          buyStock(props.stock, shares);
         }
         props.rerenderAllTickers();
         break;
@@ -154,7 +134,7 @@ export function StockTicker(props: IProps): React.ReactElement {
         setModalProps({
           text: "Enter the price for your Limit Order",
           placeText: "Place Buy Limit Order",
-          place: (price: number) => props.placeOrder(props.stock, shares, price, OrderTypes.LimitBuy, position),
+          place: (price: number) => placeOrder(props.stock, shares, price, OrderType.LimitBuy, position),
         });
         break;
       }
@@ -163,7 +143,7 @@ export function StockTicker(props: IProps): React.ReactElement {
         setModalProps({
           text: "Enter the price for your Stop Order",
           placeText: "Place Buy Stop Order",
-          place: (price: number) => props.placeOrder(props.stock, shares, price, OrderTypes.StopBuy, position),
+          place: (price: number) => placeOrder(props.stock, shares, price, OrderType.StopBuy, position),
         });
         break;
       }
@@ -173,7 +153,7 @@ export function StockTicker(props: IProps): React.ReactElement {
   }
 
   function handleBuyMaxButtonClick(): void {
-    const playerMoney: number = props.p.money;
+    const playerMoney: number = Player.money;
 
     const stock = props.stock;
     let maxShares = calculateBuyMaxAmount(stock, position, playerMoney);
@@ -181,10 +161,10 @@ export function StockTicker(props: IProps): React.ReactElement {
 
     switch (orderType) {
       case SelectorOrderType.Market: {
-        if (position === PositionTypes.Short) {
-          props.buyStockShort(stock, maxShares);
+        if (position === PositionType.Short) {
+          shortStock(stock, maxShares);
         } else {
-          props.buyStockLong(stock, maxShares);
+          buyStock(stock, maxShares);
         }
         props.rerenderAllTickers();
         break;
@@ -196,10 +176,10 @@ export function StockTicker(props: IProps): React.ReactElement {
     }
   }
 
-  function handleOrderTypeChange(e: SelectChangeEvent<string>): void {
+  function handleOrderTypeChange(e: SelectChangeEvent): void {
     const val = e.target.value;
 
-    // The select value returns a string. Afaik TypeScript doesnt make it easy
+    // The select value returns a string. Afaik TypeScript doesn't make it easy
     // to convert that string back to an enum type so we'll just do this for now
     switch (val) {
       case SelectorOrderType.Limit:
@@ -214,13 +194,13 @@ export function StockTicker(props: IProps): React.ReactElement {
     }
   }
 
-  function handlePositionTypeChange(e: SelectChangeEvent<string>): void {
+  function handlePositionTypeChange(e: SelectChangeEvent): void {
     const val = e.target.value;
 
-    if (val === PositionTypes.Short) {
-      setPosition(PositionTypes.Short);
+    if (val === PositionType.Short) {
+      setPosition(PositionType.Short);
     } else {
-      setPosition(PositionTypes.Long);
+      setPosition(PositionType.Long);
     }
   }
 
@@ -237,10 +217,10 @@ export function StockTicker(props: IProps): React.ReactElement {
 
     switch (orderType) {
       case SelectorOrderType.Market: {
-        if (position === PositionTypes.Short) {
-          props.sellStockShort(props.stock, shares);
+        if (position === PositionType.Short) {
+          sellShort(props.stock, shares);
         } else {
-          props.sellStockLong(props.stock, shares);
+          sellStock(props.stock, shares);
         }
         props.rerenderAllTickers();
         break;
@@ -250,7 +230,7 @@ export function StockTicker(props: IProps): React.ReactElement {
         setModalProps({
           text: "Enter the price for your Limit Order",
           placeText: "Place Sell Limit Order",
-          place: (price: number) => props.placeOrder(props.stock, shares, price, OrderTypes.LimitSell, position),
+          place: (price: number) => placeOrder(props.stock, shares, price, OrderType.LimitSell, position),
         });
         break;
       }
@@ -259,7 +239,7 @@ export function StockTicker(props: IProps): React.ReactElement {
         setModalProps({
           text: "Enter the price for your Stop Order",
           placeText: "Place Sell Stop Order",
-          place: (price: number) => props.placeOrder(props.stock, shares, price, OrderTypes.StopSell, position),
+          place: (price: number) => placeOrder(props.stock, shares, price, OrderType.StopSell, position),
         });
         break;
       }
@@ -273,10 +253,10 @@ export function StockTicker(props: IProps): React.ReactElement {
 
     switch (orderType) {
       case SelectorOrderType.Market: {
-        if (position === PositionTypes.Short) {
-          props.sellStockShort(stock, stock.playerShortShares);
+        if (position === PositionType.Short) {
+          sellShort(stock, stock.playerShortShares);
         } else {
-          props.sellStockLong(stock, stock.playerShares);
+          sellStock(stock, stock.playerShares);
         }
         props.rerenderAllTickers();
         break;
@@ -290,18 +270,18 @@ export function StockTicker(props: IProps): React.ReactElement {
 
   // Whether the player has access to orders besides market orders (limit/stop)
   function hasOrderAccess(): boolean {
-    return props.p.bitNodeN === 8 || SourceFileFlags[8] >= 3;
+    return Player.bitNodeN === 8 || Player.activeSourceFileLvl(8) >= 3;
   }
 
   // Whether the player has access to shorting stocks
   function hasShortAccess(): boolean {
-    return props.p.bitNodeN === 8 || SourceFileFlags[8] >= 2;
+    return Player.bitNodeN === 8 || Player.activeSourceFileLvl(8) >= 2;
   }
 
   return (
     <Box component={Paper}>
       <ListItemButton onClick={() => setTicketOpen((old) => !old)}>
-        <ListItemText primary={<StockTickerHeaderText p={props.p} stock={props.stock} />} />
+        <ListItemText primary={<StockTickerHeaderText stock={props.stock} />} />
         {tickerOpen ? <ExpandLess color="primary" /> : <ExpandMore color="primary" />}
       </ListItemButton>
       <Collapse in={tickerOpen} unmountOnExit>
@@ -309,8 +289,8 @@ export function StockTicker(props: IProps): React.ReactElement {
           <Box display="flex" alignItems="center">
             <TextField onChange={handleQuantityChange} placeholder="Quantity (Shares)" value={qty} />
             <Select onChange={handlePositionTypeChange} value={position}>
-              <MenuItem value={PositionTypes.Long}>Long</MenuItem>
-              {hasShortAccess() && <MenuItem value={PositionTypes.Short}>Short</MenuItem>}
+              <MenuItem value={PositionType.Long}>Long</MenuItem>
+              {hasShortAccess() && <MenuItem value={PositionType.Short}>Short</MenuItem>}
             </Select>
             <Select onChange={handleOrderTypeChange} value={orderType}>
               <MenuItem value={SelectorOrderType.Market}>{SelectorOrderType.Market}</MenuItem>
@@ -327,8 +307,8 @@ export function StockTicker(props: IProps): React.ReactElement {
             <StockTickerTxButton onClick={handleBuyMaxButtonClick} text={"Buy MAX"} />
             <StockTickerTxButton onClick={handleSellAllButtonClick} text={"Sell ALL"} />
           </Box>
-          <StockTickerPositionText p={props.p} stock={props.stock} />
-          <StockTickerOrderList cancelOrder={props.cancelOrder} orders={props.orders} p={props.p} stock={props.stock} />
+          <StockTickerPositionText stock={props.stock} />
+          <StockTickerOrderList orders={props.orders} stock={props.stock} />
 
           <PlaceOrderModal
             text={modalProps.text}

@@ -1,30 +1,44 @@
-import React, { useState } from "react";
-import { Sleeve } from "../Sleeve";
-import { IPlayer } from "../../IPlayer";
-import { SleeveTaskType } from "../SleeveTaskTypesEnum";
-import { Crimes } from "../../../Crime/Crimes";
-import { LocationName } from "../../../Locations/data/LocationNames";
-import { CityName } from "../../../Locations/data/CityNames";
-import { Factions } from "../../../Faction/Factions";
-import { FactionWorkType } from "../../../Faction/FactionWorkTypeEnum";
-import Select, { SelectChangeEvent } from "@mui/material/Select";
-import MenuItem from "@mui/material/MenuItem";
+import type { Sleeve } from "../Sleeve";
 
-const universitySelectorOptions: string[] = [
-  "Study Computer Science",
-  "Data Structures",
-  "Networks",
-  "Algorithms",
-  "Management",
-  "Leadership",
-];
+import React from "react";
+import { MenuItem, Select, SelectChangeEvent } from "@mui/material";
+
+import { Player } from "@player";
+import {
+  BladeburnerActionType,
+  BladeburnerContractName,
+  BladeburnerGeneralActionName,
+  CityName,
+  FactionName,
+  LocationName,
+  SpecialBladeburnerActionTypeForSleeve,
+  UniversityClassType,
+} from "@enums";
+import { Crimes } from "../../../Crime/Crimes";
+import { Factions } from "../../../Faction/Factions";
+import { getEnumHelper } from "../../../utils/EnumHelper";
+import { SleeveWorkType } from "../Work/Work";
+import { getRecordKeys } from "../../../Types/Record";
+
+const universitySelectorOptions = Object.values(UniversityClassType);
 
 const gymSelectorOptions: string[] = ["Train Strength", "Train Defense", "Train Dexterity", "Train Agility"];
 
+const bladeburnerSelectorOptions: string[] = [
+  BladeburnerGeneralActionName.Training,
+  BladeburnerGeneralActionName.FieldAnalysis,
+  BladeburnerGeneralActionName.Recruitment,
+  BladeburnerGeneralActionName.Diplomacy,
+  BladeburnerGeneralActionName.HyperbolicRegen,
+  SpecialBladeburnerActionTypeForSleeve.InfiltrateSynthoids,
+  SpecialBladeburnerActionTypeForSleeve.SupportMainSleeve,
+  SpecialBladeburnerActionTypeForSleeve.TakeOnContracts,
+];
+
 interface IProps {
   sleeve: Sleeve;
-  player: IPlayer;
-  setABC: (abc: string[]) => void;
+  abc: [string, string, string];
+  setABC: (abc: [string, string, string]) => void;
 }
 
 interface ITaskDetails {
@@ -32,79 +46,102 @@ interface ITaskDetails {
   second: (s1: string) => string[];
 }
 
-function possibleJobs(player: IPlayer, sleeve: Sleeve): string[] {
+function possibleJobs(sleeve: Sleeve): string[] {
   // Array of all companies that other sleeves are working at
-  const forbiddenCompanies = [];
-  for (const otherSleeve of player.sleeves) {
+  const forbiddenCompanies: string[] = [];
+  for (const otherSleeve of Player.sleeves) {
     if (sleeve === otherSleeve) {
       continue;
     }
-    if (otherSleeve.currentTask === SleeveTaskType.Company) {
-      forbiddenCompanies.push(otherSleeve.currentTaskLocation);
+    if (otherSleeve.currentWork?.type === SleeveWorkType.COMPANY) {
+      forbiddenCompanies.push(otherSleeve.currentWork.companyName);
     }
   }
-  const allJobs: string[] = Object.keys(player.jobs);
-  for (let i = 0; i < allJobs.length; ++i) {
-    if (!forbiddenCompanies.includes(allJobs[i])) {
-      allJobs[i];
-    }
-  }
+  const allJobs: string[] = Object.keys(Player.jobs);
 
-  return allJobs;
+  return allJobs.filter((company) => !forbiddenCompanies.includes(company));
 }
 
-function possibleFactions(player: IPlayer, sleeve: Sleeve): string[] {
+function possibleFactions(sleeve: Sleeve): string[] {
   // Array of all factions that other sleeves are working for
-  const forbiddenFactions = ["Bladeburners"];
-  if (player.gang) {
-    forbiddenFactions.push(player.gang.facName);
+  const forbiddenFactions = [FactionName.Bladeburners as string, FactionName.ShadowsOfAnarchy as string];
+  if (Player.gang) {
+    forbiddenFactions.push(Player.gang.facName);
   }
-  for (const otherSleeve of player.sleeves) {
+  for (const otherSleeve of Player.sleeves) {
     if (sleeve === otherSleeve) {
       continue;
     }
-    if (otherSleeve.currentTask === SleeveTaskType.Faction) {
-      forbiddenFactions.push(otherSleeve.currentTaskLocation);
+    if (otherSleeve.currentWork?.type === SleeveWorkType.FACTION) {
+      forbiddenFactions.push(otherSleeve.currentWork.factionName);
     }
   }
 
   const factions = [];
-  for (const fac of player.factions) {
+  for (const fac of Player.factions) {
     if (!forbiddenFactions.includes(fac)) {
       factions.push(fac);
     }
   }
 
-  return factions;
+  return factions.filter((faction) => {
+    const factionObj = Factions[faction];
+    if (!factionObj) return false;
+    const facInfo = factionObj.getInfo();
+    return facInfo.offerHackingWork || facInfo.offerFieldWork || facInfo.offerSecurityWork;
+  });
+}
+
+function possibleContracts(sleeve: Sleeve): BladeburnerContractName[] | ["------"] {
+  const bb = Player.bladeburner;
+  if (bb === null) {
+    return ["------"];
+  }
+  let contracts = Object.values(BladeburnerContractName);
+  for (const otherSleeve of Player.sleeves) {
+    if (sleeve === otherSleeve) {
+      continue;
+    }
+    if (
+      otherSleeve.currentWork?.type === SleeveWorkType.BLADEBURNER &&
+      otherSleeve.currentWork.actionId.type === BladeburnerActionType.Contract
+    ) {
+      const w = otherSleeve.currentWork;
+      contracts = contracts.filter((x) => x != w.actionId.name);
+    }
+  }
+  return contracts;
 }
 
 const tasks: {
-  [key: string]: undefined | ((player: IPlayer, sleeve: Sleeve) => ITaskDetails);
-  ["------"]: (player: IPlayer, sleeve: Sleeve) => ITaskDetails;
-  ["Work for Company"]: (player: IPlayer, sleeve: Sleeve) => ITaskDetails;
-  ["Work for Faction"]: (player: IPlayer, sleeve: Sleeve) => ITaskDetails;
-  ["Commit Crime"]: (player: IPlayer, sleeve: Sleeve) => ITaskDetails;
-  ["Take University Course"]: (player: IPlayer, sleeve: Sleeve) => ITaskDetails;
-  ["Workout at Gym"]: (player: IPlayer, sleeve: Sleeve) => ITaskDetails;
-  ["Shock Recovery"]: (player: IPlayer, sleeve: Sleeve) => ITaskDetails;
-  ["Synchronize"]: (player: IPlayer, sleeve: Sleeve) => ITaskDetails;
+  [key: string]: undefined | ((sleeve: Sleeve) => ITaskDetails);
+  ["Idle"]: (sleeve: Sleeve) => ITaskDetails;
+  ["Work for Company"]: (sleeve: Sleeve) => ITaskDetails;
+  ["Work for Faction"]: (sleeve: Sleeve) => ITaskDetails;
+  ["Commit Crime"]: (sleeve: Sleeve) => ITaskDetails;
+  ["Take University Course"]: (sleeve: Sleeve) => ITaskDetails;
+  ["Workout at Gym"]: (sleeve: Sleeve) => ITaskDetails;
+  ["Perform Bladeburner Actions"]: (sleeve: Sleeve) => ITaskDetails;
+  ["Shock Recovery"]: (sleeve: Sleeve) => ITaskDetails;
+  ["Synchronize"]: (sleeve: Sleeve) => ITaskDetails;
 } = {
-  "------": (): ITaskDetails => {
+  Idle: (): ITaskDetails => {
     return { first: ["------"], second: () => ["------"] };
   },
-  "Work for Company": (player: IPlayer, sleeve: Sleeve): ITaskDetails => {
-    let jobs = possibleJobs(player, sleeve);
+  "Work for Company": (sleeve: Sleeve): ITaskDetails => {
+    let jobs = possibleJobs(sleeve);
 
     if (jobs.length === 0) jobs = ["------"];
     return { first: jobs, second: () => ["------"] };
   },
-  "Work for Faction": (player: IPlayer, sleeve: Sleeve): ITaskDetails => {
-    let factions = possibleFactions(player, sleeve);
+  "Work for Faction": (sleeve: Sleeve): ITaskDetails => {
+    let factions = possibleFactions(sleeve);
     if (factions.length === 0) factions = ["------"];
 
     return {
       first: factions,
-      second: (s1: string) => {
+      second: (s1) => {
+        if (!getEnumHelper("FactionName").isMember(s1)) return ["------"];
         const faction = Factions[s1];
         const facInfo = faction.getInfo();
         const options: string[] = [];
@@ -122,9 +159,9 @@ const tasks: {
     };
   },
   "Commit Crime": (): ITaskDetails => {
-    return { first: Object.values(Crimes).map((crime) => crime.name), second: () => ["------"] };
+    return { first: Object.keys(Crimes), second: () => ["------"] };
   },
-  "Take University Course": (player: IPlayer, sleeve: Sleeve): ITaskDetails => {
+  "Take University Course": (sleeve: Sleeve): ITaskDetails => {
     let universities: string[] = [];
     switch (sleeve.city) {
       case CityName.Aevum:
@@ -143,7 +180,7 @@ const tasks: {
 
     return { first: universitySelectorOptions, second: () => universities };
   },
-  "Workout at Gym": (player: IPlayer, sleeve: Sleeve): ITaskDetails => {
+  "Workout at Gym": (sleeve: Sleeve): ITaskDetails => {
     let gyms: string[] = [];
     switch (sleeve.city) {
       case CityName.Aevum:
@@ -162,6 +199,18 @@ const tasks: {
 
     return { first: gymSelectorOptions, second: () => gyms };
   },
+  "Perform Bladeburner Actions": (sleeve: Sleeve): ITaskDetails => {
+    return {
+      first: bladeburnerSelectorOptions,
+      second: (s1: string) => {
+        if (s1 === SpecialBladeburnerActionTypeForSleeve.TakeOnContracts) {
+          return possibleContracts(sleeve);
+        } else {
+          return ["------"];
+        }
+      },
+    };
+  },
   "Shock Recovery": (): ITaskDetails => {
     return { first: ["------"], second: () => ["------"] };
   },
@@ -170,112 +219,62 @@ const tasks: {
   },
 };
 
-const canDo: {
-  [key: string]: undefined | ((player: IPlayer, sleeve: Sleeve) => boolean);
-  ["------"]: (player: IPlayer, sleeve: Sleeve) => boolean;
-  ["Work for Company"]: (player: IPlayer, sleeve: Sleeve) => boolean;
-  ["Work for Faction"]: (player: IPlayer, sleeve: Sleeve) => boolean;
-  ["Commit Crime"]: (player: IPlayer, sleeve: Sleeve) => boolean;
-  ["Take University Course"]: (player: IPlayer, sleeve: Sleeve) => boolean;
-  ["Workout at Gym"]: (player: IPlayer, sleeve: Sleeve) => boolean;
-  ["Shock Recovery"]: (player: IPlayer, sleeve: Sleeve) => boolean;
-  ["Synchronize"]: (player: IPlayer, sleeve: Sleeve) => boolean;
-} = {
-  "------": () => true,
-  "Work for Company": (player: IPlayer, sleeve: Sleeve) => possibleJobs(player, sleeve).length > 0,
-  "Work for Faction": (player: IPlayer, sleeve: Sleeve) => possibleFactions(player, sleeve).length > 0,
+const canDo = {
+  Idle: () => true,
+  "Work for Company": (sleeve: Sleeve) => possibleJobs(sleeve).length > 0,
+  "Work for Faction": (sleeve: Sleeve) => possibleFactions(sleeve).length > 0,
   "Commit Crime": () => true,
-  "Take University Course": (player: IPlayer, sleeve: Sleeve) =>
+  "Take University Course": (sleeve: Sleeve) =>
     [CityName.Aevum, CityName.Sector12, CityName.Volhaven].includes(sleeve.city),
-  "Workout at Gym": (player: IPlayer, sleeve: Sleeve) =>
-    [CityName.Aevum, CityName.Sector12, CityName.Volhaven].includes(sleeve.city),
-  "Shock Recovery": (player: IPlayer, sleeve: Sleeve) => sleeve.shock < 100,
-  Synchronize: (player: IPlayer, sleeve: Sleeve) => sleeve.sync < 100,
-};
-
-function getABC(sleeve: Sleeve): [string, string, string] {
-  switch (sleeve.currentTask) {
-    case SleeveTaskType.Idle:
-      return ["------", "------", "------"];
-    case SleeveTaskType.Company:
-      return ["Work for Company", sleeve.currentTaskLocation, "------"];
-    case SleeveTaskType.Faction: {
-      let workType = "";
-      switch (sleeve.factionWorkType) {
-        case FactionWorkType.Hacking:
-          workType = "Hacking Contracts";
-          break;
-        case FactionWorkType.Field:
-          workType = "Field Work";
-          break;
-        case FactionWorkType.Security:
-          workType = "Security Work";
-          break;
-      }
-      return ["Work for Faction", sleeve.currentTaskLocation, workType];
-    }
-    case SleeveTaskType.Crime:
-      return ["Commit Crime", sleeve.crimeType, "------"];
-    case SleeveTaskType.Class:
-      return ["Take University Course", sleeve.className, sleeve.currentTaskLocation];
-    case SleeveTaskType.Gym:
-      return ["Workout at Gym", sleeve.gymStatType, sleeve.currentTaskLocation];
-    case SleeveTaskType.Recovery:
-      return ["Shock Recovery", "------", "------"];
-    case SleeveTaskType.Synchro:
-      return ["Synchronize", "------", "------"];
-  }
-}
+  "Workout at Gym": (sleeve: Sleeve) => [CityName.Aevum, CityName.Sector12, CityName.Volhaven].includes(sleeve.city),
+  "Perform Bladeburner Actions": () => !!Player.bladeburner,
+  "Shock Recovery": (sleeve: Sleeve) => sleeve.shock > 0,
+  Synchronize: (sleeve: Sleeve) => sleeve.sync < 100,
+} as const;
 
 export function TaskSelector(props: IProps): React.ReactElement {
-  const abc = getABC(props.sleeve);
-  const [s0, setS0] = useState(abc[0]);
-  const [s1, setS1] = useState(abc[1]);
-  const [s2, setS2] = useState(abc[2]);
+  const s0 = props.abc[0];
+  const s1 = props.abc[1];
+  const s2 = props.abc[2];
 
-  const validActions = Object.keys(canDo).filter((k) =>
-    (canDo[k] as (player: IPlayer, sleeve: Sleeve) => boolean)(props.player, props.sleeve),
-  );
+  const validActions = getRecordKeys(canDo).filter((taskType) => canDo[taskType](props.sleeve));
 
   const detailsF = tasks[s0];
-  if (detailsF === undefined) throw new Error(`No function for task '${s0}'`);
-  const details = detailsF(props.player, props.sleeve);
+  if (detailsF === undefined) {
+    throw new Error(`No function for task '${s0}'`);
+  }
+  const details = detailsF(props.sleeve);
   const details2 = details.second(s1);
 
   if (details.first.length > 0 && !details.first.includes(s1)) {
-    setS1(details.first[0]);
     props.setABC([s0, details.first[0], s2]);
   }
   if (details2.length > 0 && !details2.includes(s2)) {
-    setS2(details2[0]);
     props.setABC([s0, s1, details2[0]]);
   }
 
-  function onS0Change(event: SelectChangeEvent<string>): void {
+  function onS0Change(event: SelectChangeEvent): void {
     const n = event.target.value;
     const detailsF = tasks[n];
-    if (detailsF === undefined) throw new Error(`No function for task '${s0}'`);
-    const details = detailsF(props.player, props.sleeve);
-    const details2 = details.second(details.first[0]);
-    setS2(details2[0]);
-    setS1(details.first[0]);
-    setS0(n);
+    if (detailsF === undefined) {
+      throw new Error(`No function for task '${s0}'`);
+    }
+    const details = detailsF(props.sleeve);
+    const details2 = details.second(details.first[0]) ?? ["------"];
     props.setABC([n, details.first[0], details2[0]]);
   }
 
-  function onS1Change(event: SelectChangeEvent<string>): void {
-    setS1(event.target.value);
+  function onS1Change(event: SelectChangeEvent): void {
     props.setABC([s0, event.target.value, s2]);
   }
 
-  function onS2Change(event: SelectChangeEvent<string>): void {
-    setS2(event.target.value);
+  function onS2Change(event: SelectChangeEvent): void {
     props.setABC([s0, s1, event.target.value]);
   }
 
   return (
     <>
-      <Select onChange={onS0Change} value={s0}>
+      <Select onChange={onS0Change} value={s0} sx={{ width: "100%" }}>
         {validActions.map((task) => (
           <MenuItem key={task} value={task}>
             {task}
@@ -284,8 +283,7 @@ export function TaskSelector(props: IProps): React.ReactElement {
       </Select>
       {!(details.first.length === 1 && details.first[0] === "------") && (
         <>
-          <br />
-          <Select onChange={onS1Change} value={s1}>
+          <Select onChange={onS1Change} value={s1} sx={{ width: "100%" }}>
             {details.first.map((detail) => (
               <MenuItem key={detail} value={detail}>
                 {detail}
@@ -296,8 +294,7 @@ export function TaskSelector(props: IProps): React.ReactElement {
       )}
       {!(details2.length === 1 && details2[0] === "------") && (
         <>
-          <br />
-          <Select onChange={onS2Change} value={s2}>
+          <Select onChange={onS2Change} value={s2} sx={{ width: "100%" }}>
             {details2.map((detail) => (
               <MenuItem key={detail} value={detail}>
                 {detail}

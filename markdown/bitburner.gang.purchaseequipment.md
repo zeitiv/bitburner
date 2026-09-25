@@ -6,7 +6,7 @@
 
 Purchase an equipment for a gang member.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 purchaseEquipment(memberName: string, equipName: string): boolean;
@@ -14,12 +14,57 @@ purchaseEquipment(memberName: string, equipName: string): boolean;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  memberName | string | Name of Gang member to purchase the equipment for. |
-|  equipName | string | Name of Equipment/Augmentation to purchase. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+memberName
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of Gang member to purchase the equipment for.
+
+
+</td></tr>
+<tr><td>
+
+equipName
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of Equipment/Augmentation to purchase.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 boolean
 

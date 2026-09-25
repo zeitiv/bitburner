@@ -1,6 +1,7 @@
+import { AugmentationName, FactionName, FactionDiscovery } from "@enums";
 import { FactionInfo, FactionInfos } from "./FactionInfo";
-import { favorToRep, repToFavor } from "./formulas/favor";
-import { Generic_fromJSON, Generic_toJSON, Reviver } from "../utils/JSONReviver";
+import { MaxFavor, addRepToFavor } from "./formulas/favor";
+import { clampNumber } from "../utils/helpers/clampNumber";
 
 export class Faction {
   /**
@@ -9,38 +10,48 @@ export class Faction {
    */
   alreadyInvited = false;
 
-  /**
-   * Holds names of all augmentations that this Faction offers
-   */
-  augmentations: string[] = [];
+  /** Holds names of all augmentations that this Faction offers */
+  augmentations: AugmentationName[] = [];
 
-  /**
-   * Amount of favor the player has with this faction.
-   */
-  favor = 0;
+  /** Amount of favor the player has with this faction. */
+  #favor = 0;
 
-  /**
-   * Flag signalling whether player has been banned from this faction
-   */
+  /** Flag signalling whether player has been banned from this faction */
   isBanned = false;
 
-  /**
-   * Flag signalling whether player is a member of this faction
-   */
+  /** Flag signalling whether player is a member of this faction */
   isMember = false;
 
-  /**
-   * Name of faction
-   */
-  name = "";
+  /** Level of player knowledge about this faction (unknown, rumored, known) */
+  discovery: FactionDiscovery = FactionDiscovery.unknown;
 
-  /**
-   * Amount of reputation player has with this faction
-   */
+  /** Name of faction */
+  name: FactionName;
+
+  /** Amount of reputation player has with this faction */
   playerReputation = 0;
 
-  constructor(name = "") {
+  constructor(name: FactionName) {
     this.name = name;
+  }
+
+  get favor() {
+    return this.#favor;
+  }
+
+  /**
+   * There is no setter for this.#favor. This is intentional. Performing arithmetic operations on `favor` may lead to
+   * the overflow error of `playerReputation`, so anything that wants to change `favor` must explicitly do that through
+   * `setFavor`.
+   *
+   * @param value
+   */
+  setFavor(value: number) {
+    if (Number.isNaN(value)) {
+      this.#favor = 0;
+      return;
+    }
+    this.#favor = clampNumber(value, 0, MaxFavor);
   }
 
   getInfo(): FactionInfo {
@@ -54,38 +65,22 @@ export class Faction {
     return info;
   }
 
-  gainFavor(): void {
-    if (this.favor == null) {
-      this.favor = 0;
-    }
-    this.favor += this.getFavorGain();
+  prestigeSourceFile() {
+    // Reset favor, reputation, and flags
+    this.setFavor(0);
+    this.playerReputation = 0;
+    this.alreadyInvited = false;
+    this.isMember = false;
+    this.isBanned = false;
   }
 
-  //Returns an array with [How much favor would be gained, how much rep would be left over]
-  getFavorGain(): number {
-    if (this.favor == null) {
-      this.favor = 0;
-    }
-    const storedRep = Math.max(0, favorToRep(this.favor));
-    const totalRep = storedRep + this.playerReputation;
-    const newFavor = repToFavor(totalRep);
-    return newFavor - this.favor;
-  }
-
-  /**
-   * Serialize the current object to a JSON save state.
-   */
-  toJSON(): any {
-    return Generic_toJSON("Faction", this);
-  }
-
-  /**
-   * Initiatizes a Faction object from a JSON save state.
-   */
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-  static fromJSON(value: any): Faction {
-    return Generic_fromJSON(Faction, value.data);
+  prestigeAugmentation(): void {
+    // Gain favor
+    this.setFavor(addRepToFavor(this.favor, this.playerReputation));
+    // Reset reputation and flags
+    this.playerReputation = 0;
+    this.alreadyInvited = false;
+    this.isMember = false;
+    this.isBanned = false;
   }
 }
-
-Reviver.constructors.Faction = Faction;

@@ -6,7 +6,7 @@
 
 Format a string with an array of arguments.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 vsprintf(format: string, args: any[]): string;
@@ -14,16 +14,61 @@ vsprintf(format: string, args: any[]): string;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  format | string | String to format. |
-|  args | any\[\] | Formating arguments. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+format
+
+
+</td><td>
 
 string
 
-Formated text.
+
+</td><td>
+
+String to format.
+
+
+</td></tr>
+<tr><td>
+
+args
+
+
+</td><td>
+
+any\[\]
+
+
+</td><td>
+
+Formatting arguments.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
+
+string
+
+Formatted text.
 
 ## Remarks
 

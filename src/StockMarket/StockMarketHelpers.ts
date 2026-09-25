@@ -1,9 +1,6 @@
-/**
- * Stock Market Helper Functions
- */
 import { Stock } from "./Stock";
-import { PositionTypes } from "./data/PositionTypes";
-import { CONSTANTS } from "../Constants";
+import { PositionType } from "@enums";
+import { StockMarketConstants } from "./data/Constants";
 
 // Amount by which a stock's forecast changes during each price movement
 export const forecastChangePerPriceMovement = 0.006;
@@ -12,10 +9,10 @@ export const forecastChangePerPriceMovement = 0.006;
  * Calculate the total cost of a "buy" transaction. This accounts for spread and commission.
  * @param {Stock} stock - Stock being purchased
  * @param {number} shares - Number of shares being transacted
- * @param {PositionTypes} posType - Long or short position
+ * @param {PositionType} posType - Long or short position
  * @returns {number | null} Total transaction cost. Returns null for an invalid transaction
  */
-export function getBuyTransactionCost(stock: Stock, shares: number, posType: PositionTypes): number | null {
+export function getBuyTransactionCost(stock: Stock, shares: number, posType: PositionType): number | null {
   if (isNaN(shares) || shares <= 0 || !(stock instanceof Stock)) {
     return null;
   }
@@ -24,13 +21,13 @@ export function getBuyTransactionCost(stock: Stock, shares: number, posType: Pos
   // hanging in the case when a really big number is passed in
   shares = Math.min(shares, stock.maxShares);
 
-  const isLong = posType === PositionTypes.Long;
+  const isLong = posType === PositionType.Long;
 
   // If the number of shares doesn't trigger a price movement, its a simple calculation
   if (isLong) {
-    return shares * stock.getAskPrice() + CONSTANTS.StockMarketCommission;
+    return shares * stock.getAskPrice() + StockMarketConstants.StockMarketCommission;
   } else {
-    return shares * stock.getBidPrice() + CONSTANTS.StockMarketCommission;
+    return shares * stock.getBidPrice() + StockMarketConstants.StockMarketCommission;
   }
 }
 
@@ -38,11 +35,11 @@ export function getBuyTransactionCost(stock: Stock, shares: number, posType: Pos
  * Calculate the TOTAL amount of money gained from a sale (NOT net profit). This accounts
  * for spread and commission.
  * @param {Stock} stock - Stock being sold
- * @param {number} shares - Number of sharse being transacted
- * @param {PositionTypes} posType - Long or short position
+ * @param {number} shares - Number of shares being transacted
+ * @param {PositionType} posType - Long or short position
  * @returns {number | null} Amount of money gained from transaction. Returns null for an invalid transaction
  */
-export function getSellTransactionGain(stock: Stock, shares: number, posType: PositionTypes): number | null {
+export function getSellTransactionGain(stock: Stock, shares: number, posType: PositionType): number | null {
   if (isNaN(shares) || shares <= 0 || !(stock instanceof Stock)) {
     return null;
   }
@@ -51,13 +48,13 @@ export function getSellTransactionGain(stock: Stock, shares: number, posType: Po
   // hanging in the case when a really big number is passed in
   shares = Math.min(shares, stock.maxShares);
 
-  const isLong = posType === PositionTypes.Long;
+  const isLong = posType === PositionType.Long;
   if (isLong) {
-    return shares * stock.getBidPrice() - CONSTANTS.StockMarketCommission;
+    return shares * stock.getBidPrice() - StockMarketConstants.StockMarketCommission;
   } else {
     // Calculating gains for a short position requires calculating the profit made
     const origCost = shares * stock.playerAvgShortPx;
-    const profit = (stock.playerAvgShortPx - stock.getAskPrice()) * shares - CONSTANTS.StockMarketCommission;
+    const profit = (stock.playerAvgShortPx - stock.getAskPrice()) * shares - StockMarketConstants.StockMarketCommission;
 
     return origCost + profit;
   }
@@ -67,8 +64,8 @@ export function getSellTransactionGain(stock: Stock, shares: number, posType: Po
  * Processes a stock's change in forecast & second-order forecast
  * whenever it is transacted
  * @param {Stock} stock - Stock being sold
- * @param {number} shares - Number of sharse being transacted
- * @param {PositionTypes} posType - Long or short position
+ * @param {number} shares - Number of shares being transacted
+ * @param {PositionType} posType - Long or short position
  */
 export function processTransactionForecastMovement(stock: Stock, shares: number): void {
   if (isNaN(shares) || shares <= 0 || !(stock instanceof Stock)) {
@@ -96,7 +93,7 @@ export function processTransactionForecastMovement(stock: Stock, shares: number)
   const remainingShares = shares - firstShares;
   let numIterations = 1 + Math.ceil(remainingShares / stock.shareTxForMovement);
 
-  // If on the offchance we end up perfectly at the next price movement
+  // If on the off chance we end up perfectly at the next price movement
   stock.shareTxUntilMovement =
     stock.shareTxForMovement - ((shares - stock.shareTxUntilMovement) % stock.shareTxForMovement);
   if (stock.shareTxUntilMovement === stock.shareTxForMovement || stock.shareTxUntilMovement <= 0) {
@@ -116,18 +113,18 @@ export function processTransactionForecastMovement(stock: Stock, shares: number)
  * Handles mid-transaction price movements, both L and S positions, etc.
  * Used for the "Buy Max" button in the UI
  * @param {Stock} stock - Stock being purchased
- * @param {PositionTypes} posType - Long or short position
+ * @param {PositionType} posType - Long or short position
  * @param {number} money - Amount of money player has
  * @returns maximum number of shares that the player can purchase
  */
-export function calculateBuyMaxAmount(stock: Stock, posType: PositionTypes, money: number): number {
+export function calculateBuyMaxAmount(stock: Stock, posType: PositionType, money: number): number {
   if (!(stock instanceof Stock)) {
     return 0;
   }
 
-  const isLong = posType === PositionTypes.Long;
+  const isLong = posType === PositionType.Long;
 
-  const remainingMoney = money - CONSTANTS.StockMarketCommission;
+  const remainingMoney = money - StockMarketConstants.StockMarketCommission;
   const currPrice = isLong ? stock.getAskPrice() : stock.getBidPrice();
 
   return Math.floor(remainingMoney / currPrice);

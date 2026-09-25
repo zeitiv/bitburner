@@ -6,7 +6,7 @@
 
 Get price of an augmentation.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 getAugmentationPrice(augName: string): number;
@@ -14,11 +14,41 @@ getAugmentationPrice(augName: string): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  augName | string | Name of Augmentation. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+augName
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of Augmentation.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 

@@ -4,23 +4,87 @@
 
 ## WarehouseAPI.setSmartSupply() method
 
-Set smart supply
+Set smart supply.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-setSmartSupply(divisionName: string, cityName: string, enabled: boolean): void;
+setSmartSupply(divisionName: string, city: CityName, enabled: boolean): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  divisionName | string | Name of the division |
-|  cityName | string | Name of the city |
-|  enabled | boolean | smart supply enabled |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+divisionName
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the division
+
+
+</td></tr>
+<tr><td>
+
+city
+
+
+</td><td>
+
+[CityName](./bitburner.cityname.md)
+
+
+</td><td>
+
+Name of the city
+
+
+</td></tr>
+<tr><td>
+
+enabled
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Use true to enable, false otherwise.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 void
+
+## Remarks
+
+RAM cost: 20 GB
 

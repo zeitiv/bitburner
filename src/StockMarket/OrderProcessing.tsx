@@ -8,38 +8,36 @@ import { IStockMarket } from "./IStockMarket";
 import { Order } from "./Order";
 import { Stock } from "./Stock";
 
-import { OrderTypes } from "./data/OrderTypes";
-import { PositionTypes } from "./data/PositionTypes";
+import { PositionType, OrderType } from "@enums";
 
-import { IMap } from "../types";
-
-import { numeralWrapper } from "../ui/numeralFormat";
+import { formatShares } from "../ui/formatNumber";
 import { Money } from "../ui/React/Money";
 
 import { dialogBoxCreate } from "../ui/React/DialogBox";
 import { Settings } from "../Settings/Settings";
 
 import * as React from "react";
+import { throwIfReachable } from "../utils/helpers/throwIfReachable";
 
 export interface IProcessOrderRefs {
   stockMarket: IStockMarket;
-  symbolToStockMap: IMap<Stock>;
+  symbolToStockMap: Record<string, Stock>;
 }
 
 /**
  * Search for all orders of a specific type and execute them if appropriate
  * @param {Stock} stock - Stock for which orders should be processed
- * @param {OrderTypes} orderType - Type of order to check (Limit/Stop buy/sell)
- * @param {PositionTypes} posType - Long or short
+ * @param {OrderType} orderType - Type of order to check (Limit/Stop buy/sell)
+ * @param {PositionType} posType - Long or short
  * @param {IProcessOrderRefs} refs - References to objects/functions that are required for this function
  */
 export function processOrders(
   stock: Stock,
-  orderType: OrderTypes,
-  posType: PositionTypes,
+  orderType: OrderType,
+  posType: PositionType,
   refs: IProcessOrderRefs,
 ): void {
-  const orderBook = refs.stockMarket["Orders"];
+  const orderBook = refs.stockMarket.Orders;
   if (orderBook == null) {
     const orders: IOrderBook = {};
     for (const name of Object.keys(refs.stockMarket)) {
@@ -49,12 +47,12 @@ export function processOrders(
       }
       orders[stock.symbol] = [];
     }
-    refs.stockMarket["Orders"] = orders;
+    refs.stockMarket.Orders = orders;
     return; // Newly created, so no orders to process
   }
   let stockOrders = orderBook[stock.symbol];
-  if (stockOrders == null || !(stockOrders.constructor === Array)) {
-    console.error(`Invalid Order book for ${stock.symbol} in processOrders(): ${stockOrders}`);
+  if (stockOrders == null || !Array.isArray(stockOrders)) {
+    console.error(`Invalid Order book for ${stock.symbol} in processOrders(). stockOrders: ${stockOrders}`);
     stockOrders = [];
     return;
   }
@@ -62,37 +60,36 @@ export function processOrders(
   for (const order of stockOrders) {
     if (order.type === orderType && order.pos === posType) {
       switch (order.type) {
-        case OrderTypes.LimitBuy:
-          if (order.pos === PositionTypes.Long && stock.price <= order.price) {
+        case OrderType.LimitBuy:
+          if (order.pos === PositionType.Long && stock.price <= order.price) {
             executeOrder(/*66*/ order, refs);
-          } else if (order.pos === PositionTypes.Short && stock.price >= order.price) {
-            executeOrder(/*66*/ order, refs);
-          }
-          break;
-        case OrderTypes.LimitSell:
-          if (order.pos === PositionTypes.Long && stock.price >= order.price) {
-            executeOrder(/*66*/ order, refs);
-          } else if (order.pos === PositionTypes.Short && stock.price <= order.price) {
+          } else if (order.pos === PositionType.Short && stock.price >= order.price) {
             executeOrder(/*66*/ order, refs);
           }
           break;
-        case OrderTypes.StopBuy:
-          if (order.pos === PositionTypes.Long && stock.price >= order.price) {
+        case OrderType.LimitSell:
+          if (order.pos === PositionType.Long && stock.price >= order.price) {
             executeOrder(/*66*/ order, refs);
-          } else if (order.pos === PositionTypes.Short && stock.price <= order.price) {
+          } else if (order.pos === PositionType.Short && stock.price <= order.price) {
             executeOrder(/*66*/ order, refs);
           }
           break;
-        case OrderTypes.StopSell:
-          if (order.pos === PositionTypes.Long && stock.price <= order.price) {
+        case OrderType.StopBuy:
+          if (order.pos === PositionType.Long && stock.price >= order.price) {
             executeOrder(/*66*/ order, refs);
-          } else if (order.pos === PositionTypes.Short && stock.price >= order.price) {
+          } else if (order.pos === PositionType.Short && stock.price <= order.price) {
+            executeOrder(/*66*/ order, refs);
+          }
+          break;
+        case OrderType.StopSell:
+          if (order.pos === PositionType.Long && stock.price <= order.price) {
+            executeOrder(/*66*/ order, refs);
+          } else if (order.pos === PositionType.Short && stock.price >= order.price) {
             executeOrder(/*66*/ order, refs);
           }
           break;
         default:
-          console.warn(`Invalid order type: ${order.type}`);
-          return;
+          throwIfReachable(order.type);
       }
     }
   }
@@ -110,7 +107,7 @@ function executeOrder(order: Order, refs: IProcessOrderRefs): void {
     return;
   }
   const stockMarket = refs.stockMarket;
-  const orderBook = stockMarket["Orders"];
+  const orderBook = stockMarket.Orders;
   const stockOrders = orderBook[stock.symbol];
 
   // When orders are executed, the buying and selling functions shouldn't
@@ -122,30 +119,29 @@ function executeOrder(order: Order, refs: IProcessOrderRefs): void {
   let res = true;
   let isBuy = false;
   switch (order.type) {
-    case OrderTypes.LimitBuy:
-    case OrderTypes.StopBuy:
+    case OrderType.LimitBuy:
+    case OrderType.StopBuy:
       isBuy = true;
-      if (order.pos === PositionTypes.Long) {
+      if (order.pos === PositionType.Long) {
         res = buyStock(stock, order.shares, null, opts) && res;
-      } else if (order.pos === PositionTypes.Short) {
+      } else if (order.pos === PositionType.Short) {
         res = shortStock(stock, order.shares, null, opts) && res;
       }
       break;
-    case OrderTypes.LimitSell:
-    case OrderTypes.StopSell:
-      if (order.pos === PositionTypes.Long) {
+    case OrderType.LimitSell:
+    case OrderType.StopSell:
+      if (order.pos === PositionType.Long) {
         res = sellStock(stock, order.shares, null, opts) && res;
-      } else if (order.pos === PositionTypes.Short) {
+      } else if (order.pos === PositionType.Short) {
         res = sellShort(stock, order.shares, null, opts) && res;
       }
       break;
     default:
-      console.warn(`Invalid order type: ${order.type}`);
-      return;
+      throwIfReachable(order.type);
   }
 
   // Position type, for logging/message purposes
-  const pos = order.pos === PositionTypes.Long ? "Long" : "Short";
+  const pos = order.pos === PositionType.Long ? "Long" : "Short";
 
   if (res) {
     for (let i = 0; i < stockOrders.length; ++i) {
@@ -155,7 +151,7 @@ function executeOrder(order: Order, refs: IProcessOrderRefs): void {
           dialogBoxCreate(
             <>
               {order.type} for {stock.symbol} @ <Money money={order.price} /> ({pos}) was filled (
-              {numeralWrapper.formatShares(Math.round(order.shares))} shares)
+              {formatShares(Math.round(order.shares))} shares)
             </>,
           );
         }
@@ -165,14 +161,12 @@ function executeOrder(order: Order, refs: IProcessOrderRefs): void {
 
     console.error("Could not find the following Order in Order Book: ");
     console.error(order);
-  } else {
-    if (isBuy) {
-      dialogBoxCreate(
-        <>
-          Failed to execute {order.type} for {stock.symbol} @ <Money money={order.price} /> ({pos}). This is most likely
-          because you do not have enough money or the order would exceed the stock's maximum number of shares
-        </>,
-      );
-    }
+  } else if (isBuy) {
+    dialogBoxCreate(
+      <>
+        Failed to execute {order.type} for {stock.symbol} @ <Money money={order.price} /> ({pos}). This is most likely
+        because you do not have enough money or the order would exceed the stock's maximum number of shares
+      </>,
+    );
   }
 }

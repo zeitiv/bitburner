@@ -23,6 +23,8 @@ declare module "@mui/material/styles" {
       successdark: React.CSSProperties["color"];
       white: React.CSSProperties["color"];
       black: React.CSSProperties["color"];
+      maplocation: React.CSSProperties["color"];
+      disabled: React.CSSProperties["color"];
     };
   }
   interface ThemeOptions {
@@ -42,11 +44,14 @@ declare module "@mui/material/styles" {
       successdark: React.CSSProperties["color"];
       white: React.CSSProperties["color"];
       black: React.CSSProperties["color"];
+      maplocation: React.CSSProperties["color"];
+      disabled: React.CSSProperties["color"];
     };
   }
 }
 
 let theme: Theme;
+const themeStyleSheet = new CSSStyleSheet();
 
 export function refreshTheme(): void {
   theme = createTheme({
@@ -66,6 +71,8 @@ export function refreshTheme(): void {
       successdark: Settings.theme.successdark,
       white: Settings.theme.white,
       black: Settings.theme.black,
+      maplocation: Settings.theme.maplocation,
+      disabled: Settings.theme.disabled,
     },
     palette: {
       primary: {
@@ -108,6 +115,7 @@ export function refreshTheme(): void {
     },
     typography: {
       fontFamily: Settings.styles.fontFamily,
+      fontSize: Settings.styles.fontSize,
       button: {
         textTransform: "none",
       },
@@ -124,6 +132,10 @@ export function refreshTheme(): void {
               userSelect: "none",
               color: Settings.theme.primarydark,
             },
+            // Inputs below 16px trigger iOS Safari's zoom-on-focus, which jars mobile users on every tap.
+            "@media (max-width:600px)": {
+              fontSize: "16px",
+            },
           },
         },
       },
@@ -132,7 +144,7 @@ export function refreshTheme(): void {
         styleOverrides: {
           root: {
             backgroundColor: Settings.theme.well,
-            borderBottomColor: "#fff",
+            borderBottomColor: Settings.theme.white,
           },
           underline: {
             "&:hover": {
@@ -163,11 +175,11 @@ export function refreshTheme(): void {
       MuiButtonGroup: {
         styleOverrides: {
           root: {
-            '& .MuiButton-root:not(:last-of-type)': {
-              marginRight: '1px',
-            }
-          }
-        }
+            "& .MuiButton-root:not(:last-of-type)": {
+              marginRight: "1px",
+            },
+          },
+        },
       },
 
       MuiButton: {
@@ -206,8 +218,8 @@ export function refreshTheme(): void {
         styleOverrides: {
           root: {
             lineHeight: Settings.styles.lineHeight,
-          }
-        }
+          },
+        },
       },
       MuiMenu: {
         styleOverrides: {
@@ -226,7 +238,7 @@ export function refreshTheme(): void {
       MuiAccordionSummary: {
         styleOverrides: {
           root: {
-            backgroundColor: "#111",
+            backgroundColor: Settings.theme.backgroundprimary,
           },
         },
       },
@@ -239,9 +251,7 @@ export function refreshTheme(): void {
       },
       MuiIconButton: {
         styleOverrides: {
-          root: {
-            color: Settings.theme.primary,
-          },
+          root: { color: Settings.theme.primary },
         },
       },
       MuiTooltip: {
@@ -251,8 +261,11 @@ export function refreshTheme(): void {
             color: Settings.theme.primary,
             backgroundColor: Settings.theme.well,
             borderRadius: 0,
-            border: "2px solid white",
+            border: "2px solid " + Settings.theme.white,
             maxWidth: "100vh",
+          },
+          popper: {
+            zIndex: 25000,
           },
         },
         defaultProps: {
@@ -336,12 +349,43 @@ export function refreshTheme(): void {
               color: Settings.theme.primary,
             },
           },
+          root: {
+            backgroundColor: Settings.theme.backgroundsecondary,
+            border: "1px solid " + Settings.theme.well,
+            margin: "3px",
+
+            "&.Mui-selected": {
+              backgroundColor: Settings.theme.button,
+            },
+          },
+        },
+      },
+      MuiTabs: {
+        styleOverrides: {
+          scrollButtons: {
+            backgroundColor: Settings.theme.backgroundsecondary,
+            color: Settings.theme.secondary,
+            margin: "3px",
+            opacity: 1,
+            width: "fit-content",
+
+            "&.Mui-disabled": {
+              opacity: 0.5,
+            },
+          },
+        },
+        defaultProps: {
+          TabIndicatorProps: {
+            style: {
+              display: "none",
+            },
+          },
         },
       },
       MuiAlert: {
         styleOverrides: {
           root: {
-            backgroundColor: Settings.theme.black,
+            backgroundColor: Settings.theme.backgroundsecondary,
             borderRadius: 0,
             border: "1px solid " + Settings.theme.well,
           },
@@ -359,11 +403,46 @@ export function refreshTheme(): void {
           },
         },
       },
+      MuiAutocomplete: {
+        styleOverrides: {
+          option: {
+            color: Settings.theme.primary,
+          },
+          inputRoot: {
+            height: "100%",
+          },
+        },
+      },
+      MuiModal: {
+        styleOverrides: {
+          root: {
+            zIndex: 20000,
+          },
+        },
+      },
+      MuiLink: {
+        styleOverrides: {
+          root: {
+            fontFamily: Settings.styles.fontFamily,
+          },
+        },
+      },
     },
   });
 
   document.body.style.backgroundColor = theme.colors.backgroundprimary?.toString() ?? "black";
+
+  const styleSheet =
+    ":root {" +
+    Object.entries(Settings.theme)
+      .map(([k, v]) => `--bb-theme-${k}: ${v}`)
+      .join(";") +
+    "}";
+
+  themeStyleSheet.replaceSync(styleSheet);
 }
+
+document.adoptedStyleSheets.push(themeStyleSheet);
 refreshTheme();
 
 interface IProps {

@@ -1,743 +1,721 @@
-import { INetscriptHelper } from "./INetscriptHelper";
-import { WorkerScript } from "../Netscript/WorkerScript";
-import { IPlayer } from "../PersonObjects/IPlayer";
-import { netscriptDelay } from "../NetscriptEvaluator";
+import { Player } from "@player";
 
 import { OfficeSpace } from "../Corporation/OfficeSpace";
-import { Employee } from "../Corporation/Employee";
 import { Product } from "../Corporation/Product";
 import { Material } from "../Corporation/Material";
 import { Warehouse } from "../Corporation/Warehouse";
-import { IIndustry } from "../Corporation/IIndustry";
-import { ICorporation } from "../Corporation/ICorporation";
-
+import { Division } from "../Corporation/Division";
+import { Corporation, CorporationPromise } from "../Corporation/Corporation";
+import { omit } from "lodash";
 import {
   Corporation as NSCorporation,
-  CorporationInfo,
-  Employee as NSEmployee,
-  Product as NSProduct,
-  Material as NSMaterial,
-  Warehouse as NSWarehouse,
   Division as NSDivision,
   WarehouseAPI,
   OfficeAPI,
-  InvestmentOffer
-} from "../ScriptEditor/NetscriptDefinitions";
+  CorpResearchName,
+  CorpMaterialName,
+  CorpStateName,
+} from "@nsdefs";
 
 import {
-  NewIndustry,
-  NewCity,
-  UnlockUpgrade,
-  LevelUpgrade,
-  IssueDividends,
-  SellMaterial,
-  SellProduct,
-  SetSmartSupply,
-  BuyMaterial,
-  AssignJob,
-  UpgradeOfficeSize,
-  ThrowParty,
-  PurchaseWarehouse,
-  UpgradeWarehouse,
-  BuyCoffee,
-  HireAdVert,
-  MakeProduct,
-  Research,
-  ExportMaterial,
-  CancelExportMaterial,
-  SetMaterialMarketTA1,
-  SetMaterialMarketTA2,
-  SetProductMarketTA1,
-  SetProductMarketTA2,
-  SetSmartSupplyUseLeftovers,
+  createDivision,
+  purchaseOffice,
+  issueDividends,
+  goPublic,
+  issueNewShares,
+  acceptInvestmentOffer,
+  sellMaterial,
+  sellProduct,
+  setSmartSupply,
+  buyMaterial,
+  upgradeOfficeSize,
+  purchaseWarehouse,
+  upgradeWarehouse,
+  buyTea,
+  throwParty,
+  hireAdVert,
+  makeProduct,
+  research,
+  exportMaterial,
+  cancelExportMaterial,
+  setMaterialMarketTA1,
+  setMaterialMarketTA2,
+  setProductMarketTA1,
+  setProductMarketTA2,
+  bulkPurchase,
+  sellShares,
+  buyBackShares,
+  setSmartSupplyOption,
+  limitMaterialProduction,
+  limitProductProduction,
+  upgradeWarehouseCost,
+  createCorporation,
+  removeDivision,
+  bribe,
 } from "../Corporation/Actions";
-import { CorporationUnlockUpgrades } from "../Corporation/data/CorporationUnlockUpgrades";
-import { CorporationUpgrades } from "../Corporation/data/CorporationUpgrades";
-import { EmployeePositions } from "../Corporation/EmployeePositions";
-import { calculateIntelligenceBonus } from "../PersonObjects/formulas/intelligence";
-import { Industry } from "../Corporation/Industry";
-import { IndustryResearchTrees, IndustryStartingCosts } from "../Corporation/IndustryData";
-import { CorporationConstants } from "../Corporation/data/Constants";
-import { IndustryUpgrades } from "../Corporation/IndustryUpgrades";
+import { CorpUnlocks } from "../Corporation/data/CorporationUnlocks";
+import { CorpUpgrades } from "../Corporation/data/CorporationUpgrades";
+import { CorpUnlockName, CorpUpgradeName, CorpEmployeeJob, CityName, CreatingCorporationCheckResultEnum } from "@enums";
+import { IndustriesData, IndustryResearchTrees } from "../Corporation/data/IndustryData";
+import * as corpConstants from "../Corporation/data/Constants";
 import { ResearchMap } from "../Corporation/ResearchMap";
-import { Factions } from "../Faction/Factions";
+import { InternalAPI, NetscriptContext, setRemovedFunctions } from "../Netscript/APIWrapper";
+import { helpers } from "../Netscript/NetscriptHelpers";
+import { getEnumHelper } from "../utils/EnumHelper";
+import { MaterialInfo } from "../Corporation/MaterialInfo";
+import {
+  calculateOfficeSizeUpgradeCost,
+  calculateUpgradeCost,
+  canCreateCorporation,
+  convertCreatingCorporationCheckResultToMessage,
+} from "../Corporation/helpers";
+import { PositiveInteger } from "../types";
+import { getRecordKeys } from "../Types/Record";
+import { setDeprecatedProperties } from "../utils/DeprecationHelper";
+import { CONSTANTS } from "../Constants";
 
-export function NetscriptCorporation(
-  player: IPlayer,
-  workerScript: WorkerScript,
-  helper: INetscriptHelper,
-): NSCorporation {
-  function createCorporation(corporationName: string, selfFund = true): boolean {
-    if (!player.canAccessCorporation() || player.hasCorporation()) return false;
-    if (!corporationName) return false;
-    if (player.bitNodeN !== 3 && !selfFund) throw new Error("cannot use seed funds outside of BitNode 3");
-
-    if (selfFund) {
-      if (!player.canAfford(150e9)) return false;
-
-      player.startCorporation(corporationName);
-      player.loseMoney(150e9, "corporation");
-    } else {
-      player.startCorporation(corporationName, 500e6);
-    }
-    return true;
-  }
-
-  function hasUnlockUpgrade(upgradeName: string): boolean {
+export function NetscriptCorporation(): InternalAPI<NSCorporation> {
+  function hasUnlock(unlockName: CorpUnlockName): boolean {
     const corporation = getCorporation();
-    const upgrade = Object.values(CorporationUnlockUpgrades).find((upgrade) => upgrade[2] === upgradeName);
-    if (upgrade === undefined) throw new Error(`No upgrade named '${upgradeName}'`);
-    const upgN = upgrade[0];
-    return corporation.unlockUpgrades[upgN] === 1;
+    return corporation.unlocks.has(unlockName);
   }
 
-  function getUnlockUpgradeCost(upgradeName: string): number {
-    const upgrade = Object.values(CorporationUnlockUpgrades).find((upgrade) => upgrade[2] === upgradeName);
-    if (upgrade === undefined) throw new Error(`No upgrade named '${upgradeName}'`);
-    return upgrade[1];
+  function getUnlockCost(unlockName: CorpUnlockName): number {
+    return CorpUnlocks[unlockName].price;
   }
 
-  function getUpgradeLevel(aupgradeName: string): number {
-    const upgradeName = helper.string("levelUpgrade", "upgradeName", aupgradeName);
+  function getUpgradeLevel(upgradeName: CorpUpgradeName): number {
     const corporation = getCorporation();
-    const upgrade = Object.values(CorporationUpgrades).find((upgrade) => upgrade[4] === upgradeName);
-    if (upgrade === undefined) throw new Error(`No upgrade named '${upgradeName}'`);
-    const upgN = upgrade[0];
-    return corporation.upgrades[upgN];
+    return corporation.upgrades[upgradeName].level;
   }
 
-  function getUpgradeLevelCost(aupgradeName: string): number {
-    const upgradeName = helper.string("levelUpgrade", "upgradeName", aupgradeName);
+  function getUpgradeLevelCost(upgradeName: CorpUpgradeName): number {
     const corporation = getCorporation();
-    const upgrade = Object.values(CorporationUpgrades).find((upgrade) => upgrade[4] === upgradeName);
-    if (upgrade === undefined) throw new Error(`No upgrade named '${upgradeName}'`);
-    const upgN = upgrade[0];
-    const baseCost = upgrade[1];
-    const priceMult = upgrade[2];
-    const level = corporation.upgrades[upgN];
-    return baseCost * Math.pow(priceMult, level);
-  }
-
-  function getExpandIndustryCost(industryName: string): number {
-    const cost = IndustryStartingCosts[industryName];
-    if (cost === undefined) {
-      throw new Error(`Invalid industry: '${industryName}'`);
-    }
+    const upgrade = CorpUpgrades[upgradeName];
+    const cost = calculateUpgradeCost(
+      upgrade.basePrice,
+      upgrade.priceMult,
+      corporation.upgrades[upgradeName].level,
+      1 as PositiveInteger,
+    );
     return cost;
   }
 
-  function getExpandCityCost(): number {
-    return CorporationConstants.OfficeInitialCost;
-  }
-
-  function getInvestmentOffer(): InvestmentOffer {
-    const corporation = getCorporation();
-    if (corporation.fundingRound >= CorporationConstants.FundingRoundShares.length || corporation.fundingRound >= CorporationConstants.FundingRoundMultiplier.length || corporation.public) 
-      return {
-        funds: 0,
-        shares: 0,
-        round: corporation.fundingRound + 1 // Make more readable 
-      }; // Don't throw an error here, no reason to have a second function to check if you can get investment.
-    const val = corporation.determineValuation();
-    const percShares = CorporationConstants.FundingRoundShares[corporation.fundingRound];
-    const roundMultiplier = CorporationConstants.FundingRoundMultiplier[corporation.fundingRound];
-    const funding = val * percShares * roundMultiplier;
-    const investShares = Math.floor(CorporationConstants.INITIALSHARES * percShares);
-    return {
-      funds: funding,
-      shares: investShares,
-      round: corporation.fundingRound + 1 // Make more readable 
-    };
-  }
-
-  function acceptInvestmentOffer(): boolean {
-    const corporation = getCorporation();
-    if (corporation.fundingRound >= CorporationConstants.FundingRoundShares.length || corporation.fundingRound >= CorporationConstants.FundingRoundMultiplier.length || corporation.public) return false;
-    const val = corporation.determineValuation();
-    const percShares = CorporationConstants.FundingRoundShares[corporation.fundingRound];
-    const roundMultiplier = CorporationConstants.FundingRoundMultiplier[corporation.fundingRound];
-    const funding = val * percShares * roundMultiplier;
-    const investShares = Math.floor(CorporationConstants.INITIALSHARES * percShares);
-    corporation.fundingRound++;
-    corporation.addFunds(funding);
-    corporation.numShares -= investShares;
-    return true;
-  }
-
-  function goPublic(numShares: number): boolean {
-    const corporation = getCorporation();
-    const initialSharePrice = corporation.determineValuation() / corporation.totalShares;
-    if (isNaN(numShares)) throw new Error("Invalid value for number of issued shares");
-    if (numShares < 0) throw new Error("Invalid value for number of issued shares");
-    if (numShares > corporation.numShares) throw new Error("You don't have that many shares to issue!");
-    corporation.public = true;
-    corporation.sharePrice = initialSharePrice;
-    corporation.issuedShares = numShares;
-    corporation.numShares -= numShares;
-    corporation.addFunds(numShares * initialSharePrice);
-    return true;
-  }
-
-  function getResearchCost(division: IIndustry, researchName: string): number {
-    const researchTree = IndustryResearchTrees[division.type];
-    if (researchTree === undefined) throw new Error(`No research tree for industry '${division.type}'`);
+  function getResearchCost(division: Division, researchName: CorpResearchName): number {
+    const researchTree = IndustryResearchTrees[division.industry];
+    if (researchTree === undefined) throw new Error(`No research tree for industry '${division.industry}'`);
     const allResearch = researchTree.getAllNodes();
     if (!allResearch.includes(researchName)) throw new Error(`No research named '${researchName}'`);
     const research = ResearchMap[researchName];
     return research.cost;
   }
 
-  function hasResearched(division: IIndustry, researchName: string): boolean {
-    return division.researched[researchName] === undefined ? false : division.researched[researchName] as boolean;
+  function hasResearched(division: Division, researchName: CorpResearchName): boolean {
+    return division.researched.has(researchName);
   }
 
-  function bribe(factionName: string, amountCash: number, amountShares: number): boolean {
-    if (!player.factions.includes(factionName)) throw new Error("Invalid faction name");
-    if (isNaN(amountCash) || amountCash < 0 || isNaN(amountShares) || amountShares < 0)  throw new Error("Invalid value for amount field! Must be numeric, grater than 0.");
-    const corporation = getCorporation();
-    if (corporation.funds < amountCash) return false;
-    if (corporation.numShares < amountShares) return false;
-    const faction = Factions[factionName]
-    const info = faction.getInfo();
-    if (!info.offersWork()) return false;
-    if (player.hasGangWith(factionName)) return false;
-
-    const repGain = (amountCash + amountShares * corporation.sharePrice) / CorporationConstants.BribeToRepRatio;
-    faction.playerReputation += repGain;
-    corporation.funds = corporation.funds - amountCash;
-    corporation.numShares -= amountShares;
-
-    return true;
-  }
-
-  function getCorporation(): ICorporation {
-    const corporation = player.corporation;
+  function getCorporation(): Corporation {
+    const corporation = Player.corporation;
     if (corporation === null) throw new Error("cannot be called without a corporation");
     return corporation;
   }
 
-  function getDivision(divisionName: any): IIndustry {
+  function getDivision(divisionName: string): Division {
     const corporation = getCorporation();
-    const division = corporation.divisions.find((div) => div.name === divisionName);
+    const division = corporation.divisions.get(divisionName);
     if (division === undefined) throw new Error(`No division named '${divisionName}'`);
     return division;
   }
 
-  function getOffice(divisionName: any, cityName: any): OfficeSpace {
+  function getOffice(divisionName: string, cityName: CityName): OfficeSpace {
     const division = getDivision(divisionName);
-    if (!(cityName in division.offices)) throw new Error(`Invalid city name '${cityName}'`);
     const office = division.offices[cityName];
-    if (office === 0) throw new Error(`${division.name} has not expanded to '${cityName}'`);
+    if (!office) throw new Error(`${division.name} has not expanded to '${cityName}'`);
     return office;
   }
 
-  function getWarehouse(divisionName: any, cityName: any): Warehouse {
+  function getWarehouse(divisionName: string, cityName: CityName): Warehouse {
     const division = getDivision(divisionName);
-    if (!(cityName in division.warehouses)) throw new Error(`Invalid city name '${cityName}'`);
     const warehouse = division.warehouses[cityName];
-    if (warehouse === 0) throw new Error(`${division.name} has not expanded to '${cityName}'`);
+    if (!warehouse) throw new Error(`${division.name} does not have a warehouse in '${cityName}'`);
     return warehouse;
   }
 
-  function getMaterial(divisionName: any, cityName: any, materialName: any): Material {
+  function getMaterial(divisionName: string, cityName: CityName, materialName: CorpMaterialName): Material {
     const warehouse = getWarehouse(divisionName, cityName);
-    const matName = (materialName as string).replace(/ /g, "");
-    const material = warehouse.materials[matName];
-    if (material === undefined) throw new Error(`Invalid material name: '${materialName}'`);
+    const material = warehouse.materials[materialName];
     return material;
   }
 
-  function getProduct(divisionName: any, productName: any): Product {
+  function getProduct(divisionName: string, productName: string): Product {
     const division = getDivision(divisionName);
-    const product = division.products[productName];
+    const product = division.products.get(productName);
     if (product === undefined) throw new Error(`Invalid product name: '${productName}'`);
     return product;
   }
 
-  function getEmployee(divisionName: any, cityName: any, employeeName: any): Employee {
-    const office = getOffice(divisionName, cityName);
-    const employee = office.employees.find((e) => e.name === employeeName);
-    if (employee === undefined) throw new Error(`Invalid employee name: '${employeeName}'`);
-    return employee;
-  }
-
-  function checkAccess(func: string, api?: number): void {
-    if (player.corporation === null) throw helper.makeRuntimeErrorMsg(`corporation.${func}`, "Must own a corporation.");
+  function checkAccess(ctx: NetscriptContext, api?: CorpUnlockName): void {
+    if (!Player.corporation) throw helpers.errorMessage(ctx, "Must own a corporation.");
     if (!api) return;
-
-    if (!player.corporation.unlockUpgrades[api])
-      throw helper.makeRuntimeErrorMsg(`corporation.${func}`, "You do not have access to this API.");
+    if (!Player.corporation.unlocks.has(api)) {
+      throw helpers.errorMessage(ctx, "You do not have access to this API.");
+    }
   }
 
-  function getSafeDivision(division: Industry): NSDivision {
-    const cities: string[] = [];
-      for (const office of Object.values(division.offices)) {
-        if (office === 0) continue;
-        cities.push(office.loc);
-      }
-      return {
-        name: division.name,
-        type: division.type,
-        awareness: division.awareness,
-        popularity: division.popularity,
-        prodMult: division.prodMult,
-        research: division.sciResearch.qty,
-        lastCycleRevenue: division.lastCycleRevenue,
-        lastCycleExpenses: division.lastCycleExpenses,
-        thisCycleRevenue: division.thisCycleRevenue,
-        thisCycleExpenses: division.thisCycleExpenses,
-        upgrades: division.upgrades,
-        cities: cities,
-        products: division.products === undefined ? [] : Object.keys(division.products),
-      };
+  function getSafeDivision(division: Division): NSDivision {
+    const cities = getRecordKeys(division.offices);
+
+    const data = {
+      name: division.name,
+      industry: division.industry,
+      awareness: division.awareness,
+      popularity: division.popularity,
+      productionMult: division.productionMult,
+      researchPoints: division.researchPoints,
+      lastCycleRevenue: division.lastCycleRevenue,
+      lastCycleExpenses: division.lastCycleExpenses,
+      thisCycleRevenue: division.thisCycleRevenue,
+      thisCycleExpenses: division.thisCycleExpenses,
+      numAdVerts: division.numAdVerts,
+      cities: cities,
+      products: [...division.products.keys()],
+      makesProducts: division.makesProducts,
+      maxProducts: division.maxProducts,
+    };
+    setDeprecatedProperties(data, {
+      type: {
+        identifier: "ns.corporation.getDivision().type",
+        message: "Use ns.corporation.getDivision().industry instead.",
+        value: data.industry,
+      },
+    });
+    return data;
   }
 
-  const warehouseAPI: WarehouseAPI = {
-    getPurchaseWarehouseCost: function (): number {
-      checkAccess("getPurchaseWarehouseCost", 7);
-      return CorporationConstants.WarehouseInitialCost;
-    },
-    getUpgradeWarehouseCost: function (adivisionName: any, acityName: any): number {
-      checkAccess("upgradeWarehouse", 7);
-      const divisionName = helper.string("getUpgradeWarehouseCost", "divisionName", adivisionName);
-      const cityName = helper.string("getUpgradeWarehouseCost", "cityName", acityName);
-      const warehouse = getWarehouse(divisionName, cityName);
-      return CorporationConstants.WarehouseUpgradeBaseCost * Math.pow(1.07, warehouse.level + 1);
-    },
-    hasWarehouse: function (adivisionName: any, acityName: any): boolean {
-      checkAccess("hasWarehouse", 7);
-      const divisionName = helper.string("getWarehouse", "divisionName", adivisionName);
-      const cityName = helper.string("getWarehouse", "cityName", acityName);
+  const warehouseAPI: InternalAPI<WarehouseAPI> = {
+    getUpgradeWarehouseCost:
+      (ctx) =>
+      (_divisionName, _cityName, _amt = 1) => {
+        checkAccess(ctx, CorpUnlockName.WarehouseAPI);
+        const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+        const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
+        const amt = helpers.number(ctx, "amount", _amt);
+        if (amt < 1) {
+          throw helpers.errorMessage(ctx, "You must provide a positive number");
+        }
+        const warehouse = getWarehouse(divisionName, cityName);
+        return upgradeWarehouseCost(warehouse.level, amt);
+      },
+    hasWarehouse: (ctx) => (_divisionName, _cityName) => {
+      checkAccess(ctx, CorpUnlockName.WarehouseAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
       const division = getDivision(divisionName);
-      if (!(cityName in division.warehouses)) throw new Error(`Invalid city name '${cityName}'`);
-      const warehouse = division.warehouses[cityName];
-      return warehouse !== 0;
+      return cityName in division.warehouses;
     },
-    getWarehouse: function (adivisionName: any, acityName: any): NSWarehouse {
-      checkAccess("getWarehouse", 7);
-      const divisionName = helper.string("getWarehouse", "divisionName", adivisionName);
-      const cityName = helper.string("getWarehouse", "cityName", acityName);
+    getWarehouse: (ctx) => (_divisionName, _cityName) => {
+      checkAccess(ctx, CorpUnlockName.WarehouseAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
       const warehouse = getWarehouse(divisionName, cityName);
       return {
         level: warehouse.level,
-        loc: warehouse.loc,
+        city: warehouse.city,
         size: warehouse.size,
         sizeUsed: warehouse.sizeUsed,
-        smartSupplyEnabled: warehouse.smartSupplyEnabled
+        smartSupplyEnabled: warehouse.smartSupplyEnabled,
       };
     },
-    getMaterial: function (adivisionName: any, acityName: any, amaterialName: any): NSMaterial {
-      checkAccess("getMaterial", 7);
-      const divisionName = helper.string("getMaterial", "divisionName", adivisionName);
-      const cityName = helper.string("getMaterial", "cityName", acityName);
-      const materialName = helper.string("getMaterial", "materialName", amaterialName);
+    getMaterial: (ctx) => (_divisionName, _cityName, _materialName) => {
+      checkAccess(ctx, CorpUnlockName.WarehouseAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
+      const materialName = getEnumHelper("CorpMaterialName").nsGetMember(ctx, _materialName, "materialName");
       const material = getMaterial(divisionName, cityName, materialName);
+      const corporation = getCorporation();
+      const exports = structuredClone(material.exports);
       return {
+        marketPrice: material.marketPrice,
+        desiredSellPrice: material.desiredSellPrice,
+        desiredSellAmount: material.desiredSellAmount,
         name: material.name,
-        qty: material.qty,
-        qlt: material.qlt,
-        prod: material.prd,
-        sell: material.sll,
+        stored: material.stored,
+        quality: material.quality,
+        demand: corporation.unlocks.has(CorpUnlockName.MarketResearchDemand) ? material.demand : undefined,
+        competition: corporation.unlocks.has(CorpUnlockName.MarketDataCompetition) ? material.competition : undefined,
+        buyAmount: material.buyAmount,
+        productionAmount: material.productionAmount,
+        importAmount: material.importAmount,
+        actualSellAmount: material.actualSellAmount,
+        exports: exports,
+        productionLimit: material.productionLimit,
       };
     },
-    getProduct: function (adivisionName: any, aproductName: any): NSProduct {
-      checkAccess("getProduct", 7);
-      const divisionName = helper.string("getProduct", "divisionName", adivisionName);
-      const productName = helper.string("getProduct", "productName", aproductName);
+    getProduct: (ctx) => (_divisionName, _cityName, _productName) => {
+      checkAccess(ctx, CorpUnlockName.WarehouseAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const productName = helpers.string(ctx, "productName", _productName);
+      const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
       const product = getProduct(divisionName, productName);
+      const corporation = getCorporation();
+      const cityData = product.cityData[cityName];
       return {
         name: product.name,
-        dmd: product.dmd,
-        cmp: product.cmp,
-        pCost: product.pCost,
-        sCost: product.sCost,
-        cityData: product.data,
-        developmentProgress: product.prog,
+        demand: corporation.unlocks.has(CorpUnlockName.MarketResearchDemand) ? product.demand : undefined,
+        competition: corporation.unlocks.has(CorpUnlockName.MarketDataCompetition) ? product.competition : undefined,
+        rating: product.rating,
+        effectiveRating: cityData.effectiveRating,
+        stats: structuredClone(product.stats),
+        productionCost: cityData.productionCost,
+        desiredSellPrice: cityData.desiredSellPrice,
+        desiredSellAmount: cityData.desiredSellAmount,
+        stored: cityData.stored,
+        productionAmount: cityData.productionAmount,
+        actualSellAmount: cityData.actualSellAmount,
+        developmentProgress: product.developmentProgress,
+        advertisingInvestment: product.advertisingInvestment,
+        designInvestment: product.designInvestment,
+        size: product.size,
+        productionLimit: cityData.productionLimit,
       };
     },
-    purchaseWarehouse: function (adivisionName: any, acityName: any): void {
-      checkAccess("purchaseWarehouse", 7);
-      const divisionName = helper.string("purchaseWarehouse", "divisionName", adivisionName);
-      const cityName = helper.string("purchaseWarehouse", "cityName", acityName);
+    purchaseWarehouse: (ctx) => (_divisionName, _cityName) => {
+      checkAccess(ctx, CorpUnlockName.WarehouseAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
       const corporation = getCorporation();
-      PurchaseWarehouse(corporation, getDivision(divisionName), cityName);
+      purchaseWarehouse(corporation, getDivision(divisionName), cityName);
     },
-    upgradeWarehouse: function (adivisionName: any, acityName: any): void {
-      checkAccess("upgradeWarehouse", 7);
-      const divisionName = helper.string("upgradeWarehouse", "divisionName", adivisionName);
-      const cityName = helper.string("upgradeWarehouse", "cityName", acityName);
-      const corporation = getCorporation();
-      UpgradeWarehouse(corporation, getDivision(divisionName), getWarehouse(divisionName, cityName));
-    },
-    sellMaterial: function (adivisionName: any, acityName: any, amaterialName: any, aamt: any, aprice: any): void {
-      checkAccess("sellMaterial", 7);
-      const divisionName = helper.string("sellMaterial", "divisionName", adivisionName);
-      const cityName = helper.string("sellMaterial", "cityName", acityName);
-      const materialName = helper.string("sellMaterial", "materialName", amaterialName);
-      const amt = helper.string("sellMaterial", "amt", aamt);
-      const price = helper.string("sellMaterial", "price", aprice);
+    upgradeWarehouse:
+      (ctx) =>
+      (_divisionName, _cityName, _amt = 1): void => {
+        checkAccess(ctx, CorpUnlockName.WarehouseAPI);
+        const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+        const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
+        const amt = helpers.number(ctx, "amount", _amt);
+        const corporation = getCorporation();
+        if (amt < 1) {
+          throw helpers.errorMessage(ctx, "You must provide a positive number");
+        }
+        upgradeWarehouse(corporation, getDivision(divisionName), getWarehouse(divisionName, cityName), amt);
+      },
+    sellMaterial: (ctx) => (_divisionName, _cityName, _materialName, _amt, _price) => {
+      checkAccess(ctx, CorpUnlockName.WarehouseAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
+      const materialName = getEnumHelper("CorpMaterialName").nsGetMember(ctx, _materialName, "materialName");
+      const amt = helpers.string(ctx, "amt", _amt);
+      const price = helpers.string(ctx, "price", _price);
       const material = getMaterial(divisionName, cityName, materialName);
-      SellMaterial(material, amt, price);
+      sellMaterial(material, amt, price);
     },
-    sellProduct: function (
-      adivisionName: any,
-      acityName: any,
-      aproductName: any,
-      aamt: any,
-      aprice: any,
-      aall: any,
-    ): void {
-      checkAccess("sellProduct", 7);
-      const divisionName = helper.string("sellProduct", "divisionName", adivisionName);
-      const cityName = helper.string("sellProduct", "cityName", acityName);
-      const productName = helper.string("sellProduct", "productName", aproductName);
-      const amt = helper.string("sellProduct", "amt", aamt);
-      const price = helper.string("sellProduct", "price", aprice);
-      const all = helper.boolean(aall);
-      const product = getProduct(divisionName, productName);
-      SellProduct(product, cityName, amt, price, all);
+    sellProduct:
+      (ctx) =>
+      (_divisionName, _cityName, _productName, _amt, _price, _all): void => {
+        checkAccess(ctx, CorpUnlockName.WarehouseAPI);
+        const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+        const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
+        const productName = helpers.string(ctx, "productName", _productName);
+        const amt = helpers.string(ctx, "amt", _amt);
+        const price = helpers.string(ctx, "price", _price);
+        const all = !!_all;
+        const product = getProduct(divisionName, productName);
+        sellProduct(product, cityName, amt, price, all);
+      },
+    discontinueProduct: (ctx) => (_divisionName, _productName) => {
+      checkAccess(ctx, CorpUnlockName.WarehouseAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const productName = helpers.string(ctx, "productName", _productName);
+      getDivision(divisionName).discontinueProduct(productName);
     },
-    discontinueProduct: function (adivisionName: any, aproductName: any): void {
-      checkAccess("discontinueProduct", 7);
-      const divisionName = helper.string("discontinueProduct", "divisionName", adivisionName);
-      const productName = helper.string("discontinueProduct", "productName", aproductName);
-      getDivision(divisionName).discontinueProduct(getProduct(divisionName, productName));
-    },
-    setSmartSupply: function (adivisionName: any, acityName: any, aenabled: any): void {
-      checkAccess("setSmartSupply", 7);
-      const divisionName = helper.string("setSmartSupply", "divisionName", adivisionName);
-      const cityName = helper.string("sellProduct", "cityName", acityName);
-      const enabled = helper.boolean(aenabled);
+    setSmartSupply: (ctx) => (_divisionName, _cityName, _enabled) => {
+      checkAccess(ctx, CorpUnlockName.WarehouseAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
+      const enabled = !!_enabled;
       const warehouse = getWarehouse(divisionName, cityName);
-      SetSmartSupply(warehouse, enabled);
+      if (!hasUnlock(CorpUnlockName.SmartSupply))
+        throw helpers.errorMessage(ctx, `You have not purchased the Smart Supply upgrade!`);
+      setSmartSupply(warehouse, enabled);
     },
-    setSmartSupplyUseLeftovers: function (adivisionName: any, acityName: any, amaterialName: any, aenabled: any): void {
-      checkAccess("setSmartSupplyUseLeftovers", 7);
-      const divisionName = helper.string("setSmartSupply", "divisionName", adivisionName);
-      const cityName = helper.string("sellProduct", "cityName", acityName);
-      const materialName = helper.string("sellProduct", "materialName", amaterialName);
-      const enabled = helper.boolean(aenabled);
+    setSmartSupplyOption: (ctx) => (_divisionName, _cityName, _materialName, _option) => {
+      checkAccess(ctx, CorpUnlockName.WarehouseAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
+      const materialName = getEnumHelper("CorpMaterialName").nsGetMember(ctx, _materialName, "materialName");
       const warehouse = getWarehouse(divisionName, cityName);
       const material = getMaterial(divisionName, cityName, materialName);
-      SetSmartSupplyUseLeftovers(warehouse, material, enabled);
+      const option = getEnumHelper("SmartSupplyOption").nsGetMember(ctx, _option);
+      if (!hasUnlock(CorpUnlockName.SmartSupply))
+        throw helpers.errorMessage(ctx, `You have not purchased the Smart Supply upgrade!`);
+      setSmartSupplyOption(warehouse, material, option);
     },
-    buyMaterial: function (adivisionName: any, acityName: any, amaterialName: any, aamt: any): void {
-      checkAccess("buyMaterial", 7);
-      const divisionName = helper.string("buyMaterial", "divisionName", adivisionName);
-      const cityName = helper.string("buyMaterial", "cityName", acityName);
-      const materialName = helper.string("buyMaterial", "materialName", amaterialName);
-      const amt = helper.number("buyMaterial", "amt", aamt);
-      if (amt < 0) throw new Error("Invalid value for amount field! Must be numeric and grater than 0");
+    buyMaterial: (ctx) => (_divisionName, _cityName, _materialName, _amt) => {
+      checkAccess(ctx, CorpUnlockName.WarehouseAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const division = getCorporation().divisions.get(divisionName);
+      if (!division) throw helpers.errorMessage(ctx, `No division with provided name ${divisionName}`);
+      const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
+      const materialName = getEnumHelper("CorpMaterialName").nsGetMember(ctx, _materialName, "materialName");
+      const amt = helpers.number(ctx, "amt", _amt);
       const material = getMaterial(divisionName, cityName, materialName);
-      BuyMaterial(material, amt);
+      buyMaterial(division, material, amt);
     },
-    makeProduct: function (
-      adivisionName: any,
-      acityName: any,
-      aproductName: any,
-      adesignInvest: any,
-      amarketingInvest: any,
-    ): void {
-      checkAccess("makeProduct", 7);
-      const divisionName = helper.string("makeProduct", "divisionName", adivisionName);
-      const cityName = helper.string("makeProduct", "cityName", acityName);
-      const productName = helper.string("makeProduct", "productName", aproductName);
-      const designInvest = helper.number("makeProduct", "designInvest", adesignInvest);
-      const marketingInvest = helper.number("makeProduct", "marketingInvest", amarketingInvest);
+    bulkPurchase: (ctx) => (_divisionName, _cityName, _materialName, _amt) => {
+      checkAccess(ctx, CorpUnlockName.WarehouseAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const division = getCorporation().divisions.get(divisionName);
+      if (!division) throw helpers.errorMessage(ctx, `No division with provided name ${divisionName}`);
       const corporation = getCorporation();
-      MakeProduct(corporation, getDivision(divisionName), cityName, productName, designInvest, marketingInvest);
+      const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
+      const materialName = getEnumHelper("CorpMaterialName").nsGetMember(ctx, _materialName, "materialName");
+      const amt = helpers.number(ctx, "amt", _amt);
+      const warehouse = getWarehouse(divisionName, cityName);
+      const material = getMaterial(divisionName, cityName, materialName);
+      bulkPurchase(corporation, division, warehouse, material, amt);
     },
-    exportMaterial: function (
-      asourceDivision: any,
-      asourceCity: any,
-      atargetDivision: any,
-      atargetCity: any,
-      amaterialName: any,
-      aamt: any,
-    ): void {
-      checkAccess("exportMaterial", 7);
-      const sourceDivision = helper.string("exportMaterial", "sourceDivision", asourceDivision);
-      const sourceCity = helper.string("exportMaterial", "sourceCity", asourceCity);
-      const targetDivision = helper.string("exportMaterial", "targetDivision", atargetDivision);
-      const targetCity = helper.string("exportMaterial", "targetCity", atargetCity);
-      const materialName = helper.string("exportMaterial", "materialName", amaterialName);
-      const amt = helper.string("exportMaterial", "amt", aamt);
-      ExportMaterial(targetDivision, targetCity, getMaterial(sourceDivision, sourceCity, materialName), amt + "");
+    makeProduct:
+      (ctx) =>
+      (_divisionName, _cityName, _productName, _designInvest, _marketingInvest): void => {
+        checkAccess(ctx, CorpUnlockName.WarehouseAPI);
+        const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+        const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
+        const productName = helpers.string(ctx, "productName", _productName);
+        const designInvest = helpers.number(ctx, "designInvest", _designInvest);
+        const marketingInvest = helpers.number(ctx, "marketingInvest", _marketingInvest);
+        const corporation = getCorporation();
+        makeProduct(corporation, getDivision(divisionName), cityName, productName, designInvest, marketingInvest);
+      },
+    limitProductProduction: (ctx) => (_divisionName, _cityName, _productName, _qty) => {
+      checkAccess(ctx, CorpUnlockName.WarehouseAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
+      const productName = helpers.string(ctx, "productName", _productName);
+      const qty = helpers.number(ctx, "qty", _qty);
+      limitProductProduction(getProduct(divisionName, productName), cityName, qty);
     },
-    cancelExportMaterial: function (
-      asourceDivision: any,
-      asourceCity: any,
-      atargetDivision: any,
-      atargetCity: any,
-      amaterialName: any,
-      aamt: any,
-    ): void {
-      checkAccess("cancelExportMaterial", 7);
-      const sourceDivision = helper.string("cancelExportMaterial", "sourceDivision", asourceDivision);
-      const sourceCity = helper.string("cancelExportMaterial", "sourceCity", asourceCity);
-      const targetDivision = helper.string("cancelExportMaterial", "targetDivision", atargetDivision);
-      const targetCity = helper.string("cancelExportMaterial", "targetCity", atargetCity);
-      const materialName = helper.string("cancelExportMaterial", "materialName", amaterialName);
-      const amt = helper.string("cancelExportMaterial", "amt", aamt);
-      CancelExportMaterial(targetDivision, targetCity, getMaterial(sourceDivision, sourceCity, materialName), amt + "");
+    exportMaterial:
+      (ctx) =>
+      (_sourceDivision, _sourceCity, _targetDivision, _targetCity, _materialName, _amt): void => {
+        checkAccess(ctx, CorpUnlockName.WarehouseAPI);
+        if (!hasUnlock(CorpUnlockName.Export)) {
+          throw helpers.errorMessage(ctx, `You have not unlocked the Export feature!`);
+        }
+        const sourceDivision = helpers.string(ctx, "sourceDivision", _sourceDivision);
+        const sourceCity = getEnumHelper("CityName").nsGetMember(ctx, _sourceCity, "sourceCity");
+        const targetDivision = getDivision(helpers.string(ctx, "targetDivision", _targetDivision));
+        const targetCity = getEnumHelper("CityName").nsGetMember(ctx, _targetCity, "targetCity");
+        const materialName = getEnumHelper("CorpMaterialName").nsGetMember(ctx, _materialName, "materialName");
+        const amt = helpers.string(ctx, "amt", _amt);
+
+        exportMaterial(targetDivision, targetCity, getMaterial(sourceDivision, sourceCity, materialName), amt);
+      },
+    cancelExportMaterial:
+      (ctx) =>
+      (_sourceDivision, _sourceCity, _targetDivision, _targetCity, _materialName): void => {
+        checkAccess(ctx, CorpUnlockName.WarehouseAPI);
+        if (!hasUnlock(CorpUnlockName.Export)) {
+          throw helpers.errorMessage(ctx, `You have not unlocked the Export feature!`);
+        }
+        const sourceDivision = helpers.string(ctx, "sourceDivision", _sourceDivision);
+        const sourceCity = getEnumHelper("CityName").nsGetMember(ctx, _sourceCity, "sourceCity");
+        const targetDivision = helpers.string(ctx, "targetDivision", _targetDivision);
+        const targetCity = getEnumHelper("CityName").nsGetMember(ctx, _targetCity, "targetCity");
+        const materialName = getEnumHelper("CorpMaterialName").nsGetMember(ctx, _materialName, "materialName");
+        cancelExportMaterial(targetDivision, targetCity, getMaterial(sourceDivision, sourceCity, materialName));
+      },
+    limitMaterialProduction: (ctx) => (_divisionName, _cityName, _materialName, _qty) => {
+      checkAccess(ctx, CorpUnlockName.WarehouseAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
+      const materialName = getEnumHelper("CorpMaterialName").nsGetMember(ctx, _materialName, "materialName");
+      const qty = helpers.number(ctx, "qty", _qty);
+      limitMaterialProduction(getMaterial(divisionName, cityName, materialName), qty);
     },
-    setMaterialMarketTA1: function (adivisionName: any, acityName: any, amaterialName: any, aon: any): void {
-      checkAccess("setMaterialMarketTA1", 7);
-      const divisionName = helper.string("setMaterialMarketTA1", "divisionName", adivisionName);
-      const cityName = helper.string("setMaterialMarketTA1", "cityName", acityName);
-      const materialName = helper.string("setMaterialMarketTA1", "materialName", amaterialName);
-      const on = helper.boolean(aon);
-      SetMaterialMarketTA1(getMaterial(divisionName, cityName, materialName), on);
+    setMaterialMarketTA1: (ctx) => (_divisionName, _cityName, _materialName, _on) => {
+      checkAccess(ctx, CorpUnlockName.WarehouseAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
+      const materialName = getEnumHelper("CorpMaterialName").nsGetMember(ctx, _materialName, "materialName");
+      const on = !!_on;
+      if (!getDivision(divisionName).hasResearch("Market-TA.I"))
+        throw helpers.errorMessage(ctx, `You have not researched MarketTA.I for division: ${divisionName}`);
+      setMaterialMarketTA1(getMaterial(divisionName, cityName, materialName), on);
     },
-    setMaterialMarketTA2: function (adivisionName: any, acityName: any, amaterialName: any, aon: any): void {
-      checkAccess("setMaterialMarketTA2", 7);
-      const divisionName = helper.string("setMaterialMarketTA2", "divisionName", adivisionName);
-      const cityName = helper.string("setMaterialMarketTA2", "cityName", acityName);
-      const materialName = helper.string("setMaterialMarketTA2", "materialName", amaterialName);
-      const on = helper.boolean(aon);
-      SetMaterialMarketTA2(getMaterial(divisionName, cityName, materialName), on);
+    setMaterialMarketTA2: (ctx) => (_divisionName, _cityName, _materialName, _on) => {
+      checkAccess(ctx, CorpUnlockName.WarehouseAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
+      const materialName = getEnumHelper("CorpMaterialName").nsGetMember(ctx, _materialName, "materialName");
+      const on = !!_on;
+      if (!getDivision(divisionName).hasResearch("Market-TA.II"))
+        throw helpers.errorMessage(ctx, `You have not researched MarketTA.II for division: ${divisionName}`);
+      setMaterialMarketTA2(getMaterial(divisionName, cityName, materialName), on);
     },
-    setProductMarketTA1: function (adivisionName: any, aproductName: any, aon: any): void {
-      checkAccess("setProductMarketTA1", 7);
-      const divisionName = helper.string("setProductMarketTA1", "divisionName", adivisionName);
-      const productName = helper.string("setProductMarketTA1", "productName", aproductName);
-      const on = helper.boolean(aon);
-      SetProductMarketTA1(getProduct(divisionName, productName), on);
+    setProductMarketTA1: (ctx) => (_divisionName, _productName, _on) => {
+      checkAccess(ctx, CorpUnlockName.WarehouseAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const productName = helpers.string(ctx, "productName", _productName);
+      const on = !!_on;
+      if (!getDivision(divisionName).hasResearch("Market-TA.I"))
+        throw helpers.errorMessage(ctx, `You have not researched MarketTA.I for division: ${divisionName}`);
+      setProductMarketTA1(getProduct(divisionName, productName), on);
     },
-    setProductMarketTA2: function (adivisionName: any, aproductName: any, aon: any): void {
-      checkAccess("setProductMarketTA2", 7);
-      const divisionName = helper.string("setProductMarketTA2", "divisionName", adivisionName);
-      const productName = helper.string("setProductMarketTA2", "productName", aproductName);
-      const on = helper.boolean(aon);
-      SetProductMarketTA2(getProduct(divisionName, productName), on);
+    setProductMarketTA2: (ctx) => (_divisionName, _productName, _on) => {
+      checkAccess(ctx, CorpUnlockName.WarehouseAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const productName = helpers.string(ctx, "productName", _productName);
+      const on = !!_on;
+      if (!getDivision(divisionName).hasResearch("Market-TA.II"))
+        throw helpers.errorMessage(ctx, `You have not researched MarketTA.II for division: ${divisionName}`);
+      setProductMarketTA2(getProduct(divisionName, productName), on);
     },
   };
 
-  const officeAPI: OfficeAPI = {
-    getHireAdVertCost: function (adivisionName: any): number {
-      checkAccess("getHireAdVertCost", 8);
-      const divisionName = helper.string("getHireAdVertCost", "divisionName", adivisionName);
+  const officeAPI: InternalAPI<OfficeAPI> = {
+    getHireAdVertCost: (ctx) => (_divisionName) => {
+      checkAccess(ctx, CorpUnlockName.OfficeAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
       const division = getDivision(divisionName);
-      const upgrade = IndustryUpgrades[1];
-      return upgrade[1] * Math.pow(upgrade[2], division.upgrades[1]);
+      return division.getAdVertCost();
     },
-    getHireAdVertCount: function (adivisionName: any): number {
-      checkAccess("getHireAdVertCount", 8);
-      const divisionName = helper.string("getHireAdVertCount", "divisionName", adivisionName);
+    getHireAdVertCount: (ctx) => (_divisionName) => {
+      checkAccess(ctx, CorpUnlockName.OfficeAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
       const division = getDivision(divisionName);
-      return division.upgrades[1]
+      return division.numAdVerts;
     },
-    getResearchCost: function (adivisionName: any, aresearchName: any): number {
-      checkAccess("getResearchCost", 8);
-      const divisionName = helper.string("getResearchCost", "divisionName", adivisionName);
-      const researchName = helper.string("getResearchCost", "researchName", aresearchName);
+    getResearchCost: (ctx) => (_divisionName, _researchName) => {
+      checkAccess(ctx, CorpUnlockName.OfficeAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const researchName = getEnumHelper("CorpResearchName").nsGetMember(ctx, _researchName, "researchName");
       return getResearchCost(getDivision(divisionName), researchName);
     },
-    hasResearched: function (adivisionName: any, aresearchName: any): boolean {
-      checkAccess("hasResearched", 8);
-      const divisionName = helper.string("hasResearched", "divisionName", adivisionName);
-      const researchName = helper.string("hasResearched", "researchName", aresearchName);
+    hasResearched: (ctx) => (_divisionName, _researchName) => {
+      checkAccess(ctx, CorpUnlockName.OfficeAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const researchName = getEnumHelper("CorpResearchName").nsGetMember(ctx, _researchName, "researchName");
       return hasResearched(getDivision(divisionName), researchName);
     },
-    setAutoJobAssignment: function (adivisionName: any, acityName: any, ajob: any, aamount: any): Promise<boolean> {
-      checkAccess("setAutoJobAssignment", 8);
-      const divisionName = helper.string("setAutoJobAssignment", "divisionName", adivisionName);
-      const cityName = helper.string("setAutoJobAssignment", "cityName", acityName);
-      const amount = helper.number("setAutoJobAssignment", "amount", aamount);
-      const job = helper.string("setAutoJobAssignment", "job", ajob);
+    getOfficeSizeUpgradeCost: (ctx) => (_divisionName, _cityName, _increase) => {
+      checkAccess(ctx, CorpUnlockName.OfficeAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
+      const increase = helpers.positiveInteger(ctx, "increase", _increase);
       const office = getOffice(divisionName, cityName);
-      if (!Object.values(EmployeePositions).includes(job)) throw new Error(`'${job}' is not a valid job.`);
-      return netscriptDelay(1000, workerScript).then(function () {
-        if (workerScript.env.stopFlag) {
-          return Promise.reject(workerScript);
-        }
-        return Promise.resolve(office.setEmployeeToJob(job, amount));
-      });
+      return calculateOfficeSizeUpgradeCost(office.size, increase);
     },
-    getOfficeSizeUpgradeCost: function (adivisionName: any, acityName: any, asize: any): number {
-      checkAccess("getOfficeSizeUpgradeCost", 8);
-      const divisionName = helper.string("getOfficeSizeUpgradeCost", "divisionName", adivisionName);
-      const cityName = helper.string("getOfficeSizeUpgradeCost", "cityName", acityName);
-      const size = helper.number("getOfficeSizeUpgradeCost", "size", asize);
-      if (size < 0) throw new Error("Invalid value for size field! Must be numeric and grater than 0");
-      const office = getOffice(divisionName, cityName);
-      const initialPriceMult = Math.round(office.size / CorporationConstants.OfficeInitialSize);
-      const costMultiplier = 1.09;
-      let mult = 0;
-      for (let i = 0; i < size / CorporationConstants.OfficeInitialSize; ++i) {
-        mult += Math.pow(costMultiplier, initialPriceMult + i);
+    setJobAssignment: (ctx) => (_divisionName, _cityName, _job, _amount) => {
+      checkAccess(ctx, CorpUnlockName.OfficeAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
+      const amount = helpers.number(ctx, "amount", _amount);
+      const job = getEnumHelper("CorpEmployeeJob").nsGetMember(ctx, _job, "job");
+
+      if (job === CorpEmployeeJob.Unassigned) {
+        helpers.log(
+          ctx,
+          () => `This API will not do anything and just return false if you pass "Unassigned" to the "job" parameter.`,
+        );
+        return false;
       }
-      return CorporationConstants.OfficeInitialCost * mult;
-    },
-    assignJob: function (adivisionName: any, acityName: any, aemployeeName: any, ajob: any): Promise<void> {
-      checkAccess("assignJob", 8);
-      const divisionName = helper.string("assignJob", "divisionName", adivisionName);
-      const cityName = helper.string("assignJob", "cityName", acityName);
-      const employeeName = helper.string("assignJob", "employeeName", aemployeeName);
-      const job = helper.string("assignJob", "job", ajob);
-      const employee = getEmployee(divisionName, cityName, employeeName);
-      return netscriptDelay(1000, workerScript).then(function () {
-        return Promise.resolve(AssignJob(employee, job));
-      });
-    },
-    hireEmployee: function (adivisionName: any, acityName: any): any {
-      checkAccess("hireEmployee", 8);
-      const divisionName = helper.string("hireEmployee", "divisionName", adivisionName);
-      const cityName = helper.string("hireEmployee", "cityName", acityName);
+      if (amount < 0 || !Number.isInteger(amount)) {
+        throw helpers.errorMessage(
+          ctx,
+          `Invalid value for amount! Must be an integer and greater than or be 0". Amount:'${amount}'`,
+        );
+      }
+
       const office = getOffice(divisionName, cityName);
-      return office.hireRandomEmployee();
+
+      const totalNewEmployees = amount - office.employeeNextJobs[job];
+
+      if (office.employeeNextJobs[CorpEmployeeJob.Unassigned] < totalNewEmployees) {
+        throw helpers.errorMessage(
+          ctx,
+          `Unable to bring '${job} employees to ${amount}. Requires ${totalNewEmployees} unassigned employees`,
+        );
+      }
+      return office.autoAssignJob(job, amount);
     },
-    upgradeOfficeSize: function (adivisionName: any, acityName: any, asize: any): void {
-      checkAccess("upgradeOfficeSize", 8);
-      const divisionName = helper.string("upgradeOfficeSize", "divisionName", adivisionName);
-      const cityName = helper.string("upgradeOfficeSize", "cityName", acityName);
-      const size = helper.number("upgradeOfficeSize", "size", asize);
-      if (size < 0) throw new Error("Invalid value for size field! Must be numeric and grater than 0");
+    hireEmployee: (ctx) => (_divisionName, _cityName, _position) => {
+      checkAccess(ctx, CorpUnlockName.OfficeAPI);
+      _position ??= CorpEmployeeJob.Unassigned;
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
+      const position = getEnumHelper("CorpEmployeeJob").nsGetMember(ctx, _position, "position");
+
+      const office = getOffice(divisionName, cityName);
+      return office.hireRandomEmployee(position);
+    },
+    upgradeOfficeSize: (ctx) => (_divisionName, _cityName, _size) => {
+      checkAccess(ctx, CorpUnlockName.OfficeAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
+      const size = helpers.positiveInteger(ctx, "size", _size);
+
       const office = getOffice(divisionName, cityName);
       const corporation = getCorporation();
-      UpgradeOfficeSize(corporation, office, size);
+      upgradeOfficeSize(corporation, office, size);
     },
-    throwParty: function (adivisionName: any, acityName: any, acostPerEmployee: any): Promise<number> {
-      checkAccess("throwParty", 8);
-      const divisionName = helper.string("throwParty", "divisionName", adivisionName);
-      const cityName = helper.string("throwParty", "cityName", acityName);
-      const costPerEmployee = helper.number("throwParty", "costPerEmployee", acostPerEmployee);
-      if (costPerEmployee < 0) throw new Error("Invalid value for Cost Per Employee field! Must be numeric and grater than 0");
+    throwParty: (ctx) => (_divisionName, _cityName, _costPerEmployee) => {
+      checkAccess(ctx, CorpUnlockName.OfficeAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
+      const costPerEmployee = helpers.number(ctx, "costPerEmployee", _costPerEmployee);
+
+      if (costPerEmployee < 0) {
+        throw new Error("Invalid value for Cost Per Employee field! Must be numeric and greater than 0");
+      }
+      const corporation = getCorporation();
       const office = getOffice(divisionName, cityName);
+
+      return throwParty(corporation, office, costPerEmployee);
+    },
+    buyTea: (ctx) => (_divisionName, _cityName) => {
+      checkAccess(ctx, CorpUnlockName.OfficeAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
+
       const corporation = getCorporation();
-      return netscriptDelay(
-        (60 * 1000) / (player.hacking_speed_mult * calculateIntelligenceBonus(player.intelligence, 1)),
-        workerScript,
-      ).then(function () {
-        return Promise.resolve(ThrowParty(corporation, office, costPerEmployee));
-      });
+      const office = getOffice(divisionName, cityName);
+      return buyTea(corporation, office);
     },
-    buyCoffee: function (adivisionName: any, acityName: any): Promise<void> {
-      checkAccess("buyCoffee", 8);
-      const divisionName = helper.string("buyCoffee", "divisionName", adivisionName);
-      const cityName = helper.string("buyCoffee", "cityName", acityName);
+    hireAdVert: (ctx) => (_divisionName) => {
+      checkAccess(ctx, CorpUnlockName.OfficeAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
       const corporation = getCorporation();
-      return netscriptDelay(
-        (60 * 1000) / (player.hacking_speed_mult * calculateIntelligenceBonus(player.intelligence, 1)),
-        workerScript,
-      ).then(function () {
-        return Promise.resolve(BuyCoffee(corporation, getDivision(divisionName), getOffice(divisionName, cityName)));
-      });
+      hireAdVert(corporation, getDivision(divisionName));
     },
-    hireAdVert: function (adivisionName: any): void {
-      checkAccess("hireAdVert", 8);
-      const divisionName = helper.string("hireAdVert", "divisionName", adivisionName);
-      const corporation = getCorporation();
-      HireAdVert(corporation, getDivision(divisionName), getOffice(divisionName, "Sector-12"));
+    research: (ctx) => (_divisionName, _researchName) => {
+      checkAccess(ctx, CorpUnlockName.OfficeAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const researchName = getEnumHelper("CorpResearchName").nsGetMember(ctx, _researchName, "researchName");
+      research(getDivision(divisionName), researchName);
     },
-    research: function (adivisionName: any, aresearchName: any): void {
-      checkAccess("research", 8);
-      const divisionName = helper.string("research", "divisionName", adivisionName);
-      const researchName = helper.string("research", "researchName", aresearchName);
-      Research(getDivision(divisionName), researchName);
-    },
-    getOffice: function (adivisionName: any, acityName: any): any {
-      checkAccess("getOffice", 8);
-      const divisionName = helper.string("getOffice", "divisionName", adivisionName);
-      const cityName = helper.string("getOffice", "cityName", acityName);
+    getOffice: (ctx) => (_divisionName, _cityName) => {
+      checkAccess(ctx, CorpUnlockName.OfficeAPI);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
       const office = getOffice(divisionName, cityName);
       return {
-        loc: office.loc,
+        city: office.city,
         size: office.size,
-        minEne: office.minEne,
-        maxEne: office.maxEne,
-        minHap: office.minHap,
-        maxHap: office.maxHap,
-        maxMor: office.maxMor,
-        employees: office.employees.map((e) => e.name),
-        employeeProd: {
-          Operations: office.employeeProd[EmployeePositions.Operations],
-          Engineer: office.employeeProd[EmployeePositions.Engineer],
-          Business: office.employeeProd[EmployeePositions.Business],
-          Management: office.employeeProd[EmployeePositions.Management],
-          "Research & Development": office.employeeProd[EmployeePositions.RandD],
-          Training: office.employeeProd[EmployeePositions.Training],
-        },
-      };
-    },
-    getEmployee: function (adivisionName: any, acityName: any, aemployeeName: any): NSEmployee {
-      checkAccess("getEmployee", 8);
-      const divisionName = helper.string("getEmployee", "divisionName", adivisionName);
-      const cityName = helper.string("getEmployee", "cityName", acityName);
-      const employeeName = helper.string("getEmployee", "employeeName", aemployeeName);
-      const employee = getEmployee(divisionName, cityName, employeeName);
-      return {
-        name: employee.name,
-        mor: employee.mor,
-        hap: employee.hap,
-        ene: employee.ene,
-        int: employee.int,
-        cha: employee.cha,
-        exp: employee.exp,
-        cre: employee.cre,
-        eff: employee.eff,
-        sal: employee.sal,
-        loc: employee.loc,
-        pos: employee.pos,
+        maxEnergy: office.maxEnergy,
+        maxMorale: office.maxMorale,
+        numEmployees: office.numEmployees,
+        avgEnergy: office.avgEnergy,
+        avgMorale: office.avgMorale,
+        totalExperience: office.totalExperience,
+        employeeProductionByJob: Object.assign({}, office.employeeProductionByJob),
+        employeeJobs: Object.assign({}, office.employeeJobs),
       };
     },
   };
 
-  return {
+  // TODO 2.2: Add removed function error dialogs for all the functions removed/replaced by getConstants.
+  const corpFunctions: InternalAPI<NSCorporation> = {
     ...warehouseAPI,
     ...officeAPI,
-    expandIndustry: function (aindustryName: any, adivisionName: any): void {
-      checkAccess("expandIndustry");
-      const industryName = helper.string("expandIndustry", "industryName", aindustryName);
-      const divisionName = helper.string("expandIndustry", "divisionName", adivisionName);
-      const corporation = getCorporation();
-      NewIndustry(corporation, industryName, divisionName);
+    hasCorporation: () => () => !!Player.corporation,
+    canCreateCorporation: (ctx) => (_selfFund) => {
+      const selfFund = !!_selfFund;
+      const checkResult = canCreateCorporation(selfFund, false);
+      if (checkResult !== CreatingCorporationCheckResultEnum.Success) {
+        helpers.log(ctx, () => convertCreatingCorporationCheckResultToMessage(checkResult));
+      }
+      return checkResult;
     },
-    expandCity: function (adivisionName: any, acityName: any): void {
-      checkAccess("expandCity");
-      const divisionName = helper.string("expandCity", "divisionName", adivisionName);
-      const cityName = helper.string("expandCity", "cityName", acityName);
-      if (!CorporationConstants.Cities.includes(cityName)) throw new Error("Invalid city name");
+    createCorporation:
+      (ctx) =>
+      (_corporationName, _selfFund = true): boolean => {
+        const corporationName = helpers.string(ctx, "corporationName", _corporationName);
+        const selfFund = !!_selfFund;
+        const result = createCorporation(corporationName, selfFund, false);
+        if (!result.success) {
+          helpers.log(ctx, () => result.message);
+        }
+        return result.success;
+      },
+    getConstants: () => () => {
+      /* TODO 2.2: possibly just rework the whole corp constants structure to be more readable, and just use
+       *           structuredClone to provide it directly to player.
+       * TODO 2.2: Roll product information into industriesData, there's no reason to look up a product separately */
+      // TODO: add functions for getting materialInfo and research info
+      return structuredClone(omit(corpConstants, "fundingRoundShares", "fundingRoundMultiplier", "valuationLength"));
+    },
+    getIndustryData: (ctx) => (_industryName) => {
+      checkAccess(ctx);
+      const industryName = getEnumHelper("IndustryType").nsGetMember(ctx, _industryName, "industryName");
+      return structuredClone(IndustriesData[industryName]);
+    },
+    getMaterialData: (ctx) => (_materialName) => {
+      checkAccess(ctx);
+      const materialName = getEnumHelper("CorpMaterialName").nsGetMember(ctx, _materialName, "materialName");
+      return structuredClone(MaterialInfo[materialName]);
+    },
+    expandIndustry: (ctx) => (_industryName, _divisionName) => {
+      checkAccess(ctx);
+      const industryName = getEnumHelper("IndustryType").nsGetMember(ctx, _industryName, "industryName");
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const corporation = getCorporation();
+      createDivision(corporation, industryName, divisionName);
+    },
+    expandCity: (ctx) => (_divisionName, _cityName) => {
+      checkAccess(ctx);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
       const corporation = getCorporation();
       const division = getDivision(divisionName);
-      NewCity(corporation, division, cityName);
+      purchaseOffice(corporation, division, cityName);
     },
-    unlockUpgrade: function (aupgradeName: any): void {
-      checkAccess("unlockUpgrade");
-      const upgradeName = helper.string("unlockUpgrade", "upgradeName", aupgradeName);
+    purchaseUnlock: (ctx) => (_unlockName) => {
+      checkAccess(ctx);
+      const unlockName = getEnumHelper("CorpUnlockName").nsGetMember(ctx, _unlockName, "unlockName");
       const corporation = getCorporation();
-      const upgrade = Object.values(CorporationUnlockUpgrades).find((upgrade) => upgrade[2] === upgradeName);
-      if (upgrade === undefined) throw new Error(`No upgrade named '${upgradeName}'`);
-      UnlockUpgrade(corporation, upgrade);
+      const result = corporation.purchaseUnlock(unlockName);
+      if (!result.success) {
+        throw new Error(`Could not unlock ${unlockName}: ${result.message}`);
+      }
     },
-    levelUpgrade: function (aupgradeName: any): void {
-      checkAccess("levelUpgrade");
-      const upgradeName = helper.string("levelUpgrade", "upgradeName", aupgradeName);
+    levelUpgrade: (ctx) => (_upgradeName) => {
+      checkAccess(ctx);
+      const upgradeName = getEnumHelper("CorpUpgradeName").nsGetMember(ctx, _upgradeName, "upgradeName");
       const corporation = getCorporation();
-      const upgrade = Object.values(CorporationUpgrades).find((upgrade) => upgrade[4] === upgradeName);
-      if (upgrade === undefined) throw new Error(`No upgrade named '${upgradeName}'`);
-      LevelUpgrade(corporation, upgrade);
+      const result = corporation.purchaseUpgrade(upgradeName, 1);
+      if (!result.success) {
+        throw new Error(`Could not upgrade ${upgradeName}: ${result.message}`);
+      }
     },
-    issueDividends: function (apercent: any): void {
-      checkAccess("issueDividends");
-      const percent = helper.number("issueDividends", "percent", apercent);
-      if (percent < 0 || percent > 100) throw new Error("Invalid value for percent field! Must be numeric, grater than 0, and less than 100");
+    issueDividends: (ctx) => (_rate) => {
+      checkAccess(ctx);
+      const rate = helpers.number(ctx, "rate", _rate);
+      const max = corpConstants.dividendMaxRate;
+      if (rate < 0 || rate > max)
+        throw new Error(`Invalid value for rate field! Must be numeric, greater than 0, and less than ${max}`);
       const corporation = getCorporation();
-      IssueDividends(corporation, percent);
+      if (!corporation.public) throw helpers.errorMessage(ctx, `Your company has not gone public!`);
+      issueDividends(corporation, rate);
     },
-
-    // If you modify these objects you will affect them for real, it's not
-    // copies.
-    getDivision: function (adivisionName: any): NSDivision {
-      checkAccess("getDivision");
-      const divisionName = helper.string("getDivision", "divisionName", adivisionName);
+    issueNewShares: (ctx) => (_amount) => {
+      checkAccess(ctx);
+      const corporation = getCorporation();
+      const maxNewShares = corporation.calculateMaxNewShares();
+      if (_amount == undefined) _amount = maxNewShares;
+      const amount = helpers.number(ctx, "amount", _amount);
+      const [funds] = issueNewShares(corporation, amount);
+      return funds;
+    },
+    getDivision: (ctx) => (_divisionName) => {
+      checkAccess(ctx);
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
       const division = getDivision(divisionName);
       return getSafeDivision(division);
     },
-    getCorporation: function (): CorporationInfo {
-      checkAccess("getCorporation");
+    getCorporation: (ctx) => () => {
+      checkAccess(ctx);
       const corporation = getCorporation();
-      return {
+      const data = {
         name: corporation.name,
         funds: corporation.funds,
         revenue: corporation.revenue,
@@ -746,64 +724,122 @@ export function NetscriptCorporation(
         totalShares: corporation.totalShares,
         numShares: corporation.numShares,
         shareSaleCooldown: corporation.shareSaleCooldown,
+        investorShares: corporation.investorShares,
         issuedShares: corporation.issuedShares,
+        issueNewSharesCooldown: corporation.issueNewSharesCooldown,
         sharePrice: corporation.sharePrice,
-        state: corporation.state.getState(),
-        divisions: corporation.divisions.map((division): NSDivision => getSafeDivision(division)),
+        dividendRate: corporation.dividendRate,
+        tributeModifier: corporation.tributeModifier,
+        dividendEarnings: corporation.getCycleDividends() / corpConstants.secondsPerMarketCycle,
+        nextState: corporation.state.nextName,
+        prevState: corporation.state.prevName,
+        divisions: [...corporation.divisions.keys()],
+        valuation: corporation.valuation,
       };
+      return data;
     },
-    createCorporation: function (acorporationName: string, selfFund = true): boolean {
-      const corporationName = helper.string("createCorporation", "corporationName", acorporationName);
-      return createCorporation(corporationName, selfFund);
+    hasUnlock: (ctx) => (_unlockName) => {
+      checkAccess(ctx);
+      const unlockName = getEnumHelper("CorpUnlockName").nsGetMember(ctx, _unlockName, "unlockName");
+      return hasUnlock(unlockName);
     },
-    hasUnlockUpgrade: function (aupgradeName: any): boolean {
-      checkAccess("hasUnlockUpgrade");
-      const upgradeName = helper.string("hasUnlockUpgrade", "upgradeName", aupgradeName);
-      return hasUnlockUpgrade(upgradeName);
+    getUnlockCost: (ctx) => (_unlockName) => {
+      checkAccess(ctx);
+      const unlockName = getEnumHelper("CorpUnlockName").nsGetMember(ctx, _unlockName, "unlockName");
+      return getUnlockCost(unlockName);
     },
-    getUnlockUpgradeCost: function (aupgradeName: any): number {
-      checkAccess("getUnlockUpgradeCost");
-      const upgradeName = helper.string("getUnlockUpgradeCost", "upgradeName", aupgradeName);
-      return getUnlockUpgradeCost(upgradeName);
-    },
-    getUpgradeLevel: function (aupgradeName: any): number {
-      checkAccess("hasUnlockUpgrade");
-      const upgradeName = helper.string("getUpgradeLevel", "upgradeName", aupgradeName);
+    getUpgradeLevel: (ctx) => (_upgradeName) => {
+      checkAccess(ctx);
+      const upgradeName = getEnumHelper("CorpUpgradeName").nsGetMember(ctx, _upgradeName, "upgradeName");
       return getUpgradeLevel(upgradeName);
     },
-    getUpgradeLevelCost: function (aupgradeName: any): number {
-      checkAccess("getUpgradeLevelCost");
-      const upgradeName = helper.string("getUpgradeLevelCost", "upgradeName", aupgradeName);
+    getUpgradeLevelCost: (ctx) => (_upgradeName) => {
+      checkAccess(ctx);
+      const upgradeName = getEnumHelper("CorpUpgradeName").nsGetMember(ctx, _upgradeName, "upgradeName");
       return getUpgradeLevelCost(upgradeName);
     },
-    getExpandIndustryCost: function (aindustryName: any): number {
-      checkAccess("getExpandIndustryCost");
-      const industryName = helper.string("getExpandIndustryCost", "industryName", aindustryName);
-      return getExpandIndustryCost(industryName);
+    getInvestmentOffer: (ctx) => () => {
+      checkAccess(ctx);
+      const corporation = getCorporation();
+      return corporation.getInvestmentOffer();
     },
-    getExpandCityCost: function(): number {
-      checkAccess("getExpandCityCost");
-      return getExpandCityCost();
+    acceptInvestmentOffer: (ctx) => () => {
+      checkAccess(ctx);
+      const corporation = getCorporation();
+      try {
+        acceptInvestmentOffer(corporation);
+        return true;
+      } catch (err) {
+        return false;
+      }
     },
-    getInvestmentOffer: function(): InvestmentOffer {
-      checkAccess("getInvestmentOffer");
-      return getInvestmentOffer();
+    goPublic: (ctx) => (_numShares) => {
+      checkAccess(ctx);
+      const corporation = getCorporation();
+      if (corporation.public) throw helpers.errorMessage(ctx, "Corporation is already public");
+      const numShares = helpers.number(ctx, "numShares", _numShares);
+      goPublic(corporation, numShares);
+      return true;
     },
-    acceptInvestmentOffer: function(): boolean {
-      checkAccess("acceptInvestmentOffer");
-      return acceptInvestmentOffer();
+    sellShares: (ctx) => (_numShares) => {
+      checkAccess(ctx);
+      const numShares = helpers.number(ctx, "numShares", _numShares);
+      return sellShares(getCorporation(), numShares);
     },
-    goPublic: function(anumShares: any): boolean {
-      checkAccess("acceptInvestmentOffer");
-      const numShares = helper.number("goPublic", "numShares", anumShares);
-      return goPublic(numShares);
+    buyBackShares: (ctx) => (_numShares) => {
+      checkAccess(ctx);
+      const numShares = helpers.number(ctx, "numShares", _numShares);
+      return buyBackShares(getCorporation(), numShares);
     },
-    bribe: function(afactionName: string, aamountCash: any, aamountShares: any): boolean {
-      checkAccess("bribe");
-      const factionName = helper.string("bribe", "factionName", afactionName);
-      const amountCash = helper.number("bribe", "amountCash", aamountCash);
-      const amountShares = helper.number("bribe", "amountShares", aamountShares);
-      return bribe(factionName, amountCash, amountShares);
+    bribe: (ctx) => (_factionName, _amountCash) => {
+      checkAccess(ctx);
+      const factionName = getEnumHelper("FactionName").nsGetMember(ctx, _factionName);
+      const amountCash = helpers.positiveNumber(ctx, "amountCash", _amountCash);
+      const result = bribe(getCorporation(), amountCash, factionName);
+      if (!result.success) {
+        helpers.log(ctx, () => result.message);
+      }
+      return result.success;
+    },
+    getBonusTime: (ctx) => () => {
+      checkAccess(ctx);
+      return getCorporation().storedCycles * CONSTANTS.MilliPerCycle;
+    },
+    nextUpdate: (ctx) => () => {
+      checkAccess(ctx);
+      if (!CorporationPromise.promise)
+        CorporationPromise.promise = new Promise<CorpStateName>((res) => (CorporationPromise.resolve = res));
+      return CorporationPromise.promise;
+    },
+    sellDivision: (ctx) => (_divisionName) => {
+      checkAccess(ctx);
+      const corporation = getCorporation();
+      const divisionName = helpers.string(ctx, "divisionName", _divisionName);
+      removeDivision(corporation, divisionName);
     },
   };
+
+  // Removed functions
+  setRemovedFunctions(corpFunctions, {
+    assignJob: {
+      version: "2.2.0",
+      replacement: "Removed due to employees no longer being objects. Use ns.corporation.setJobAssignment instead.",
+      replaceMsg: true,
+    },
+    getEmployee: {
+      version: "2.2.0",
+      replacement: "Removed due to employees no longer being individual objects.",
+      replaceMsg: true,
+    },
+    getExpandCityCost: { version: "2.2.0", replacement: "corporation.getConstants().officeInitialCost" },
+    getExpandIndustryCost: { version: "2.2.0", replacement: "corporation.getIndustryData" },
+    getIndustryTypes: { version: "2.2.0", replacement: "corporation.getConstants().industryNames" },
+    getMaterialNames: { version: "2.2.0", replacement: "corporation.getConstants().materialNames" },
+    getPurchaseWarehouseCost: { version: "2.2.0", replacement: "corporation.getConstants().warehouseInitialCost" },
+    getResearchNames: { version: "2.2.0", replacement: "corporation.getConstants().researchNames" },
+    getUnlockables: { version: "2.2.0", replacement: "corporation.getConstants().unlockNames" },
+    getUpgradeNames: { version: "2.2.0", replacement: "corporation.getConstants().upgradeNames" },
+    setAutoJobAssignment: { version: "3.0.0", replacement: "corporation.setJobAssignment()" },
+  });
+  return corpFunctions;
 }

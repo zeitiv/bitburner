@@ -6,7 +6,7 @@
 
 Prints a raw value or a variable to the Terminal.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 tprintf(format: string, ...values: any[]): void;
@@ -14,16 +14,67 @@ tprintf(format: string, ...values: any[]): void;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  format | string | format of the message |
-|  values | any\[\] |  |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+format
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Format of the message.
+
+
+</td></tr>
+<tr><td>
+
+values
+
+
+</td><td>
+
+any\[\]
+
+
+</td><td>
+
+Value(s) to be printed.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 void
 
 ## Remarks
 
 RAM cost: 0 GB
+
+- See [print](./bitburner.ns.print.md) for how to add color to your printed strings.
+
+- See [printf](./bitburner.ns.printf.md) for examples on formatted strings.
+
+- For more detail, see: https://github.com/alexei/sprintf.js
 

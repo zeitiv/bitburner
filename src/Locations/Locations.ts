@@ -2,15 +2,12 @@
  * Map of all Locations in the game
  * Key = Location name, value = Location object
  */
-import { City } from "./City";
 import { Cities } from "./Cities";
 import { Location, IConstructorParams } from "./Location";
-import { CityName } from "./data/CityNames";
+import { CityName } from "@enums";
 import { LocationsMetadata } from "./data/LocationsMetadata";
 
-import { IMap } from "../types";
-
-export const Locations: IMap<Location> = {};
+export const Locations: Record<string, Location> = {};
 
 /**
  * Here, we'll initialize both Locations and Cities data. These can both
@@ -21,7 +18,7 @@ function constructLocation(p: IConstructorParams): Location {
     throw new Error(`Invalid constructor parameters for Location. No 'name' property`);
   }
 
-  if (Locations[p.name] instanceof Location) {
+  if (Locations[p.name]) {
     console.warn(`Property with name ${p.name} already exists and is being overwritten`);
   }
 
@@ -31,13 +28,6 @@ function constructLocation(p: IConstructorParams): Location {
 }
 
 // First construct all cities
-Cities[CityName.Aevum] = new City(CityName.Aevum);
-Cities[CityName.Chongqing] = new City(CityName.Chongqing);
-Cities[CityName.Ishima] = new City(CityName.Ishima);
-Cities[CityName.NewTokyo] = new City(CityName.NewTokyo);
-Cities[CityName.Sector12] = new City(CityName.Sector12);
-Cities[CityName.Volhaven] = new City(CityName.Volhaven);
-
 Cities[CityName.Aevum].asciiArt = `
    [aevum police headquarters]       26                                         
                                    o                                            
@@ -78,7 +68,7 @@ Cities[CityName.Chongqing].asciiArt = `
                                     |                                           
                                  75 o                                           
                                      \\                                         
-                                      o 76                                      
+                                      H [shadowed walkway]                                      
                             7 |       |                                         
                               |       + 77                                      
        [world stock exchange] F       |                                         
@@ -127,10 +117,10 @@ Cities[CityName.NewTokyo].asciiArt = `
                                                                                 
                   o                                                             
                    \\                                                           
-                    \\    [defcomm]                                             
+          [arcade]  E    [defcomm]                                             
                      \\                                                         
                       o--x---A--x--o [travel agency]                            
-                      7  8     10   G                                           
+                      7  8     10   H                                           
              [vitalife]              o 12   [global pharmaceuticals]            
                                      |                                          
                o--D-x----x-------x-C-+--------x--x-B-x---x-o                    
@@ -141,14 +131,14 @@ Cities[CityName.NewTokyo].asciiArt = `
                                           \\                                    
                     [hospital]             o 15 [world stock exchange]          
                                            |                                    
-                  o--x--E--x-----x-----x---+---x----x--H--x-o                   
+                  o--x--F--x-----x-----x---+---x----x--I--x-o                   
                                            |                                    
                                            |                                    
                                            o 17                                 
                                                                                 
                                                                                 
                                                                                 
-                                           F  [the slums]                       
+                                           G  [the slums]                       
                                                                                 `;
 Cities[CityName.Sector12].asciiArt = `
           78                                                     o 97           
@@ -220,7 +210,7 @@ for (const metadata of LocationsMetadata) {
   const cityName = loc.city;
   if (cityName === null) {
     // Generic location, add to all cities
-    for (const city of Object.keys(Cities)) {
+    for (const city of Object.values(CityName)) {
       Cities[city].addLocation(loc.name);
     }
   } else {

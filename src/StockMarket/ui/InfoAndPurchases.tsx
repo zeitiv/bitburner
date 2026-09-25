@@ -7,72 +7,76 @@ import React, { useState } from "react";
 
 import { getStockMarket4SDataCost, getStockMarket4STixApiCost } from "../StockMarketCosts";
 
-import { CONSTANTS } from "../../Constants";
-import { IPlayer } from "../../PersonObjects/IPlayer";
+import { StockMarketConstants } from "../data/Constants";
+import { Player } from "@player";
 import { Money } from "../../ui/React/Money";
+import { initStockMarket, isStockMarketInitialized } from "../StockMarket";
 
 import Typography from "@mui/material/Typography";
-import Link from "@mui/material/Link";
 import Button from "@mui/material/Button";
 import Tooltip from "@mui/material/Tooltip";
 import IconButton from "@mui/material/IconButton";
 import HelpIcon from "@mui/icons-material/Help";
 import CheckIcon from "@mui/icons-material/Check";
 import { StaticModal } from "../../ui/React/StaticModal";
+import { FactionName } from "@enums";
 
-type IProps = {
-  initStockMarket: () => void;
-  p: IPlayer;
+interface IProps {
   rerender: () => void;
-};
+}
 
 function Purchase4SMarketDataTixApiAccessButton(props: IProps): React.ReactElement {
   function purchase4SMarketDataTixApiAccess(): void {
-    if (props.p.has4SDataTixApi) {
+    if (Player.has4SDataTixApi) {
       return;
     }
-    if (!props.p.canAfford(getStockMarket4STixApiCost())) {
+    if (Player.bitNodeOptions.disable4SData) {
       return;
     }
-    props.p.has4SDataTixApi = true;
-    props.p.loseMoney(getStockMarket4STixApiCost(), "stock");
+    if (!Player.hasTixApiAccess) {
+      return;
+    }
+    if (!Player.canAfford(getStockMarket4STixApiCost())) {
+      return;
+    }
+    Player.has4SDataTixApi = true;
+    Player.loseMoney(getStockMarket4STixApiCost(), "stock");
     props.rerender();
   }
 
-  if (props.p.has4SDataTixApi) {
+  if (Player.has4SDataTixApi) {
     return (
       <Typography>
-        Market Data TIX API Access <CheckIcon />
+        4S Market Data TIX API Access <CheckIcon />
       </Typography>
     );
-  } else {
-    const cost = getStockMarket4STixApiCost();
-    return (
-      <Tooltip
-        title={
-          !props.p.hasTixApiAccess ? (
-            <Typography>Requires TIX API Access</Typography>
-          ) : (
-            <Typography>Let you access 4S Market Data through Netscript</Typography>
-          )
-        }
-      >
-        <span>
-          <Button
-            disabled={!props.p.hasTixApiAccess || !props.p.canAfford(cost)}
-            onClick={purchase4SMarketDataTixApiAccess}
-          >
-            Buy 4S Market Data TIX API Access -&nbsp;
-            <Money money={cost} player={props.p} />
-          </Button>
-        </span>
-      </Tooltip>
-    );
   }
+  const cost = getStockMarket4STixApiCost();
+  let tooltipTitle = "Let you access 4S Market Data through Netscript";
+  if (Player.bitNodeOptions.disable4SData) {
+    tooltipTitle = "4S Market Data is disabled in advanced BitNode options";
+  } else if (!Player.hasTixApiAccess) {
+    tooltipTitle = "Requires TIX API Access";
+  } else if (!Player.canAfford(cost)) {
+    tooltipTitle = "You do not have enough money";
+  }
+  return (
+    <Tooltip title={<Typography>{tooltipTitle}</Typography>}>
+      <span>
+        <Button
+          disabled={Player.bitNodeOptions.disable4SData || !Player.hasTixApiAccess || !Player.canAfford(cost)}
+          onClick={purchase4SMarketDataTixApiAccess}
+        >
+          Buy 4S Market Data TIX API Access -&nbsp;
+          <Money money={cost} forPurchase={true} />
+        </Button>
+      </span>
+    </Tooltip>
+  );
 }
 
 function PurchaseWseAccountButton(props: IProps): React.ReactElement {
-  if (props.p.hasWseAccount) {
+  if (Player.hasWseAccount) {
     return (
       <Typography>
         WSE Account <CheckIcon />
@@ -80,129 +84,168 @@ function PurchaseWseAccountButton(props: IProps): React.ReactElement {
     );
   }
   function purchaseWseAccount(): void {
-    if (props.p.hasWseAccount) {
+    if (Player.hasWseAccount) {
       return;
     }
-    if (!props.p.canAfford(CONSTANTS.WSEAccountCost)) {
+    if (!Player.canAfford(StockMarketConstants.WseAccountCost)) {
       return;
     }
-    props.p.hasWseAccount = true;
-    props.initStockMarket();
-    props.p.loseMoney(CONSTANTS.WSEAccountCost, "stock");
+    Player.hasWseAccount = true;
+    if (!isStockMarketInitialized()) {
+      initStockMarket();
+    }
+    Player.loseMoney(StockMarketConstants.WseAccountCost, "stock");
     props.rerender();
   }
 
-  const cost = CONSTANTS.WSEAccountCost;
+  const cost = StockMarketConstants.WseAccountCost;
+  let tooltipTitle = "Let you trade stock via UI";
+  if (!Player.canAfford(cost)) {
+    tooltipTitle = "You do not have enough money";
+  }
   return (
     <>
-      <Typography>To begin trading, you must first purchase an account:</Typography>
-      <Button disabled={!props.p.canAfford(cost)} onClick={purchaseWseAccount}>
-        Buy WSE Account -&nbsp;
-        <Money money={cost} player={props.p} />
-      </Button>
+      <Typography>If you want to trade via Stock Market dashboard (UI), you must purchase a WSE account.</Typography>
+      <Tooltip title={<Typography>{tooltipTitle}</Typography>}>
+        <span>
+          <Button disabled={!Player.canAfford(cost)} onClick={purchaseWseAccount}>
+            Buy WSE Account -&nbsp;
+            <Money money={cost} forPurchase={true} />
+          </Button>
+        </span>
+      </Tooltip>
     </>
   );
 }
 
 function PurchaseTixApiAccessButton(props: IProps): React.ReactElement {
   function purchaseTixApiAccess(): void {
-    if (props.p.hasTixApiAccess) {
+    if (Player.hasTixApiAccess) {
       return;
     }
-    if (!props.p.canAfford(CONSTANTS.TIXAPICost)) {
+    if (!Player.canAfford(StockMarketConstants.TixApiCost)) {
       return;
     }
-    props.p.hasTixApiAccess = true;
-    props.p.loseMoney(CONSTANTS.TIXAPICost, "stock");
+    Player.hasTixApiAccess = true;
+    if (!isStockMarketInitialized()) {
+      initStockMarket();
+    }
+    Player.loseMoney(StockMarketConstants.TixApiCost, "stock");
     props.rerender();
   }
 
-  if (props.p.hasTixApiAccess) {
+  if (Player.hasTixApiAccess) {
     return (
       <Typography>
         TIX API Access <CheckIcon />
       </Typography>
     );
-  } else {
-    const cost = CONSTANTS.TIXAPICost;
-    return (
-      <Button disabled={!props.p.canAfford(cost) || !props.p.hasWseAccount} onClick={purchaseTixApiAccess}>
-        Buy Trade Information eXchange (TIX) API Access -&nbsp;
-        <Money money={cost} player={props.p} />
-      </Button>
-    );
   }
+  const cost = StockMarketConstants.TixApiCost;
+  let tooltipTitle = "Let you trade stock via NS APIs";
+  if (!Player.canAfford(cost)) {
+    tooltipTitle = "You do not have enough money";
+  }
+  return (
+    <>
+      <Typography>
+        TIX, short for Trade Information eXchange, is the communications protocol used by the WSE. Purchasing access to
+        the TIX API lets you write code to create your own algorithmic/automated trading strategies.
+      </Typography>
+      <Typography>If you want to trade via NS APIs, you must purchase TIX API access.</Typography>
+      <Tooltip title={<Typography>{tooltipTitle}</Typography>}>
+        <span>
+          <Button disabled={!Player.canAfford(cost)} onClick={purchaseTixApiAccess}>
+            Buy Trade Information eXchange (TIX) API Access -&nbsp;
+            <Money money={cost} forPurchase={true} />
+          </Button>
+        </span>
+      </Tooltip>
+    </>
+  );
 }
 
 function Purchase4SMarketDataButton(props: IProps): React.ReactElement {
   function purchase4SMarketData(): void {
-    if (props.p.has4SData) {
+    if (Player.has4SData) {
       return;
     }
-    if (!props.p.canAfford(getStockMarket4SDataCost())) {
+    if (Player.bitNodeOptions.disable4SData) {
       return;
     }
-    props.p.has4SData = true;
-    props.p.loseMoney(getStockMarket4SDataCost(), "stock");
+    if (!Player.hasWseAccount) {
+      return;
+    }
+    if (!Player.canAfford(getStockMarket4SDataCost())) {
+      return;
+    }
+    Player.has4SData = true;
+    Player.loseMoney(getStockMarket4SDataCost(), "stock");
     props.rerender();
   }
-  if (props.p.has4SData) {
+  if (Player.has4SData) {
     return (
       <Typography>
-        4S Market Data Access <CheckIcon />
+        4S Market Data UI Access <CheckIcon />
       </Typography>
     );
-  } else {
-    const cost = getStockMarket4SDataCost();
-    return (
-      <Tooltip
-        title={<Typography>Lets you view additional pricing and volatility information about stocks</Typography>}
-      >
-        <span>
-          <Button disabled={!props.p.canAfford(cost) || !props.p.hasWseAccount} onClick={purchase4SMarketData}>
-            Buy 4S Market Data Access -&nbsp;
-            <Money money={cost} player={props.p} />
-          </Button>
-        </span>
-      </Tooltip>
-    );
   }
+  const cost = getStockMarket4SDataCost();
+  let tooltipTitle = "Lets you view additional pricing and volatility information about stocks";
+  if (Player.bitNodeOptions.disable4SData) {
+    tooltipTitle = "4S Market Data is disabled in advanced BitNode options";
+  } else if (!Player.hasWseAccount) {
+    tooltipTitle = "Requires WSE Account";
+  } else if (!Player.canAfford(cost)) {
+    tooltipTitle = "You do not have enough money";
+  }
+  return (
+    <Tooltip title={<Typography>{tooltipTitle}</Typography>}>
+      <span>
+        <Button
+          disabled={Player.bitNodeOptions.disable4SData || !Player.hasWseAccount || !Player.canAfford(cost)}
+          onClick={purchase4SMarketData}
+        >
+          Buy 4S Market Data Access -&nbsp;
+          <Money money={cost} forPurchase={true} />
+        </Button>
+      </span>
+    </Tooltip>
+  );
 }
 
 export function InfoAndPurchases(props: IProps): React.ReactElement {
   const [helpOpen, setHelpOpen] = useState(false);
-  const documentationLink = "https://bitburner.readthedocs.io/en/latest/basicgameplay/stockmarket.html";
   return (
     <>
-      <Typography>Welcome to the World Stock Exchange (WSE)!</Typography>
-      <Link href={documentationLink} target={"_blank"}>
-        <Typography>Investopedia</Typography>
-      </Link>
-      <br />
+      <Typography variant="h4">Welcome to the World Stock Exchange (WSE)!</Typography>
+
+      <Typography variant="h5" color="primary">
+        WSE Account
+      </Typography>
       <PurchaseWseAccountButton {...props} />
 
       <Typography variant="h5" color="primary">
         Trade Information eXchange (TIX) API
       </Typography>
-      <Typography>
-        TIX, short for Trade Information eXchange, is the communications protocol used by the WSE. Purchasing access to
-        the TIX API lets you write code to create your own algorithmic/automated trading strategies.
-      </Typography>
       <PurchaseTixApiAccessButton {...props} />
+
       <Typography variant="h5" color="primary">
-        Four Sigma (4S) Market Data Feed
+        {FactionName.FourSigma} (4S) Market Data Feed
       </Typography>
       <Typography>
-        Four Sigma's (4S) Market Data Feed provides information about stocks that will help your trading strategies.
+        {FactionName.FourSigma}'s (4S) Market Data Feed provides information about stocks that will help your trading
+        strategies.
         <IconButton onClick={() => setHelpOpen(true)}>
           <HelpIcon />
         </IconButton>
       </Typography>
       <Purchase4SMarketDataTixApiAccessButton {...props} />
       <Purchase4SMarketDataButton {...props} />
+
       <Typography>
         Commission Fees: Every transaction you make has a{" "}
-        <Money money={CONSTANTS.StockMarketCommission} player={props.p} /> commission fee.
+        <Money money={StockMarketConstants.StockMarketCommission} forPurchase={true} /> commission fee.
       </Typography>
       <br />
       <Typography>

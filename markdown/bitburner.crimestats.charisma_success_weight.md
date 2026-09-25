@@ -4,9 +4,9 @@
 
 ## CrimeStats.charisma\_success\_weight property
 
-charisma level impact on success change of the crime
+Impact of charisma level on success chance of the crime
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 charisma_success_weight: number;

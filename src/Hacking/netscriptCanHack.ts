@@ -6,37 +6,37 @@
  */
 import { IReturnStatus } from "../types";
 
-import { IPlayer } from "../PersonObjects/IPlayer";
+import { Player } from "@player";
 import { Server } from "../Server/Server";
 
-function baseCheck(server: Server, fnName: string): IReturnStatus {
+function baseCheck(server: Server, actionName: string): IReturnStatus {
   const hostname = server.hostname;
 
-  if (!("requiredHackingSkill" in server)) {
+  if (server.purchasedByPlayer) {
     return {
       res: false,
-      msg: `Cannot ${fnName} ${hostname} server because it is a Hacknet Node`,
+      msg: `Cannot ${actionName} ${hostname} server because it is your server`,
     };
   }
 
-  if (server.hasAdminRights === false) {
+  if (!server.hasAdminRights) {
     return {
       res: false,
-      msg: `Cannot ${fnName} ${hostname} server because you do not have root access`,
+      msg: `Cannot ${actionName} ${hostname} server because you do not have root access`,
     };
   }
 
   return { res: true };
 }
 
-export function netscriptCanHack(server: Server, p: IPlayer): IReturnStatus {
-  const initialCheck = baseCheck(server, "hack");
+export function netscriptCanHack(server: Server, customActionName?: string): IReturnStatus {
+  const initialCheck = baseCheck(server, customActionName ?? "hack");
   if (!initialCheck.res) {
     return initialCheck;
   }
 
   const s = server;
-  if (s.requiredHackingSkill > p.hacking) {
+  if (s.requiredHackingSkill > Player.skills.hacking) {
     return {
       res: false,
       msg: `Cannot hack ${server.hostname} server because your hacking skill is not high enough`,

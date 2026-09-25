@@ -6,14 +6,14 @@
 
 Gets the current game information (version, commit, ...)
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 getGameInfo(): GameInfo;
 ```
-<b>Returns:</b>
+**Returns:**
 
-GameInfo
+[GameInfo](./bitburner.gameinfo.md)
 
 ## Remarks
 

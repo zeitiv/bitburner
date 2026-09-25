@@ -4,7 +4,9 @@
 
 ## GangMemberInfo.dex\_exp property
 
-<b>Signature:</b>
+Current dexterity experience
+
+**Signature:**
 
 ```typescript
 dex_exp: number;

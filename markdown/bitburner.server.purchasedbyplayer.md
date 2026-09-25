@@ -4,9 +4,9 @@
 
 ## Server.purchasedByPlayer property
 
-Flag indicating whether this is a purchased server
+Flag indicating whether this is a server owned by the player (e.g., home, cloud servers, hacknet servers)
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 purchasedByPlayer: boolean;

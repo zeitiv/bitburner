@@ -6,16 +6,91 @@
 
 Options to affect the behavior of [hack](./bitburner.ns.hack.md)<!-- -->, [grow](./bitburner.ns.grow.md)<!-- -->, and [weaken](./bitburner.ns.weaken.md)<!-- -->.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-export interface BasicHGWOptions 
+interface BasicHGWOptions 
 ```
 
 ## Properties
 
-|  Property | Type | Description |
-|  --- | --- | --- |
-|  [stock?](./bitburner.basichgwoptions.stock.md) | boolean | <i>(Optional)</i> Set to true this action will affect the stock market. |
-|  [threads?](./bitburner.basichgwoptions.threads.md) | number | <i>(Optional)</i> Number of threads to use for this function. Must be less than or equal to the number of threads the script is running with. |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[additionalMsec?](./bitburner.basichgwoptions.additionalmsec.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Number of additional milliseconds that will be spent waiting between the start of the function and when it completes.
+
+
+</td></tr>
+<tr><td>
+
+[stock?](./bitburner.basichgwoptions.stock.md)
+
+
+</td><td>
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+_(Optional)_ Set to true this action will affect the stock market.
+
+
+</td></tr>
+<tr><td>
+
+[threads?](./bitburner.basichgwoptions.threads.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Number of threads to use for this function. Must be less than or equal to the number of threads the script is running with. Accepts positive non integer values.
+
+
+</td></tr>
+</tbody></table>
 

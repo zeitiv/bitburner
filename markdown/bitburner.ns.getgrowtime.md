@@ -6,27 +6,57 @@
 
 Get the execution time of a grow() call.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getGrowTime(host: string): number;
+getGrowTime(host?: string): number;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  host | string | Host of target server. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+host
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Hostname/IP of the target server. Optional. Defaults to current server if not provided.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 
-Returns the amount of time in milliseconds it takes to execute the grow Netscript function. Returns Infinity if called on a Hacknet Server.
+Returns the amount of time in milliseconds it takes to execute the grow Netscript function.
 
 ## Remarks
 
 RAM cost: 0.05 GB
 
-Returns the amount of time in milliseconds it takes to execute the grow Netscript function on the target server. The function takes in an optional hackLvl parameter that can be specified to see what the grow time would be at different hacking levels. The required time is increased by the security level of the target server and decreased by the player's hacking level.
+Returns the amount of time in milliseconds it takes to execute the grow Netscript function on the target server. The required time is increased by the security level of the target server and decreased by the player's hacking level.
 

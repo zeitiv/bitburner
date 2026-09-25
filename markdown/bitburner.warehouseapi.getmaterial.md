@@ -4,25 +4,89 @@
 
 ## WarehouseAPI.getMaterial() method
 
-Get material data
+Get material data.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getMaterial(divisionName: string, cityName: string, materialName: string): Material;
+getMaterial(divisionName: string, city: CityName, materialName: CorpMaterialName): Material;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  divisionName | string | Name of the division |
-|  cityName | string |  |
-|  materialName | string | Name of the material |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+divisionName
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the division
+
+
+</td></tr>
+<tr><td>
+
+city
+
+
+</td><td>
+
+[CityName](./bitburner.cityname.md)
+
+
+</td><td>
+
+Name of the city
+
+
+</td></tr>
+<tr><td>
+
+materialName
+
+
+</td><td>
+
+[CorpMaterialName](./bitburner.corpmaterialname.md)
+
+
+</td><td>
+
+Name of the material
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 [Material](./bitburner.material.md)
 
-material data
+Material data
+
+## Remarks
+
+RAM cost: 10 GB
 

@@ -6,19 +6,49 @@
 
 Get number of communities in a city.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getCityCommunities(name: string): number;
+getCityCommunities(city: CityName): number;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  name | string |  |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+city
+
+
+</td><td>
+
+[CityName](./bitburner.cityname.md)
+
+
+</td><td>
+
+Name of city. Case-sensitive
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 

@@ -9,25 +9,27 @@ import TextField from "@mui/material/TextField";
 import IconButton from "@mui/material/IconButton";
 import ReplyIcon from "@mui/icons-material/Reply";
 import PaletteSharpIcon from "@mui/icons-material/PaletteSharp";
-import HistoryIcon from '@mui/icons-material/History';
+import HistoryIcon from "@mui/icons-material/History";
 import { Color, ColorPicker } from "material-ui-color";
 import { ThemeEvents } from "./Theme";
-import { Settings, defaultSettings } from "../../Settings/Settings";
-import { defaultTheme } from "../Themes";
-import { UserInterfaceTheme } from "../../ScriptEditor/NetscriptDefinitions";
-import { IRouter } from "../../ui/Router";
+import { Settings } from "../../Settings/Settings";
+import { defaultTheme, type ITheme } from "../Themes";
+import { UserInterfaceTheme } from "@nsdefs";
+import { Router } from "../../ui/GameRoot";
+import { Page } from "../../ui/Router";
 import { ThemeCollaborate } from "./ThemeCollaborate";
+import { dialogBoxCreate } from "../../ui/React/DialogBox";
+import { assertAndSanitizeMainTheme } from "../../JsonSchema/JSONSchemaAssertion";
 
 interface IProps {
   open: boolean;
   onClose: () => void;
-  router: IRouter;
 }
 
 interface IColorEditorProps {
-  name: string;
+  name: keyof ITheme;
   color: string | undefined;
-  onColorChange: (name: string, value: string) => void;
+  onColorChange: (name: keyof ITheme, value: string) => void;
   defaultColor: string;
 }
 
@@ -69,7 +71,7 @@ function ColorEditor({ name, onColorChange, color, defaultColor }: IColorEditorP
 }
 
 export function ThemeEditorModal(props: IProps): React.ReactElement {
-  const [customTheme, setCustomTheme] = useState<{ [key: string]: string | undefined }>({
+  const [customTheme, setCustomTheme] = useState<Record<keyof ITheme, string | undefined>>({
     ...Settings.theme,
   });
 
@@ -80,21 +82,23 @@ export function ThemeEditorModal(props: IProps): React.ReactElement {
   }
 
   function onThemeChange(event: React.ChangeEvent<HTMLInputElement>): void {
+    let themeData: unknown;
     try {
-      const importedTheme = JSON.parse(event.target.value);
-      if (typeof importedTheme !== "object") return;
-      setCustomTheme(importedTheme);
-      for (const key of Object.keys(importedTheme)) {
-        Settings.theme[key] = importedTheme[key];
-      }
-      ThemeEvents.emit();
-    } catch (err) {
-      // ignore
+      themeData = JSON.parse(event.target.value);
+      assertAndSanitizeMainTheme(themeData);
+    } catch (error) {
+      console.error(error);
+      console.error("Theme data is invalid. Data:", event.target.value);
+      dialogBoxCreate(`Invalid theme. Errors: ${error}.`);
+      return;
     }
+    Object.assign(Settings.theme, themeData);
+    ThemeEvents.emit();
+    setCustomTheme(Settings.theme);
   }
 
-  function onColorChange(name: string, value: string): void {
-    setCustomTheme((old: any) => {
+  function onColorChange(name: keyof ITheme, value: string): void {
+    setCustomTheme((old: Record<string, string | undefined>) => {
       old[name] = value;
       return old;
     });
@@ -110,236 +114,268 @@ export function ThemeEditorModal(props: IProps): React.ReactElement {
   return (
     <Modal open={props.open} onClose={props.onClose}>
       <Paper sx={{ px: 1, py: 1, my: 1 }}>
-          <Tooltip open={true} placement={"top"} title={<Typography>Example tooltip</Typography>}>
-            <Button color="primary" size="small">primary button</Button>
-          </Tooltip>
-          <Button color="secondary" size="small">secondary button</Button>
-          <Button color="warning" size="small">warning button</Button>
-          <Button color="info" size="small">info button</Button>
-          <Button color="error" size="small">error button</Button>
-          <Button disabled size="small">disabled button</Button>
-
-          <br />
-          <Typography color="primary" variant="caption">text with primary color</Typography>&nbsp;
-          <Typography color="secondary" variant="caption">text with secondary color</Typography>&nbsp;
-          <Typography color="error" variant="caption">text with error color</Typography>
-
-          <br />
-          <TextField value={"Text field"} size="small" />
+        <Tooltip open={true} placement={"top"} title={<Typography>Example tooltip</Typography>}>
+          <Button color="primary" size="small">
+            primary button
+          </Button>
+        </Tooltip>
+        <Button color="secondary" size="small">
+          secondary button
+        </Button>
+        <Button color="warning" size="small">
+          warning button
+        </Button>
+        <Button color="info" size="small">
+          info button
+        </Button>
+        <Button color="error" size="small">
+          error button
+        </Button>
+        <Button disabled size="small">
+          disabled button
+        </Button>
+        <br />
+        <Typography color="primary" variant="caption">
+          text with primary color
+        </Typography>
+        &nbsp;
+        <Typography color="secondary" variant="caption">
+          text with secondary color
+        </Typography>
+        &nbsp;
+        <Typography color="error" variant="caption">
+          text with error color
+        </Typography>
+        <br />
+        <TextField value={"Text field"} size="small" />
       </Paper>
 
       <Paper sx={{ py: 1, my: 1 }}>
         <ColorEditor
           name="primarylight"
           onColorChange={onColorChange}
-          color={customTheme["primarylight"]}
-          defaultColor={defaultSettings.theme["primarylight"]}
+          color={customTheme.primarylight}
+          defaultColor={defaultTheme.primarylight}
         />
         <ColorEditor
           name="primary"
           onColorChange={onColorChange}
-          color={customTheme["primary"]}
-          defaultColor={defaultSettings.theme["primary"]}
+          color={customTheme.primary}
+          defaultColor={defaultTheme.primary}
         />
         <ColorEditor
           name="primarydark"
           onColorChange={onColorChange}
-          color={customTheme["primarydark"]}
-          defaultColor={defaultSettings.theme["primarydark"]}
+          color={customTheme.primarydark}
+          defaultColor={defaultTheme.primarydark}
         />
 
         <br />
         <ColorEditor
           name="successlight"
           onColorChange={onColorChange}
-          color={customTheme["successlight"]}
-          defaultColor={defaultSettings.theme["successlight"]}
+          color={customTheme.successlight}
+          defaultColor={defaultTheme.successlight}
         />
         <ColorEditor
           name="success"
           onColorChange={onColorChange}
-          color={customTheme["success"]}
-          defaultColor={defaultSettings.theme["success"]}
+          color={customTheme.success}
+          defaultColor={defaultTheme.success}
         />
         <ColorEditor
           name="successdark"
           onColorChange={onColorChange}
-          color={customTheme["successdark"]}
-          defaultColor={defaultSettings.theme["successdark"]}
+          color={customTheme.successdark}
+          defaultColor={defaultTheme.successdark}
         />
 
         <br />
         <ColorEditor
           name="errorlight"
           onColorChange={onColorChange}
-          color={customTheme["errorlight"]}
-          defaultColor={defaultSettings.theme["errorlight"]}
+          color={customTheme.errorlight}
+          defaultColor={defaultTheme.errorlight}
         />
         <ColorEditor
           name="error"
           onColorChange={onColorChange}
-          color={customTheme["error"]}
-          defaultColor={defaultSettings.theme["error"]}
+          color={customTheme.error}
+          defaultColor={defaultTheme.error}
         />
         <ColorEditor
           name="errordark"
           onColorChange={onColorChange}
-          color={customTheme["errordark"]}
-          defaultColor={defaultSettings.theme["errordark"]}
+          color={customTheme.errordark}
+          defaultColor={defaultTheme.errordark}
         />
 
         <br />
         <ColorEditor
           name="secondarylight"
           onColorChange={onColorChange}
-          color={customTheme["secondarylight"]}
-          defaultColor={defaultSettings.theme["secondarylight"]}
+          color={customTheme.secondarylight}
+          defaultColor={defaultTheme.secondarylight}
         />
         <ColorEditor
           name="secondary"
           onColorChange={onColorChange}
-          color={customTheme["secondary"]}
-          defaultColor={defaultSettings.theme["secondary"]}
+          color={customTheme.secondary}
+          defaultColor={defaultTheme.secondary}
         />
         <ColorEditor
           name="secondarydark"
           onColorChange={onColorChange}
-          color={customTheme["secondarydark"]}
-          defaultColor={defaultSettings.theme["secondarydark"]}
+          color={customTheme.secondarydark}
+          defaultColor={defaultTheme.secondarydark}
         />
 
         <br />
         <ColorEditor
           name="warninglight"
           onColorChange={onColorChange}
-          color={customTheme["warninglight"]}
-          defaultColor={defaultSettings.theme["warninglight"]}
+          color={customTheme.warninglight}
+          defaultColor={defaultTheme.warninglight}
         />
         <ColorEditor
           name="warning"
           onColorChange={onColorChange}
-          color={customTheme["warning"]}
-          defaultColor={defaultSettings.theme["warning"]}
+          color={customTheme.warning}
+          defaultColor={defaultTheme.warning}
         />
         <ColorEditor
           name="warningdark"
           onColorChange={onColorChange}
-          color={customTheme["warningdark"]}
-          defaultColor={defaultSettings.theme["warningdark"]}
+          color={customTheme.warningdark}
+          defaultColor={defaultTheme.warningdark}
         />
 
         <br />
         <ColorEditor
           name="infolight"
           onColorChange={onColorChange}
-          color={customTheme["infolight"]}
-          defaultColor={defaultSettings.theme["infolight"]}
+          color={customTheme.infolight}
+          defaultColor={defaultTheme.infolight}
         />
         <ColorEditor
           name="info"
           onColorChange={onColorChange}
-          color={customTheme["info"]}
-          defaultColor={defaultSettings.theme["info"]}
+          color={customTheme.info}
+          defaultColor={defaultTheme.info}
         />
         <ColorEditor
           name="infodark"
           onColorChange={onColorChange}
-          color={customTheme["infodark"]}
-          defaultColor={defaultSettings.theme["infodark"]}
+          color={customTheme.infodark}
+          defaultColor={defaultTheme.infodark}
         />
 
         <br />
         <ColorEditor
           name="welllight"
           onColorChange={onColorChange}
-          color={customTheme["welllight"]}
-          defaultColor={defaultSettings.theme["welllight"]}
+          color={customTheme.welllight}
+          defaultColor={defaultTheme.welllight}
         />
         <ColorEditor
           name="well"
           onColorChange={onColorChange}
-          color={customTheme["well"]}
-          defaultColor={defaultSettings.theme["well"]}
+          color={customTheme.well}
+          defaultColor={defaultTheme.well}
         />
         <ColorEditor
           name="white"
           onColorChange={onColorChange}
-          color={customTheme["white"]}
-          defaultColor={defaultSettings.theme["white"]}
+          color={customTheme.white}
+          defaultColor={defaultTheme.white}
         />
         <ColorEditor
           name="black"
           onColorChange={onColorChange}
-          color={customTheme["black"]}
-          defaultColor={defaultSettings.theme["black"]}
+          color={customTheme.black}
+          defaultColor={defaultTheme.black}
         />
         <ColorEditor
           name="backgroundprimary"
           onColorChange={onColorChange}
-          color={customTheme["backgroundprimary"]}
-          defaultColor={defaultSettings.theme["backgroundprimary"]}
+          color={customTheme.backgroundprimary}
+          defaultColor={defaultTheme.backgroundprimary}
         />
         <ColorEditor
           name="backgroundsecondary"
           onColorChange={onColorChange}
-          color={customTheme["backgroundsecondary"]}
-          defaultColor={defaultSettings.theme["backgroundsecondary"]}
+          color={customTheme.backgroundsecondary}
+          defaultColor={defaultTheme.backgroundsecondary}
         />
         <ColorEditor
           name="button"
           onColorChange={onColorChange}
-          color={customTheme["button"]}
-          defaultColor={defaultSettings.theme["button"]}
+          color={customTheme.button}
+          defaultColor={defaultTheme.button}
         />
 
         <br />
-        <ColorEditor
-          name="hp"
-          onColorChange={onColorChange}
-          color={customTheme["hp"]}
-          defaultColor={defaultSettings.theme["hp"]}
-        />
+        <ColorEditor name="hp" onColorChange={onColorChange} color={customTheme.hp} defaultColor={defaultTheme.hp} />
         <ColorEditor
           name="money"
           onColorChange={onColorChange}
-          color={customTheme["money"]}
-          defaultColor={defaultSettings.theme["money"]}
+          color={customTheme.money}
+          defaultColor={defaultTheme.money}
         />
         <ColorEditor
           name="hack"
           onColorChange={onColorChange}
-          color={customTheme["hack"]}
-          defaultColor={defaultSettings.theme["hack"]}
+          color={customTheme.hack}
+          defaultColor={defaultTheme.hack}
         />
         <ColorEditor
           name="combat"
           onColorChange={onColorChange}
-          color={customTheme["combat"]}
-          defaultColor={defaultSettings.theme["combat"]}
+          color={customTheme.combat}
+          defaultColor={defaultTheme.combat}
         />
-        <ColorEditor
-          name="cha"
-          onColorChange={onColorChange}
-          color={customTheme["cha"]}
-          defaultColor={defaultSettings.theme["cha"]}
-        />
-        <ColorEditor
-          name="int"
-          onColorChange={onColorChange}
-          color={customTheme["int"]}
-          defaultColor={defaultSettings.theme["int"]}
-        />
-        <ColorEditor
-          name="rep"
-          onColorChange={onColorChange}
-          color={customTheme["rep"]}
-          defaultColor={defaultSettings.theme["rep"]}
-        />
+        <ColorEditor name="cha" onColorChange={onColorChange} color={customTheme.cha} defaultColor={defaultTheme.cha} />
+        <ColorEditor name="int" onColorChange={onColorChange} color={customTheme.int} defaultColor={defaultTheme.int} />
+        <ColorEditor name="rep" onColorChange={onColorChange} color={customTheme.rep} defaultColor={defaultTheme.rep} />
         <ColorEditor
           name="disabled"
           onColorChange={onColorChange}
-          color={customTheme["disabled"]}
-          defaultColor={defaultSettings.theme["disabled"]}
+          color={customTheme.disabled}
+          defaultColor={defaultTheme.disabled}
+        />
+
+        <br />
+        <ColorEditor
+          name="maplocation"
+          onColorChange={onColorChange}
+          color={customTheme.maplocation}
+          defaultColor={defaultTheme.maplocation}
+        />
+
+        <br />
+        <ColorEditor
+          name="bnlvl0"
+          onColorChange={onColorChange}
+          color={customTheme.bnlvl0}
+          defaultColor={defaultTheme.bnlvl0}
+        />
+        <ColorEditor
+          name="bnlvl1"
+          onColorChange={onColorChange}
+          color={customTheme.bnlvl1}
+          defaultColor={defaultTheme.bnlvl1}
+        />
+        <ColorEditor
+          name="bnlvl2"
+          onColorChange={onColorChange}
+          color={customTheme.bnlvl2}
+          defaultColor={defaultTheme.bnlvl2}
+        />
+        <ColorEditor
+          name="bnlvl3"
+          onColorChange={onColorChange}
+          color={customTheme.bnlvl3}
+          defaultColor={defaultTheme.bnlvl3}
         />
       </Paper>
 
@@ -348,26 +384,27 @@ export function ThemeEditorModal(props: IProps): React.ReactElement {
           sx={{ mb: 1 }}
           multiline
           fullWidth
-          maxRows={3}
+          maxRows={10}
           label={"import / export theme"}
-          value={JSON.stringify(customTheme)}
+          value={JSON.stringify(customTheme, undefined, 2)}
           onChange={onThemeChange}
         />
-          <>
-            <Typography sx={{ my: 1 }}>Backup your theme or share it with others by copying the string above.</Typography>
-            <ThemeCollaborate />
-            <ButtonGroup>
-              <Tooltip title="Reverts all modification back to the default theme. This is permanent.">
-                <Button onClick={() => setTemplateTheme(defaultTheme)}
-                  startIcon={<HistoryIcon />}>
-                    Revert to Default
-                </Button>
-              </Tooltip>
-              <Tooltip title="Move over to the theme browser's page to use one of our predefined themes.">
-                <Button startIcon={<PaletteSharpIcon />} onClick={() => props.router.toThemeBrowser()}>See more themes</Button>
-              </Tooltip>
-            </ButtonGroup>
-          </>
+        <>
+          <Typography sx={{ my: 1 }}>Backup your theme or share it with others by copying the string above.</Typography>
+          <ThemeCollaborate />
+          <ButtonGroup>
+            <Tooltip title="Reverts all modification back to the default theme. This is permanent.">
+              <Button onClick={() => setTemplateTheme(defaultTheme)} startIcon={<HistoryIcon />}>
+                Revert to Default
+              </Button>
+            </Tooltip>
+            <Tooltip title="Move over to the theme browser's page to use one of our predefined themes.">
+              <Button startIcon={<PaletteSharpIcon />} onClick={() => Router.toPage(Page.ThemeBrowser)}>
+                See more themes
+              </Button>
+            </Tooltip>
+          </ButtonGroup>
+        </>
       </Paper>
     </Modal>
   );

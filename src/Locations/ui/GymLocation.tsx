@@ -8,69 +8,48 @@ import Button from "@mui/material/Button";
 
 import { Location } from "../Location";
 
-import { CONSTANTS } from "../../Constants";
-import { IPlayer } from "../../PersonObjects/IPlayer";
-import { GetServer } from "../../Server/AllServers";
-import { Server } from "../../Server/Server";
+import { Player } from "@player";
 
 import { Money } from "../../ui/React/Money";
-import { IRouter } from "../../ui/Router";
-import { serverMetadata } from "../../Server/data/servers";
+import { Router } from "../../ui/GameRoot";
+import { Page } from "../../ui/Router";
 import { Box } from "@mui/material";
+import { ClassWork, Classes } from "../../Work/ClassWork";
+import { calculateCost } from "../../Work/Formulas";
+import { GymType } from "@enums";
 
-type IProps = {
+interface IProps {
   loc: Location;
-  p: IPlayer;
-  router: IRouter;
-};
+}
 
 export function GymLocation(props: IProps): React.ReactElement {
-  function calculateCost(): number {
-    const serverMeta = serverMetadata.find((s) => s.specialName === props.loc.name);
-    const server = GetServer(serverMeta ? serverMeta.hostname : "");
-    if (server == null || !server.hasOwnProperty("backdoorInstalled")) return props.loc.costMult;
-    const discount = (server as Server).backdoorInstalled ? 0.9 : 1;
-    return props.loc.costMult * discount;
+  function train(stat: GymType): void {
+    Player.startWork(
+      new ClassWork({
+        classType: stat,
+        location: props.loc.name,
+        singularity: false,
+      }),
+    );
+    Player.startFocusing();
+    Router.toPage(Page.Work);
   }
 
-  function train(stat: string): void {
-    const loc = props.loc;
-    props.p.startClass(calculateCost(), loc.expMult, stat);
-    props.p.startFocusing();
-    props.router.toWork();
-  }
-
-  function trainStrength(): void {
-    train(CONSTANTS.ClassGymStrength);
-  }
-
-  function trainDefense(): void {
-    train(CONSTANTS.ClassGymDefense);
-  }
-
-  function trainDexterity(): void {
-    train(CONSTANTS.ClassGymDexterity);
-  }
-
-  function trainAgility(): void {
-    train(CONSTANTS.ClassGymAgility);
-  }
-
-  const cost = CONSTANTS.ClassGymBaseCost * calculateCost();
+  const cost = calculateCost(Classes[GymType.strength], props.loc);
 
   return (
-    <Box sx={{ display: 'grid', width: 'fit-content' }}>
-      <Button onClick={trainStrength}>
-        Train Strength (<Money money={cost} player={props.p} /> / sec)
+    <Box sx={{ display: "grid", width: "fit-content" }}>
+      <Button onClick={() => train(GymType.strength)}>
+        Train Strength (<Money money={cost} forPurchase={true} /> / sec)
       </Button>
-      <Button onClick={trainDefense}>
-        Train Defense (<Money money={cost} player={props.p} /> / sec)
+      <Button onClick={() => train(GymType.defense)}>
+        Train Defense (<Money money={cost} forPurchase={true} /> / sec)
       </Button>
-      <Button onClick={trainDexterity}>
-        Train Dexterity (<Money money={cost} player={props.p} /> / sec)
+      <Button onClick={() => train(GymType.dexterity)}>
+        Train Dexterity (<Money money={cost} forPurchase={true} /> / sec)
       </Button>
-      <Button onClick={trainAgility}>
-        Train Agility (<Money money={cost} player={props.p} /> / sec)
+      <Button onClick={() => train(GymType.agility)}>
+        Train Agility (<Money money={cost} forPurchase={true} /> / sec)
       </Button>
     </Box>
   );

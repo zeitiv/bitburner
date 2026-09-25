@@ -1,152 +1,80 @@
-import { ITerminal } from "../../ITerminal";
-import { removeLeadingSlash, removeTrailingSlash } from '../../DirectoryHelpers'
-import { IRouter, ScriptEditorRouteOptions } from "../../../ui/Router";
-import { IPlayer } from "../../../PersonObjects/IPlayer";
+import { Terminal } from "../../../Terminal";
+import { ScriptEditorRouteOptions, Page } from "../../../ui/Router";
+import { Router } from "../../../ui/GameRoot";
 import { BaseServer } from "../../../Server/BaseServer";
-import { isScriptFilename } from "../../../Script/isScriptFilename";
-import { CursorPositions } from "../../../ScriptEditor/CursorPositions";
-import { Script } from "../../../Script/Script";
-import { isEmpty } from "lodash";
+import { type ScriptFilePath, hasScriptExtension, isLegacyScript } from "../../../Paths/ScriptFilePath";
+import { TextFilePath, hasTextExtension } from "../../../Paths/TextFilePath";
+import { getGlobbedFileMap } from "../../../Paths/GlobbedFiles";
+import { sendDeprecationNotice } from "./deprecation";
+import { getFileType, getFileTypeFeature } from "../../../utils/ScriptTransformer";
+import { hasContractExtension } from "../../../Paths/ContractFilePath";
+
+import { hasCacheExtension } from "../../../Paths/CacheFilePath";
 
 interface EditorParameters {
-  terminal: ITerminal;
-  router: IRouter;
-  player: IPlayer;
-  server: BaseServer;
   args: (string | number | boolean)[];
+  server: BaseServer;
 }
 
-function isNs2(filename: string): boolean {
-  return filename.endsWith(".ns") || filename.endsWith(".js");
-}
+function getScriptTemplate(path: string): string {
+  if (hasTextExtension(path) || isLegacyScript(path)) {
+    return "";
+  }
+  const fileTypeFeature = getFileTypeFeature(getFileType(path));
+  if (fileTypeFeature.isTypeScript) {
+    return `export async function main(ns: NS) {
 
-const newNs2Template = `/** @param {NS} ns **/
+}`;
+  } else {
+    return `/** @param {NS} ns */
 export async function main(ns) {
 
 }`;
-
-interface ISimpleScriptGlob {
-  glob: string;
-  preGlob: string;
-  postGlob: string;
-  globError: string;
-  globMatches: string[];
-  globAgainst: Script[];
-}
-
-function containsSimpleGlob(filename: string): boolean {
-  return filename.includes("*");
-}
-
-function detectSimpleScriptGlob(
-  args: EditorParameters["args"],
-  player: IPlayer,
-  terminal: ITerminal,
-): ISimpleScriptGlob | null {
-  if (args.length == 1 && containsSimpleGlob(`${args[0]}`)) {
-    const filename = `${args[0]}`;
-    const scripts = player.getCurrentServer().scripts;
-    const parsedGlob = parseSimpleScriptGlob(filename, scripts, terminal);
-    return parsedGlob;
   }
-  return null;
-}
-
-function parseSimpleScriptGlob(globString: string, globDatabase: Script[], terminal: ITerminal): ISimpleScriptGlob {
-  const parsedGlob: ISimpleScriptGlob = {
-    glob: globString,
-    preGlob: "",
-    postGlob: "",
-    globError: "",
-    globMatches: [],
-    globAgainst: globDatabase,
-  };
-
-  // Ensure deep globs are minified to simple globs, which act as deep globs in this impl
-  globString = globString.replace("**", "*");
-
-  // Ensure only a single glob is present
-  if (globString.split("").filter((c) => c == "*").length !== 1) {
-    parsedGlob.globError = "Only a single glob is supported per command.\nexample: `nano my-dir/*.js`";
-    return parsedGlob;
-  }
-
-  // Split arg around glob, normalize preGlob path
-  [parsedGlob.preGlob, parsedGlob.postGlob] = globString.split("*");
-  parsedGlob.preGlob = removeLeadingSlash(parsedGlob.preGlob);
-
-  // Add CWD to preGlob path
-  const cwd = removeTrailingSlash(terminal.cwd())
-  parsedGlob.preGlob = `${cwd}/${parsedGlob.preGlob}`
-
-  // For every script on the current server, filter matched scripts per glob values & persist
-  globDatabase.forEach((script) => {
-    const filename = script.filename.startsWith('/') ? script.filename : `/${script.filename}`
-    if (filename.startsWith(parsedGlob.preGlob) && filename.endsWith(parsedGlob.postGlob)) {
-      parsedGlob.globMatches.push(filename);
-    }
-  });
-
-  // Rebuild glob for potential error reporting
-  parsedGlob.glob = `${parsedGlob.preGlob}*${parsedGlob.postGlob}`
-
-  return parsedGlob;
 }
 
 export function commonEditor(
   command: string,
-  { terminal, router, player, args }: EditorParameters,
-  scriptEditorRouteOptions?: ScriptEditorRouteOptions,
+  { args, server }: EditorParameters,
+  options?: ScriptEditorRouteOptions,
 ): void {
-  if (args.length < 1) {
-    terminal.error(`Incorrect usage of ${command} command. Usage: ${command} [scriptname]`);
-    return;
-  }
+  if (args.length < 1) return Terminal.error(`Incorrect usage of ${command} command. Usage: ${command} [scriptname]`);
+  const files = new Map<ScriptFilePath | TextFilePath, string>();
+  let hasLegacyScript = false;
+  for (const arg of args) {
+    const pattern = String(arg);
 
-  let filesToLoadOrCreate = args;
-  try {
-    const globSearch = detectSimpleScriptGlob(args, player, terminal);
-    if (globSearch) {
-      if (isEmpty(globSearch.globError) === false) throw new Error(globSearch.globError);
-      filesToLoadOrCreate = globSearch.globMatches;
-    }
-
-    const files = filesToLoadOrCreate.map((arg) => {
-      const filename = `${arg}`;
-
-      if (isScriptFilename(filename)) {
-        const filepath = terminal.getFilepath(filename);
-        const script = terminal.getScript(player, filename);
-        const fileIsNs2 = isNs2(filename);
-        const code = script !== null ? script.code : fileIsNs2 ? newNs2Template : "";
-
-        if (code === newNs2Template) {
-          CursorPositions.saveCursor(filename, {
-            row: 3,
-            column: 5,
-          });
+    // Glob of existing files
+    if (pattern.includes("*") || pattern.includes("?")) {
+      const globbedFileMap = getGlobbedFileMap(pattern, server, Terminal.currDir);
+      if (globbedFileMap.size === 0) {
+        Terminal.error(`No files matching ${pattern}`);
+        return;
+      }
+      for (const [path, file] of globbedFileMap) {
+        if (isLegacyScript(path)) {
+          hasLegacyScript = true;
         }
-
-        return [filepath, code];
+        files.set(path, file.content);
       }
-
-      if (filename.endsWith(".txt")) {
-        const filepath = terminal.getFilepath(filename);
-        const txt = terminal.getTextFile(player, filename);
-        return [filepath, txt === null ? "" : txt.text];
-      }
-
-      throw new Error(
-        `Invalid file. Only scripts (.script, .ns, .js), or text files (.txt) can be edited with ${command}`,
-      );
-    });
-
-    if (globSearch && files.length === 0) {
-      throw new Error(`Could not find any valid files to open with ${command} using glob: \`${globSearch.glob}\``)
+      continue;
     }
 
-    router.toScriptEditor(Object.fromEntries(files), scriptEditorRouteOptions);
-  } catch (e) {
-    terminal.error(`${e}`);
+    // Non-glob, files do not need to already exist
+    const path = Terminal.getFilepath(pattern);
+    if (!path) return Terminal.error(`Invalid file path ${arg}`);
+    if (!hasScriptExtension(path) && !hasTextExtension(path)) {
+      const hint = hasContractExtension(path) || hasCacheExtension(path) ? " (Try using 'run')" : "";
+      return Terminal.error(`${command}: Only scripts or text files can be edited. Invalid file type: ${arg}${hint}`);
+    }
+    if (isLegacyScript(path)) {
+      hasLegacyScript = true;
+    }
+    const file = server.getContentFile(path);
+    files.set(path, file ? file.content : getScriptTemplate(path));
   }
+  if (hasLegacyScript) {
+    sendDeprecationNotice();
+  }
+  Router.toPage(Page.ScriptEditor, { files, options });
 }

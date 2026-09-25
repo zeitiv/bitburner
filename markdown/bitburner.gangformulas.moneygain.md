@@ -6,7 +6,7 @@
 
 Calculate money gain per tick.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 moneyGain(gang: GangGenInfo, member: GangMemberInfo, task: GangTaskStats): number;
@@ -14,13 +14,73 @@ moneyGain(gang: GangGenInfo, member: GangMemberInfo, task: GangTaskStats): numbe
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  gang | [GangGenInfo](./bitburner.ganggeninfo.md) | Gang info from [getGangInformation](./bitburner.gang.getganginformation.md) |
-|  member | [GangMemberInfo](./bitburner.gangmemberinfo.md) | Member info from [getMemberInformation](./bitburner.gang.getmemberinformation.md) |
-|  task | [GangTaskStats](./bitburner.gangtaskstats.md) | Task info from [getTaskStats](./bitburner.gang.gettaskstats.md) |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+gang
+
+
+</td><td>
+
+[GangGenInfo](./bitburner.ganggeninfo.md)
+
+
+</td><td>
+
+Gang info from [getGangInformation](./bitburner.gang.getganginformation.md)
+
+
+</td></tr>
+<tr><td>
+
+member
+
+
+</td><td>
+
+[GangMemberInfo](./bitburner.gangmemberinfo.md)
+
+
+</td><td>
+
+Member info from [getMemberInformation](./bitburner.gang.getmemberinformation.md)
+
+
+</td></tr>
+<tr><td>
+
+task
+
+
+</td><td>
+
+[GangTaskStats](./bitburner.gangtaskstats.md)
+
+
+</td><td>
+
+Task info from [getTaskStats](./bitburner.gang.gettaskstats.md)
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 

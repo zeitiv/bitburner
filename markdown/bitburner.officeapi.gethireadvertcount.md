@@ -4,23 +4,57 @@
 
 ## OfficeAPI.getHireAdVertCount() method
 
-Get the number of times you have Hired AdVert
+Get the number of times you have hired AdVert.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getHireAdVertCount(adivisionName: string): number;
+getHireAdVertCount(divisionName: string): number;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  adivisionName | string |  |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+divisionName
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the division.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 
-Number of times you have Hired AdVert
+Number of times you have hired AdVert.
+
+## Remarks
+
+RAM cost: 10 GB
 

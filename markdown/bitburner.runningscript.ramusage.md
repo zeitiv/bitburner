@@ -4,7 +4,9 @@
 
 ## RunningScript.ramUsage property
 
-<b>Signature:</b>
+How much RAM this script uses for ONE thread. Also known as "static RAM usage," this value does not change once the script is started, unless you call ns.ramOverride().
+
+**Signature:**
 
 ```typescript
 ramUsage: number;

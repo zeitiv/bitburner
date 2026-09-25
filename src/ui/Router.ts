@@ -1,90 +1,62 @@
-import { Faction } from "../Faction/Faction";
-import { Location } from "../Locations/Location";
+import type { ScriptFilePath } from "../Paths/ScriptFilePath";
+import type { TextFilePath } from "../Paths/TextFilePath";
+import type { Faction } from "../Faction/Faction";
+import type { Location } from "../Locations/Location";
+import type { SaveData } from "../types";
+import type { OptionsTabName } from "../GameOptions/ui/GameOptionsRoot";
+import { ComplexPage, SimplePage } from "./Enums";
 
-/**
- * The full-screen page the player is currently be on.
- * These pages are mutually exclusive.
- */
-export enum Page {
-  ActiveScripts,
-  Augmentations,
-  BitVerse,
-  Bladeburner,
-  City,
-  Corporation,
-  CreateProgram,
-  ScriptEditor,
-  DevMenu,
-  Faction,
-  Factions,
-  Gang,
-  Hacknet,
-  Infiltration,
-  Job,
-  Milestones,
-  Options,
-  Resleeves,
-  Sleeves,
-  Stats,
-  StockMarket,
-  Terminal,
-  Travel,
-  Tutorial,
-  Work,
-  BladeburnerCinematic,
-  Location,
-  Loading,
-  StaneksGift,
-  Recovery,
-  Achievements,
-  ThemeBrowser,
-  ImportSave,
-}
+// Using the same name as both type and object to mimic enum-like behavior.
+// See https://stackoverflow.com/a/71255520/202091
+export type Page = SimplePage | ComplexPage;
+export const Page = { ...SimplePage, ...ComplexPage };
+
+export type PageContext<T extends Page> = T extends ComplexPage.BitVerse
+  ? { flume: boolean; quick: boolean }
+  : T extends ComplexPage.Faction
+  ? { faction: Faction }
+  : T extends ComplexPage.FactionAugmentations
+  ? { faction: Faction }
+  : T extends ComplexPage.ScriptEditor
+  ? { files?: Map<ScriptFilePath | TextFilePath, string>; options?: ScriptEditorRouteOptions }
+  : T extends ComplexPage.Location
+  ? { location: Location }
+  : T extends ComplexPage.ImportSave
+  ? { saveData: SaveData; automatic?: boolean }
+  : T extends ComplexPage.Documentation
+  ? { docPage?: string }
+  : T extends ComplexPage.Options
+  ? { tab?: OptionsTabName }
+  : never;
+
+export type PageWithContext =
+  | ({ page: ComplexPage.BitVerse } & PageContext<ComplexPage.BitVerse>)
+  | ({ page: ComplexPage.Faction } & PageContext<ComplexPage.Faction>)
+  | ({ page: ComplexPage.FactionAugmentations } & PageContext<ComplexPage.FactionAugmentations>)
+  | ({ page: ComplexPage.ScriptEditor } & PageContext<ComplexPage.ScriptEditor>)
+  | ({ page: ComplexPage.Location } & PageContext<ComplexPage.Location>)
+  | ({ page: ComplexPage.ImportSave } & PageContext<ComplexPage.ImportSave>)
+  | ({ page: ComplexPage.Documentation } & PageContext<ComplexPage.Documentation>)
+  | ({ page: ComplexPage.Options } & PageContext<ComplexPage.Options>)
+  | { page: ComplexPage.LoadingScreen }
+  | { page: SimplePage };
 
 export interface ScriptEditorRouteOptions {
   vim: boolean;
+  hostname?: string;
 }
 
-/**
- * This class keeps track of player navigation/routing within the game.
- */
+/** The router keeps track of player navigation/routing within the game. */
 export interface IRouter {
-  // toCinematicText(): void;
-  // toInfiltration(): void;
-  // toMission(): void;
-  // toRedPill(): void;
-  // toworkInProgress(): void;
   page(): Page;
   allowRouting(value: boolean): void;
-  toActiveScripts(): void;
-  toAugmentations(): void;
-  toBitVerse(flume: boolean, quick: boolean): void;
-  toBladeburner(): void;
-  toStats(): void;
-  toCity(): void; // travel ? city ?
-  toCorporation(): void;
-  toCreateProgram(): void;
-  toDevMenu(): void;
-  toFaction(faction?: Faction): void; // faction name
-  toFactions(): void;
-  toGameOptions(): void;
-  toGang(): void;
-  toHacknetNodes(): void;
-  toInfiltration(location: Location): void;
-  toJob(): void;
-  toMilestones(): void;
-  toResleeves(): void;
-  toScriptEditor(files?: Record<string, string>, options?: ScriptEditorRouteOptions): void;
-  toSleeves(): void;
-  toStockMarket(): void;
-  toTerminal(): void;
-  toTravel(): void;
-  toTutorial(): void;
-  toWork(): void;
-  toBladeburnerCinematic(): void;
-  toLocation(location: Location): void;
-  toStaneksGift(): void;
-  toAchievements(): void;
-  toThemeBrowser(): void;
-  toImportSave(base64Save: string, automatic?: boolean): void;
+  /** If messages/toasts are hidden on this page */
+  hidingMessages(): boolean;
+  toPage(page: SimplePage): void;
+  toPage<T extends ComplexPage>(page: T, context: PageContext<T>): void;
+  /** go to a preveious page (if any) */
+  back(): void;
 }
+
+const simplePages = Object.values(SimplePage);
+export const isSimplePage = (page: Page): page is SimplePage => simplePages.includes(page as SimplePage);

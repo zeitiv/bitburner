@@ -3,61 +3,49 @@
  * This is the component for displaying a single faction's UI, not the list of all
  * accessible factions
  */
-import React, { useState, useEffect } from "react";
+import React from "react";
 
-import { AugmentationsPage } from "./AugmentationsPage";
 import { DonateOption } from "./DonateOption";
 import { Info } from "./Info";
 import { Option } from "./Option";
 
-import { CONSTANTS } from "../../Constants";
+import { Faction } from "../Faction";
 
-import { BitNodeMultipliers } from "../../BitNode/BitNodeMultipliers";
-import { Faction } from "../../Faction/Faction";
+import { Router } from "../../ui/GameRoot";
+import { Page } from "../../ui/Router";
+import { Player } from "@player";
+import { Typography, Button } from "@mui/material";
 
-import { use } from "../../ui/Context";
-import { CreateGangModal } from "./CreateGangModal";
+import { FactionWorkType } from "@enums";
+import { FactionWork } from "../../Work/FactionWork";
+import { useCycleRerender } from "../../ui/React/hooks";
+import { favorNeededToDonate } from "../formulas/donation";
+import { knowAboutBitverse } from "../../BitNode/BitNodeUtils";
 
-import Typography from "@mui/material/Typography";
-import Button from "@mui/material/Button";
-import { CovenantPurchasesRoot } from "../../PersonObjects/Sleeve/ui/CovenantPurchasesRoot";
-
-type IProps = {
+type FactionRootProps = {
   faction: Faction;
 };
 
 // Info text for all options on the UI
-const gangInfo = "Create and manage a gang for this Faction. Gangs will earn you money and " + "faction reputation";
 const hackingContractsInfo =
   "Complete hacking contracts for your faction. " +
   "Your effectiveness, which determines how much " +
-  "reputation you gain for this faction, is based on your hacking skill. " +
+  "reputation you gain for this faction, is based completely on your hacking skill. " +
   "You will gain hacking exp.";
 const fieldWorkInfo =
   "Carry out field missions for your faction. " +
   "Your effectiveness, which determines how much " +
-  "reputation you gain for this faction, is based on all of your stats. " +
+  "reputation you gain for this faction, is based on all of your stats equally. " +
   "You will gain exp for all stats.";
 const securityWorkInfo =
   "Serve in a security detail for your faction. " +
   "Your effectiveness, which determines how much " +
-  "reputation you gain for this faction, is based on your combat stats. " +
-  "You will gain exp for all combat stats.";
+  "reputation you gain for this faction, is based on your combat stats and your hacking skill. " +
+  "You will gain exp for all combat stats and hacking.";
 const augmentationsInfo =
   "As your reputation with this faction rises, you will " +
-  "unlock Augmentations, which you can purchase to enhance " +
+  "unlock augmentations, which you can purchase to enhance " +
   "your abilities.";
-const sleevePurchasesInfo = "Purchase Duplicate Sleeves and upgrades. These are permanent!";
-
-const GangNames = [
-  "Slum Snakes",
-  "Tetrads",
-  "The Syndicate",
-  "The Dark Army",
-  "Speakers for the Dead",
-  "NiteSec",
-  "The Black Hand",
-];
 
 interface IMainProps {
   faction: Faction;
@@ -66,130 +54,120 @@ interface IMainProps {
 }
 
 function MainPage({ faction, rerender, onAugmentations }: IMainProps): React.ReactElement {
-  const player = use.Player();
-  const router = use.Router();
-  const [sleevesOpen, setSleevesOpen] = useState(false);
-  const [gangOpen, setGangOpen] = useState(false);
-  const p = player;
   const factionInfo = faction.getInfo();
 
-  function manageGang(): void {
-    // If player already has a gang, just go to the gang UI
-    if (player.inGang()) {
-      return router.toGang();
-    }
-
-    setGangOpen(true);
-  }
-
   function startWork(): void {
-    player.startFocusing();
-    router.toWork();
+    Player.startFocusing();
+    Router.toPage(Page.Work);
   }
 
   function startFieldWork(faction: Faction): void {
-    player.startFactionFieldWork(faction);
+    Player.startWork(
+      new FactionWork({
+        singularity: false,
+        faction: faction.name,
+        factionWorkType: FactionWorkType.field,
+      }),
+    );
     startWork();
   }
 
   function startHackingContracts(faction: Faction): void {
-    player.startFactionHackWork(faction);
+    Player.startWork(
+      new FactionWork({
+        singularity: false,
+        faction: faction.name,
+        factionWorkType: FactionWorkType.hacking,
+      }),
+    );
     startWork();
   }
 
   function startSecurityWork(faction: Faction): void {
-    player.startFactionSecurityWork(faction);
+    Player.startWork(
+      new FactionWork({
+        singularity: false,
+        faction: faction.name,
+        factionWorkType: FactionWorkType.security,
+      }),
+    );
     startWork();
   }
 
-  // We have a special flag for whether the player this faction is the player's
+  // We have a special flag for whether this faction is the player's
   // gang faction because if the player has a gang, they cannot do any other action
-  const isPlayersGang = p.inGang() && p.getGangName() === faction.name;
+  const isPlayersGang = Player.gang && Player.getGangName() === faction.name;
 
   // Flags for whether special options (gang, sleeve purchases, donate, etc.)
   // should be shown
-  const favorToDonate = Math.floor(CONSTANTS.BaseFavorToDonate * BitNodeMultipliers.RepToDonateToFaction);
+  const favorToDonate = favorNeededToDonate();
   const canDonate = faction.favor >= favorToDonate;
-
-  const canPurchaseSleeves = faction.name === "The Covenant" && p.bitNodeN === 10;
-
-  let canAccessGang = p.canAccessGang() && GangNames.includes(faction.name);
-  if (p.inGang()) {
-    if (p.getGangName() !== faction.name) {
-      canAccessGang = false;
-    } else if (p.getGangName() === faction.name) {
-      canAccessGang = true;
-    }
-  }
 
   return (
     <>
-      <Button onClick={() => router.toFactions()}>Back</Button>
+      <Button onClick={() => Router.toPage(Page.Factions)}>Back</Button>
       <Typography variant="h4" color="primary">
         {faction.name}
       </Typography>
       <Info faction={faction} factionInfo={factionInfo} />
-      {canAccessGang && (
+      {!isPlayersGang && (
         <>
-          <Option buttonText={"Manage Gang"} infoText={gangInfo} onClick={manageGang} />
-          <CreateGangModal facName={faction.name} open={gangOpen} onClose={() => setGangOpen(false)} />
+          {factionInfo.offersWork() && (
+            <Typography>
+              Perform work/carry out assignments for your faction to help further its cause! By doing so, you will earn
+              reputation for your faction. You will also gain reputation passively over time, although at a very slow
+              rate.&nbsp;
+              {knowAboutBitverse() && <>Note that the passive reputation gain is disabled in some BitNodes. </>}
+              Earning reputation will allow you to purchase augmentations through this faction, which are powerful
+              upgrades that enhance your abilities.
+            </Typography>
+          )}
+          {factionInfo.offerHackingWork && (
+            <Option
+              buttonText={"Hacking Contracts"}
+              infoText={hackingContractsInfo}
+              onClick={() => startHackingContracts(faction)}
+            />
+          )}
+          {factionInfo.offerFieldWork && (
+            <Option buttonText={"Field Work"} infoText={fieldWorkInfo} onClick={() => startFieldWork(faction)} />
+          )}
+          {factionInfo.offerSecurityWork && (
+            <Option
+              buttonText={"Security Work"}
+              infoText={securityWorkInfo}
+              onClick={() => startSecurityWork(faction)}
+            />
+          )}
+          {factionInfo.offersWork() && (
+            <DonateOption faction={faction} rerender={rerender} favorToDonate={favorToDonate} disabled={!canDonate} />
+          )}
         </>
-      )}
-      {!isPlayersGang && factionInfo.offerHackingWork && (
-        <Option
-          buttonText={"Hacking Contracts"}
-          infoText={hackingContractsInfo}
-          onClick={() => startHackingContracts(faction)}
-        />
-      )}
-      {!isPlayersGang && factionInfo.offerFieldWork && (
-        <Option buttonText={"Field Work"} infoText={fieldWorkInfo} onClick={() => startFieldWork(faction)} />
-      )}
-      {!isPlayersGang && factionInfo.offerSecurityWork && (
-        <Option buttonText={"Security Work"} infoText={securityWorkInfo} onClick={() => startSecurityWork(faction)} />
-      )}
-      {!isPlayersGang && factionInfo.offersWork() && (
-        <DonateOption
-          faction={faction}
-          p={player}
-          rerender={rerender}
-          favorToDonate={favorToDonate}
-          disabled={!canDonate}
-        />
       )}
       <Option buttonText={"Purchase Augmentations"} infoText={augmentationsInfo} onClick={onAugmentations} />
-      {canPurchaseSleeves && (
-        <>
-          <Option
-            buttonText={"Purchase & Upgrade Duplicate Sleeves"}
-            infoText={sleevePurchasesInfo}
-            onClick={() => setSleevesOpen(true)}
-          />
-          <CovenantPurchasesRoot open={sleevesOpen} onClose={() => setSleevesOpen(false)} />
-        </>
-      )}
     </>
   );
 }
 
-export function FactionRoot(props: IProps): React.ReactElement {
-  const setRerender = useState(false)[1];
-  function rerender(): void {
-    setRerender((old) => !old);
+export function FactionRoot({ faction }: FactionRootProps): React.ReactElement {
+  const rerender = useCycleRerender();
+
+  if (!Player.factions.includes(faction.name)) {
+    return (
+      <>
+        <Typography variant="h4" color="primary">
+          You have not joined {faction.name} yet!
+        </Typography>
+        <Button onClick={() => Router.toPage(Page.Factions)}>Back to Factions</Button>
+      </>
+    );
   }
 
-  useEffect(() => {
-    const id = setInterval(rerender, 200);
-    return () => clearInterval(id);
-  }, []);
-
-  const faction = props.faction;
-
-  const [purchasingAugs, setPurchasingAugs] = useState(false);
-
-  return purchasingAugs ? (
-    <AugmentationsPage faction={faction} routeToMainPage={() => setPurchasingAugs(false)} />
-  ) : (
-    <MainPage rerender={rerender} faction={faction} onAugmentations={() => setPurchasingAugs(true)} />
+  return (
+    <MainPage
+      rerender={rerender}
+      faction={faction}
+      onAugmentations={() => Router.toPage(Page.FactionAugmentations, { faction })}
+    />
   );
 }

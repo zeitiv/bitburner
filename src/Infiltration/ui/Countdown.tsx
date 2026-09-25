@@ -1,29 +1,18 @@
-import React, { useState, useEffect } from "react";
-import Grid from "@mui/material/Grid";
+import { Paper, Typography } from "@mui/material";
+import React from "react";
+import type { Infiltration } from "../Infiltration";
+import type { CountdownModel } from "../model/CountdownModel";
 
-import Typography from "@mui/material/Typography";
 interface IProps {
-  onFinish: () => void;
+  state: Infiltration;
+  stage: CountdownModel;
 }
 
-export function Countdown(props: IProps): React.ReactElement {
-  const [x, setX] = useState(3);
-  useEffect(() => {
-    if (x === 0) {
-      props.onFinish();
-      return;
-    }
-    setTimeout(() => setX(x - 1), 200);
-  });
-
+export function Countdown({ stage }: IProps): React.ReactElement {
   return (
-    <>
-      <Grid container spacing={3}>
-        <Grid item xs={12}>
-          <Typography variant="h4">Get Ready!</Typography>
-          <Typography variant="h4">{x}</Typography>
-        </Grid>
-      </Grid>
-    </>
+    <Paper sx={{ p: 1, textAlign: "center" }}>
+      <Typography variant="h4">Get Ready!</Typography>
+      <Typography variant="h4">{stage.count}</Typography>
+    </Paper>
   );
 }

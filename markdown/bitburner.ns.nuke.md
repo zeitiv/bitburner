@@ -6,41 +6,68 @@
 
 Runs NUKE.exe on a server.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-nuke(host: string): void;
+nuke(host?: string): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  host | string | Hostname of the target server. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
 
-void
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+host
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Hostname/IP of the target server. Optional. Defaults to current server if not provided.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
+
+boolean
+
+True if the player runs the program successfully, and false otherwise.
 
 ## Remarks
 
 RAM cost: 0.05 GB
 
-Running NUKE.exe on a target server gives you root access which means you can executes scripts on said server. NUKE.exe must exist on your home computer.
+Running NUKE.exe on a target server gives you root access which means you can execute scripts on said server. NUKE.exe must exist on your home computer.
 
-## Example 1
+Each server has a different number of required open ports. If that number is greater than 0, you have to open its ports before nuking it. You can check the requirement with [getServerNumPortsRequired](./bitburner.ns.getservernumportsrequired.md) or [getServer().numOpenPortsRequired](./bitburner.server.numopenportsrequired.md)<!-- -->.
 
+Note that the server's required hacking level is not a requirement of nuking. You can nuke a server as long as you open enough ports, regardless of your hacking level.
 
-```ts
-// NS1:
-nuke("foodnstuff");
-```
-
-## Example 2
+## Example
 
 
-```ts
-// NS2:
+```js
 ns.nuke("foodnstuff");
 ```
 

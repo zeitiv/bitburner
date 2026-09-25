@@ -4,7 +4,9 @@
 
 ## GangMemberInfo.def property
 
-<b>Signature:</b>
+Defense skill level
+
+**Signature:**
 
 ```typescript
 def: number;

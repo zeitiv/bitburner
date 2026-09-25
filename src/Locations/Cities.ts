@@ -1,8 +1,5 @@
-/**
- * Map of all Cities in the game
- * Key = City Name, Value = City object
- */
 import { City } from "./City";
-import { IMap } from "../types";
+import { CityName } from "@enums";
+import { createEnumKeyedRecord } from "../Types/Record";
 
-export const Cities: IMap<City> = {};
+export const Cities = createEnumKeyedRecord(CityName, (name) => new City(name));

@@ -4,7 +4,9 @@
 
 ## GangMemberInfo.str\_asc\_mult property
 
-<b>Signature:</b>
+Strength multiplier from ascensions
+
+**Signature:**
 
 ```typescript
 str_asc_mult: number;

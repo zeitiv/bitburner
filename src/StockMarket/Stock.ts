@@ -1,6 +1,6 @@
 import { IMinMaxRange } from "../types";
-import { Generic_fromJSON, Generic_toJSON, Reviver } from "../utils/JSONReviver";
-import { getRandomInt } from "../utils/helpers/getRandomInt";
+import { Generic_fromJSON, Generic_toJSON, IReviverValue, constructorsForReviver } from "../utils/JSONReviver";
+import { getRandomIntInclusive } from "../utils/helpers/getRandomIntInclusive";
 
 export const StockForecastInfluenceLimit = 5;
 
@@ -36,8 +36,8 @@ function toNumber(n: number | IMinMaxRange): number {
       return n;
     }
     case "object": {
-      const range = n as IMinMaxRange;
-      value = getRandomInt(range.min, range.max);
+      const range = n;
+      value = getRandomIntInclusive(range.min, range.max);
       break;
     }
     default:
@@ -51,38 +51,24 @@ function toNumber(n: number | IMinMaxRange): number {
   return value;
 }
 
-/**
- * Represents the valuation of a company in the World Stock Exchange.
- */
+/** Represents the valuation of a company in the World Stock Exchange. */
 export class Stock {
-  /**
-   * Bear or bull (more likely to go up or down, based on otlkMag)
-   */
+  /** Bear or bull (more likely to go up or down, based on otlkMag) */
   b: boolean;
 
-  /**
-   * Maximum price of a stock (per share)
-   */
+  /** Maximum price of a stock (per share) */
   readonly cap: number;
 
-  /**
-   * Stocks previous share price
-   */
+  /** Stocks previous share price */
   lastPrice: number;
 
-  /**
-   * Maximum number of shares that player can own (both long and short combined)
-   */
+  /** Maximum number of shares that player can own (both long and short combined) */
   readonly maxShares: number;
 
-  /**
-   * Maximum volatility
-   */
+  /** Maximum volatility */
   readonly mv: number;
 
-  /**
-   * Name of the company that the stock is for
-   */
+  /** Name of the company that the stock is for */
   readonly name: string;
 
   /**
@@ -97,34 +83,22 @@ export class Stock {
    */
   otlkMagForecast: number;
 
-  /**
-   * Average price of stocks that the player owns in the LONG position
-   */
+  /** Average price of stocks that the player owns in the LONG position */
   playerAvgPx: number;
 
-  /**
-   * Average price of stocks that the player owns in the SHORT position
-   */
+  /** Average price of stocks that the player owns in the SHORT position */
   playerAvgShortPx: number;
 
-  /**
-   * Number of shares the player owns in the LONG position
-   */
+  /** Number of shares the player owns in the LONG position */
   playerShares: number;
 
-  /**
-   * Number of shares the player owns in the SHORT position
-   */
+  /** Number of shares the player owns in the SHORT position */
   playerShortShares: number;
 
-  /**
-   * Stock's share price
-   */
+  /** Stock's share price */
   price: number;
 
-  /**
-   * How many shares need to be transacted in order to trigger a price movement
-   */
+  /** How many shares need to be transacted in order to trigger a price movement */
   readonly shareTxForMovement: number;
 
   /**
@@ -139,9 +113,7 @@ export class Stock {
    */
   readonly spreadPerc: number;
 
-  /**
-   * The stock's ticker symbol
-   */
+  /** The stock's ticker symbol */
   readonly symbol: string;
 
   /**
@@ -164,7 +136,7 @@ export class Stock {
     this.b = p.b;
     this.otlkMag = p.otlkMag;
     this.otlkMagForecast = this.getAbsoluteForecast();
-    this.cap = getRandomInt(this.price * 1e3, this.price * 25e3);
+    this.cap = getRandomIntInclusive(this.price * 1e3, this.price * 25e3);
     this.spreadPerc = toNumber(p.spreadPerc);
     this.shareTxForMovement = toNumber(p.shareTxForMovement);
     this.shareTxUntilMovement = this.shareTxForMovement;
@@ -178,9 +150,7 @@ export class Stock {
     this.maxShares = Math.round((this.totalShares * outstandingSharePercentage) / 1e5) * 1e5;
   }
 
-  /**
-   * Safely set the stock's second-order forecast to a new value
-   */
+  /** Safely set the stock's second-order forecast to a new value */
   changeForecastForecast(newff: number): void {
     this.otlkMagForecast = newff;
     if (this.otlkMagForecast > 100) {
@@ -190,9 +160,7 @@ export class Stock {
     }
   }
 
-  /**
-   * Set the stock to a new price. Also updates the stock's previous price tracker
-   */
+  /** Set the stock to a new price. Also updates the stock's previous price tracker */
   changePrice(newPrice: number): void {
     this.lastPrice = this.price;
     this.price = newPrice;
@@ -213,13 +181,11 @@ export class Stock {
       } else {
         this.otlkMag -= changeAmt;
       }
-    } else {
+    } else if (this.b) {
       // Forecast decreases
-      if (this.b) {
-        this.otlkMag -= changeAmt;
-      } else {
-        this.otlkMag += changeAmt;
-      }
+      this.otlkMag -= changeAmt;
+    } else {
+      this.otlkMag += changeAmt;
     }
 
     this.otlkMag = Math.min(this.otlkMag, 50);
@@ -247,34 +213,25 @@ export class Stock {
    * RL stock market cycles and introduce volatility
    */
   flipForecastForecast(): void {
-    const diff = this.otlkMagForecast - 50;
-    this.otlkMagForecast = 50 + -1 * diff;
+    this.otlkMagForecast = 100 - this.otlkMagForecast;
   }
 
-  /**
-   * Returns the stock's absolute forecast, which is a number between 0-100
-   */
+  /** Returns the stock's absolute forecast, which is a number between 0-100 */
   getAbsoluteForecast(): number {
     return this.b ? 50 + this.otlkMag : 50 - this.otlkMag;
   }
 
-  /**
-   * Return the price at which YOUR stock is bought (market ask price). Accounts for spread
-   */
+  /** Return the price at which YOUR stock is bought (market ask price). Accounts for spread */
   getAskPrice(): number {
     return this.price * (1 + this.spreadPerc / 100);
   }
 
-  /**
-   * Return the price at which YOUR stock is sold (market bid price). Accounts for spread
-   */
+  /** Return the price at which YOUR stock is sold (market bid price). Accounts for spread */
   getBidPrice(): number {
     return this.price * (1 - this.spreadPerc / 100);
   }
 
-  /**
-   * Returns the chance (0-1 decimal) that a stock has of having its forecast increase
-   */
+  /** Returns the chance (0-1 decimal) that a stock has of having its forecast increase */
   getForecastIncreaseChance(): number {
     const diff = this.otlkMagForecast - this.getAbsoluteForecast();
 
@@ -307,20 +264,15 @@ export class Stock {
     }
   }
 
-  /**
-   * Serialize the Stock to a JSON save state.
-   */
-  toJSON(): any {
+  /** Serialize the Stock to a JSON save state. */
+  toJSON(): IReviverValue {
     return Generic_toJSON("Stock", this);
   }
 
-  /**
-   * Initializes a Stock from a JSON save state
-   */
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-  static fromJSON(value: any): Stock {
+  /** Initializes a Stock from a JSON save state */
+  static fromJSON(value: IReviverValue): Stock {
     return Generic_fromJSON(Stock, value.data);
   }
 }
 
-Reviver.constructors.Stock = Stock;
+constructorsForReviver.Stock = Stock;

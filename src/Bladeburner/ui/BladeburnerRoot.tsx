@@ -1,34 +1,24 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { Stats } from "./Stats";
 import { Console } from "./Console";
 import { AllPages } from "./AllPages";
 
-import { use } from "../../ui/Context";
-import Box from "@mui/material/Box";
+import { Player } from "@player";
+import { Box } from "@mui/material";
+import { useCycleRerender } from "../../ui/React/hooks";
 
 export function BladeburnerRoot(): React.ReactElement {
-  const player = use.Player();
-  const router = use.Router();
-  const setRerender = useState(false)[1];
-  function rerender(): void {
-    setRerender((old) => !old);
-  }
-
-  useEffect(() => {
-    const id = setInterval(rerender, 200);
-    return () => clearInterval(id);
-  }, []);
-
-  const bladeburner = player.bladeburner;
-  if (bladeburner === null) return <></>;
+  useCycleRerender();
+  const bladeburner = Player.bladeburner;
+  if (!bladeburner) return <></>;
   return (
     <Box display="flex" flexDirection="column">
       <Box sx={{ display: "grid", gridTemplateColumns: "4fr 8fr", p: 1 }}>
-        <Stats bladeburner={bladeburner} player={player} router={router} />
-        <Console bladeburner={bladeburner} player={player} />
+        <Stats bladeburner={bladeburner} />
+        <Console bladeburner={bladeburner} />
       </Box>
 
-      <AllPages bladeburner={bladeburner} player={player} />
+      <AllPages bladeburner={bladeburner} />
     </Box>
   );
 }

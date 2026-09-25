@@ -6,20 +6,20 @@
 
 Get the number of hacknet nodes you own.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 numNodes(): number;
 ```
-<b>Returns:</b>
+**Returns:**
 
 number
 
-number of hacknet nodes.
+Number of hacknet nodes.
 
 ## Remarks
 
-RAM cost: 0 GB
+RAM cost: 0.5 GB
 
 Returns the number of Hacknet Nodes you own.
 

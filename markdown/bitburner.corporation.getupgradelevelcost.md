@@ -4,23 +4,57 @@
 
 ## Corporation.getUpgradeLevelCost() method
 
-Gets the cost to unlock the next level of a levelable upgrade
+Get the cost to unlock the next level of a levelable upgrade.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getUpgradeLevelCost(upgradeName: string): number;
+getUpgradeLevelCost(upgradeName: CorpUpgradeName): number;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  upgradeName | string | Name of the upgrade |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+upgradeName
+
+
+</td><td>
+
+[CorpUpgradeName](./bitburner.corpupgradename.md)
+
+
+</td><td>
+
+Name of the upgrade
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 
-cost of the upgrade
+Cost of the upgrade
+
+## Remarks
+
+RAM cost: 10 GB
 

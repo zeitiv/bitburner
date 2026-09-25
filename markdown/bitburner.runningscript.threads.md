@@ -4,7 +4,9 @@
 
 ## RunningScript.threads property
 
-<b>Signature:</b>
+Number of threads that this script runs with
+
+**Signature:**
 
 ```typescript
 threads: number;

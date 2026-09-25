@@ -6,28 +6,75 @@
 
 Write data to a port.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-writePort(port: number, data: string | number): Promise<any>;
+writePort(portNumber: number, data: any): any;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  port | number |  |
-|  data | string \| number |  |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
 
-Promise&lt;any&gt;
 
-The data popped off the queue if it was full.
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+portNumber
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Port to write to. Must be a positive integer.
+
+
+</td></tr>
+<tr><td>
+
+data
+
+
+</td><td>
+
+any
+
+
+</td><td>
+
+Data to write, it's cloned with structuredClone().
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
+
+any
+
+The data popped off the queue if it was full, or null if it was not full.
 
 ## Remarks
 
 RAM cost: 0 GB
 
-Write data to that netscript port.
+Write data to the given Netscript port.
+
+There is a limit on the maximum number of ports, but you won't reach that limit in normal situations. If you do, it usually means that there is a bug in your script that leaks port data. A port is freed when it does not have any data in its underlying queue. `ns.clearPort` deletes all data on a port. `ns.readPort` reads the first element in the port's queue, then removes it from the queue. Ports are shared across all hosts and contents are reset on game restart.
 

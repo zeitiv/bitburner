@@ -1,63 +1,110 @@
 import { Settings } from "./Settings/Settings";
+import { NetscriptPort } from "@nsdefs";
+import { NetscriptPorts } from "./NetscriptWorker";
+import { PositiveInteger } from "./types";
 
-export interface IPort {
-  write: (value: any) => any;
-  tryWrite: (value: any) => boolean;
-  read: () => any;
-  peek: () => any;
-  full: () => boolean;
-  empty: () => boolean;
-  clear: () => void;
+type Resolver = () => void;
+const emptyPortData = "NULL PORT DATA";
+/** The object property is for typechecking and is not present at runtime */
+export type PortNumber = PositiveInteger & { __PortNumber: true };
+
+function isObjectLike(value: unknown): value is object {
+  return (typeof value === "object" && value !== null) || typeof value === "function";
 }
 
-export function NetscriptPort(): IPort {
-  const data: any[] = [];
+/** Gets the numbered port, initializing it if it doesn't already exist.
+ * Only using for functions that write data/resolvers. Use NetscriptPorts.get(n) for */
+export function getPort(n: PortNumber) {
+  let port = NetscriptPorts.get(n);
+  if (port) return port;
+  port = new Port();
+  NetscriptPorts.set(n, port);
+  return port;
+}
 
-  return {
-    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-    write: (value: any): any => {
-      data.push(value);
-      if (data.length > Settings.MaxPortCapacity) {
-        return data.shift();
+export class Port {
+  data: unknown[] = [];
+  resolver: Resolver | null = null;
+  promise: Promise<void> | null = null;
+  add(data: unknown) {
+    let value = data;
+    if (isObjectLike(data)) {
+      try {
+        value = structuredClone(data);
+      } catch (ex) {
+        throw new Error("You can't send Functions, Promises, NS, or other unserializable data through ports!", {
+          cause: ex,
+        });
       }
-      return null;
-    },
+    }
+    this.data.push(value);
+    if (!this.resolver) return;
+    this.resolver();
+    this.resolver = null;
+    this.promise = null;
+  }
+}
 
-    // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-    tryWrite: (value: any): boolean => {
-      if (data.length >= Settings.MaxPortCapacity) {
-        return false;
-      }
-      data.push(value);
-      return true;
-    },
+export class PortHandle implements NetscriptPort {
+  n: PortNumber;
 
-    read: (): any => {
-      if (data.length === 0) {
-        return "NULL PORT DATA";
-      }
-      return data.shift();
-    },
+  constructor(n: PortNumber) {
+    this.n = n;
+  }
 
-    peek: (): any => {
-      if (data.length === 0) {
-        return "NULL PORT DATA";
-      } else {
-        const foo = data.slice();
-        return foo[0];
-      }
-    },
+  write(value: unknown): unknown {
+    const port = getPort(this.n);
+    // Primitives don't need to be cloned.
+    port.add(value);
+    if (port.data.length > Settings.MaxPortCapacity) return port.data.shift();
+    return null;
+  }
 
-    full: (): boolean => {
-      return data.length == Settings.MaxPortCapacity;
-    },
+  tryWrite(value: unknown): boolean {
+    const port = getPort(this.n);
+    if (port.data.length >= Settings.MaxPortCapacity) return false;
+    // Primitives don't need to be cloned.
+    port.add(value);
+    return true;
+  }
 
-    empty: (): boolean => {
-      return data.length === 0;
-    },
+  read(): unknown {
+    const port = NetscriptPorts.get(this.n);
+    if (!port || !port.data.length) return emptyPortData;
+    const returnVal: unknown = port.data.shift();
+    if (!port.data.length && !port.resolver) NetscriptPorts.delete(this.n);
+    return returnVal;
+  }
 
-    clear: (): void => {
-      data.length = 0;
-    },
-  };
+  peek(): unknown {
+    const port = NetscriptPorts.get(this.n);
+    if (!port || !port.data.length) return emptyPortData;
+    // Needed to avoid exposing internal objects.
+    return isObjectLike(port.data[0]) ? structuredClone(port.data[0]) : port.data[0];
+  }
+
+  nextWrite(): Promise<void> {
+    const port = getPort(this.n);
+    if (!port.promise) port.promise = new Promise<void>((res) => (port.resolver = res));
+    return port.promise;
+  }
+
+  full(): boolean {
+    const port = NetscriptPorts.get(this.n);
+    if (!port) return false;
+    return port.data.length >= Settings.MaxPortCapacity;
+  }
+
+  empty(): boolean {
+    const port = NetscriptPorts.get(this.n);
+    if (!port) return true;
+    return port.data.length === 0;
+  }
+
+  clear(): void {
+    const port = NetscriptPorts.get(this.n);
+    if (!port) return;
+    if (!port.resolver) NetscriptPorts.delete(this.n);
+    port.data.length = 0;
+  }
 }

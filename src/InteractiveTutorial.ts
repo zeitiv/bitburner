@@ -1,7 +1,5 @@
-import { Player } from "./Player";
-
-import { LiteratureNames } from "./Literature/data/LiteratureNames";
-
+import { Player } from "@player";
+import { LiteratureName } from "@enums";
 import { ITutorialEvents } from "./ui/InteractiveTutorial/ITutorialEvents";
 
 // Ordered array of keys to Interactive Tutorial Steps
@@ -23,7 +21,7 @@ enum iTutorialSteps {
   TerminalHackingMechanics, // Explanation of hacking mechanics
   TerminalGoHome, // Go home before creating a script.
   TerminalCreateScript, // Create a script using 'nano'
-  TerminalTypeScript, // Script Editor page - Type script and then save & close
+  TerminalEditScript, // Script Editor page - Edit script and then save & close
   TerminalFree, // Using 'Free' Terminal command
   TerminalRunScript, // Running script using 'run' Terminal command
   TerminalGoToActiveScriptsPage,
@@ -34,46 +32,11 @@ enum iTutorialSteps {
   HacknetNodesIntroduction,
   HacknetNodesGoToWorldPage,
   WorldDescription,
-  TutorialPageInfo,
+  DocumentationPageInfo,
   End,
 }
 
-const ITutorial: {
-  currStep: iTutorialSteps;
-  isRunning: boolean;
-  stepIsDone: {
-    [iTutorialSteps.Start]: boolean;
-    [iTutorialSteps.GoToCharacterPage]: boolean;
-    [iTutorialSteps.CharacterPage]: boolean;
-    [iTutorialSteps.CharacterGoToTerminalPage]: boolean;
-    [iTutorialSteps.TerminalIntro]: boolean;
-    [iTutorialSteps.TerminalHelp]: boolean;
-    [iTutorialSteps.TerminalLs]: boolean;
-    [iTutorialSteps.TerminalScan]: boolean;
-    [iTutorialSteps.TerminalScanAnalyze1]: boolean;
-    [iTutorialSteps.TerminalScanAnalyze2]: boolean;
-    [iTutorialSteps.TerminalConnect]: boolean;
-    [iTutorialSteps.TerminalAnalyze]: boolean;
-    [iTutorialSteps.TerminalNuke]: boolean;
-    [iTutorialSteps.TerminalManualHack]: boolean;
-    [iTutorialSteps.TerminalHackingMechanics]: boolean;
-    [iTutorialSteps.TerminalGoHome]: boolean;
-    [iTutorialSteps.TerminalCreateScript]: boolean;
-    [iTutorialSteps.TerminalTypeScript]: boolean;
-    [iTutorialSteps.TerminalFree]: boolean;
-    [iTutorialSteps.TerminalRunScript]: boolean;
-    [iTutorialSteps.TerminalGoToActiveScriptsPage]: boolean;
-    [iTutorialSteps.ActiveScriptsPage]: boolean;
-    [iTutorialSteps.ActiveScriptsToTerminal]: boolean;
-    [iTutorialSteps.TerminalTailScript]: boolean;
-    [iTutorialSteps.GoToHacknetNodesPage]: boolean;
-    [iTutorialSteps.HacknetNodesIntroduction]: boolean;
-    [iTutorialSteps.HacknetNodesGoToWorldPage]: boolean;
-    [iTutorialSteps.WorldDescription]: boolean;
-    [iTutorialSteps.TutorialPageInfo]: boolean;
-    [iTutorialSteps.End]: boolean;
-  };
-} = {
+const ITutorial = {
   currStep: iTutorialSteps.Start,
   isRunning: false,
 
@@ -96,7 +59,7 @@ const ITutorial: {
     [iTutorialSteps.TerminalHackingMechanics]: false,
     [iTutorialSteps.TerminalGoHome]: false,
     [iTutorialSteps.TerminalCreateScript]: false,
-    [iTutorialSteps.TerminalTypeScript]: false,
+    [iTutorialSteps.TerminalEditScript]: false,
     [iTutorialSteps.TerminalFree]: false,
     [iTutorialSteps.TerminalRunScript]: false,
     [iTutorialSteps.TerminalGoToActiveScriptsPage]: false,
@@ -107,7 +70,7 @@ const ITutorial: {
     [iTutorialSteps.HacknetNodesIntroduction]: false,
     [iTutorialSteps.HacknetNodesGoToWorldPage]: false,
     [iTutorialSteps.WorldDescription]: false,
-    [iTutorialSteps.TutorialPageInfo]: false,
+    [iTutorialSteps.DocumentationPageInfo]: false,
     [iTutorialSteps.End]: false,
   },
 };
@@ -138,7 +101,9 @@ function iTutorialPrevStep(): void {
 function iTutorialEnd(): void {
   ITutorial.isRunning = false;
   ITutorial.currStep = iTutorialSteps.Start;
-  Player.getHomeComputer().messages.push(LiteratureNames.HackersStartingHandbook);
+  const messages = Player.getHomeComputer().messages;
+  const handbook = LiteratureName.HackersStartingHandbook;
+  if (!messages.includes(handbook)) messages.push(handbook);
   ITutorialEvents.emit();
 }
 

@@ -1,1328 +1,1233 @@
-import { INetscriptHelper } from "./INetscriptHelper";
-import { WorkerScript } from "../Netscript/WorkerScript";
-import { IPlayer } from "../PersonObjects/IPlayer";
-import { purchaseAugmentation, joinFaction } from "../Faction/FactionHelpers";
+import type { Singularity as ISingularity } from "@nsdefs";
+
+import { Player } from "@player";
+import { CityName, CompletedProgramName, FactionWorkType, LocationName } from "@enums";
+import { purchaseAugmentation, joinFaction, getFactionAugmentationsFiltered } from "../Faction/FactionHelpers";
 import { startWorkerScript } from "../NetscriptWorker";
-import { Augmentation } from "../Augmentation/Augmentation";
 import { Augmentations } from "../Augmentation/Augmentations";
-import { augmentationExists, installAugmentations } from "../Augmentation/AugmentationHelpers";
-import { prestigeAugmentation } from "../Prestige";
-import { AugmentationNames } from "../Augmentation/data/AugmentationNames";
-import { killWorkerScript } from "../Netscript/killWorkerScript";
+import { getAugCost, installAugmentations, soaAugmentationNames } from "../Augmentation/AugmentationHelpers";
 import { CONSTANTS } from "../Constants";
-import { isString } from "../utils/helpers/isString";
-import { getRamCost } from "../Netscript/RamCostGenerator";
 import { RunningScript } from "../Script/RunningScript";
-
-import { Singularity as ISingularity } from "../ScriptEditor/NetscriptDefinitions";
-
-import { findCrime } from "../Crime/CrimeHelpers";
-import { CompanyPosition } from "../Company/CompanyPosition";
+import { calculateAchievements } from "../Achievements/Achievements";
 import { CompanyPositions } from "../Company/CompanyPositions";
 import { DarkWebItems } from "../DarkWeb/DarkWebItems";
-import { AllGangs } from "../Gang/AllGangs";
-import { CityName } from "../Locations/data/CityNames";
-import { LocationName } from "../Locations/data/LocationNames";
 import { Router } from "../ui/GameRoot";
-import { SpecialServers } from "../Server/data/SpecialServers";
 import { Page } from "../ui/Router";
+import { SpecialServers } from "../Server/data/SpecialServers";
 import { Locations } from "../Locations/Locations";
-import { GetServer, AddToAllServers, createUniqueRandomIp } from "../Server/AllServers";
-import { Programs } from "../Programs/Programs";
-import { numeralWrapper } from "../ui/numeralFormat";
-import { BitNodeMultipliers } from "../BitNode/BitNodeMultipliers";
-import { Company } from "../Company/Company";
+import { GetServer } from "../Server/AllServers";
+import { getEffectiveHackingLevelRequirement, Programs } from "../Programs/Programs";
+import { formatMoney, formatRam, formatReputation } from "../ui/formatNumber";
+import { currentNodeMults } from "../BitNode/BitNodeMultipliers";
 import { Companies } from "../Company/Companies";
-import { Factions, factionExists } from "../Faction/Factions";
-import { Faction } from "../Faction/Faction";
-import { netscriptDelay } from "../NetscriptEvaluator";
+import { Factions } from "../Faction/Factions";
+import { helpers } from "../Netscript/NetscriptHelpers";
 import { convertTimeMsToTimeElapsedString } from "../utils/StringHelperFunctions";
-import { getServerOnNetwork, safetlyCreateUniqueServer } from "../Server/ServerHelpers";
+import { getServerOnNetwork, getTorRouter } from "../Server/ServerHelpers";
 import { Terminal } from "../Terminal";
 import { calculateHackingTime } from "../Hacking";
 import { Server } from "../Server/Server";
 import { netscriptCanHack } from "../Hacking/netscriptCanHack";
+import { FactionInfos } from "../Faction/FactionInfo";
+import { donate, favorNeededToDonate } from "../Faction/formulas/donation";
+import { InternalAPI, setRemovedFunctions } from "../Netscript/APIWrapper";
+import { enterBitNode } from "../RedPill";
+import { ClassWork } from "../Work/ClassWork";
+import { CreateProgramWork, isCreateProgramWork } from "../Work/CreateProgramWork";
+import { FactionWork } from "../Work/FactionWork";
+import { CompanyWork } from "../Work/CompanyWork";
+import { canGetBonus } from "../ExportBonus";
+import { saveObject } from "../SaveObject";
+import { calculateCrimeWorkStats } from "../Work/Formulas";
+import { Engine } from "../engine";
+import { getEnumHelper } from "../utils/EnumHelper";
+import { ScriptFilePath, resolveScriptFilePath } from "../Paths/ScriptFilePath";
+import { getRecordEntries } from "../Types/Record";
+import { JobTracks } from "../Company/data/JobTracks";
+import { ServerConstants } from "../Server/data/Constants";
+import { numberOfBlackOperations } from "../Bladeburner/data/BlackOperations";
+import { calculateEffectiveRequiredReputation } from "../Company/utils";
+import { addRepToFavor } from "../Faction/formulas/favor";
+import { validBitNodes } from "../BitNode/Constants";
+import { exceptionAlert } from "../utils/helpers/exceptionAlert";
+import { cat } from "../Terminal/commands/cat";
+import { Crimes } from "../Crime/Crimes";
+import { DarknetServer } from "../Server/DarknetServer";
+import { populateDarknet } from "../DarkNet/controllers/NetworkGenerator";
 
-export function NetscriptSingularity(
-  player: IPlayer,
-  workerScript: WorkerScript,
-  helper: INetscriptHelper,
-): ISingularity {
-  const getAugmentation = function (func: any, name: any): Augmentation {
-    if (!augmentationExists(name)) {
-      throw helper.makeRuntimeErrorMsg(func, `Invalid augmentation: '${name}'`);
-    }
-
-    return Augmentations[name];
-  };
-
-  const getFaction = function (func: any, name: any): Faction {
-    if (!factionExists(name)) {
-      throw helper.makeRuntimeErrorMsg(func, `Invalid faction name: '${name}`);
-    }
-
-    return Factions[name];
-  };
-
-  const getCompany = function (func: any, name: any): Company {
-    const company = Companies[name];
-    if (company == null || !(company instanceof Company)) {
-      throw helper.makeRuntimeErrorMsg(func, `Invalid company name: '${name}'`);
-    }
-    return company;
-  };
-
-  const runAfterReset = function (cbScript = null): void {
+export function NetscriptSingularity(): InternalAPI<ISingularity> {
+  const runAfterReset = function (cbScript: ScriptFilePath) {
     //Run a script after reset
-    if (cbScript && isString(cbScript)) {
-      const home = player.getHomeComputer();
-      for (const script of home.scripts) {
-        if (script.filename === cbScript) {
-          const ramUsage = script.ramUsage;
-          const ramAvailable = home.maxRam - home.ramUsed;
-          if (ramUsage > ramAvailable) {
-            return; // Not enough RAM
-          }
-          const runningScriptObj = new RunningScript(script, []); // No args
-          runningScriptObj.threads = 1; // Only 1 thread
-          startWorkerScript(player, runningScriptObj, home);
-        }
-      }
+    if (!cbScript) return;
+    const home = Player.getHomeComputer();
+    const script = home.scripts.get(cbScript);
+    if (!script) return;
+    const ramUsage = script.getRamUsage(home.scripts);
+    if (!ramUsage) {
+      return Terminal.error(`Attempted to launch ${cbScript} after reset but could not calculate ram usage.`);
     }
+    const ramAvailable = home.maxRam - home.ramUsed;
+    if (ramUsage > ramAvailable + 0.001) {
+      return Terminal.error(`Attempted to launch ${cbScript} after reset but there was not enough ram.`);
+    }
+    // Start script with no args and 1 thread (default).
+    const runningScriptObj = new RunningScript(script, ramUsage, []);
+    startWorkerScript(runningScriptObj, home);
   };
-  return {
-    getOwnedAugmentations: function (purchased: any = false): any {
-      helper.updateDynamicRam("getOwnedAugmentations", getRamCost(player, "getOwnedAugmentations"));
-      helper.checkSingularityAccess("getOwnedAugmentations");
-      const res = [];
-      for (let i = 0; i < player.augmentations.length; ++i) {
-        res.push(player.augmentations[i].name);
+
+  const singularityAPI: InternalAPI<ISingularity> = {
+    getOwnedAugmentations: (ctx) => (_purchased) => {
+      helpers.checkSingularityAccess(ctx);
+      const purchased = !!_purchased;
+      const res: string[] = [];
+      for (let i = 0; i < Player.augmentations.length; ++i) {
+        res.push(Player.augmentations[i].name);
       }
       if (purchased) {
-        for (let i = 0; i < player.queuedAugmentations.length; ++i) {
-          res.push(player.queuedAugmentations[i].name);
+        for (let i = 0; i < Player.queuedAugmentations.length; ++i) {
+          res.push(Player.queuedAugmentations[i].name);
         }
       }
       return res;
     },
-    getAugmentationsFromFaction: function (facname: any): any {
-      helper.updateDynamicRam("getAugmentationsFromFaction", getRamCost(player, "getAugmentationsFromFaction"));
-      helper.checkSingularityAccess("getAugmentationsFromFaction");
-      const faction = getFaction("getAugmentationsFromFaction", facname);
-
-      // If player has a gang with this faction, return all augmentations.
-      if (player.hasGangWith(facname)) {
-        const res = [];
-        for (const augName of Object.keys(Augmentations)) {
-          if (augName === AugmentationNames.NeuroFluxGovernor) continue;
-          if (augName === AugmentationNames.TheRedPill && player.bitNodeN !== 2) continue;
-          const aug = Augmentations[augName];
-          if (!aug.isSpecial) {
-            res.push(augName);
-          }
-        }
-
-        return res;
+    getOwnedSourceFiles: () => () => {
+      return [...Player.activeSourceFiles]
+        .filter(([__, activeLevel]) => {
+          return activeLevel > 0;
+        })
+        .map(([n, lvl]) => ({ n, lvl }));
+    },
+    getAugmentationFactions: (ctx) => (_augName) => {
+      helpers.checkSingularityAccess(ctx);
+      const augName = getEnumHelper("AugmentationName").nsGetMember(ctx, _augName);
+      const aug = Augmentations[augName];
+      const factions = aug.factions.slice();
+      if (!Player.gang) {
+        return factions;
       }
-
-      return faction.augmentations.slice();
+      const gangFactionName = Player.gang.facName;
+      const augmentationListOfGangFaction = getFactionAugmentationsFiltered(Factions[gangFactionName]);
+      /**
+       * If the gang faction does not offer this augmentation, we need to remove the gang faction from the faction list.
+       * Example: "NeuroFlux Governor"
+       */
+      if (!augmentationListOfGangFaction.includes(augName)) {
+        return factions.filter((factionName) => factionName !== gangFactionName);
+      }
+      /**
+       * If the gang faction offers this augmentation, but the faction list does not contain the gang faction, we need
+       * to add the gang faction to that list.
+       * Example: "The Red Pill" in BN2
+       */
+      if (augmentationListOfGangFaction.includes(augName) && !factions.includes(gangFactionName)) {
+        factions.push(gangFactionName);
+        return factions;
+      }
+      return factions;
     },
-    getAugmentationCost: function (name: any): any {
-      helper.updateDynamicRam("getAugmentationCost", getRamCost(player, "getAugmentationCost"));
-      helper.checkSingularityAccess("getAugmentationCost");
-      const aug = getAugmentation("getAugmentationCost", name);
-      return [aug.baseRepRequirement, aug.baseCost];
+    getAugmentationsFromFaction: (ctx) => (_facName) => {
+      helpers.checkSingularityAccess(ctx);
+      const facName = getEnumHelper("FactionName").nsGetMember(ctx, _facName);
+      const faction = Factions[facName];
+      return getFactionAugmentationsFiltered(faction);
     },
-    getAugmentationPrereq: function (name: any): any {
-      helper.updateDynamicRam("getAugmentationPrereq", getRamCost(player, "getAugmentationPrereq"));
-      helper.checkSingularityAccess("getAugmentationPrereq");
-      const aug = getAugmentation("getAugmentationPrereq", name);
+    getAugmentationPrereq: (ctx) => (_augName) => {
+      helpers.checkSingularityAccess(ctx);
+      const augName = getEnumHelper("AugmentationName").nsGetMember(ctx, _augName);
+      const aug = Augmentations[augName];
       return aug.prereqs.slice();
     },
-    getAugmentationPrice: function (name: any): any {
-      helper.updateDynamicRam("getAugmentationPrice", getRamCost(player, "getAugmentationPrice"));
-      helper.checkSingularityAccess("getAugmentationPrice");
-      const aug = getAugmentation("getAugmentationPrice", name);
-      return aug.baseCost;
+    getAugmentationBasePrice: (ctx) => (_augName) => {
+      helpers.checkSingularityAccess(ctx);
+      const augName = getEnumHelper("AugmentationName").nsGetMember(ctx, _augName);
+      const aug = Augmentations[augName];
+      // SoA augmentations don't use the bitnode AugmentationMoneyCost multiplier;
+      // their cost only scales with the number of SoA augs already owned.
+      if (soaAugmentationNames.includes(augName)) {
+        return aug.baseCost;
+      }
+      return aug.baseCost * currentNodeMults.AugmentationMoneyCost;
     },
-    getAugmentationRepReq: function (name: any): any {
-      helper.updateDynamicRam("getAugmentationRepReq", getRamCost(player, "getAugmentationRepReq"));
-      helper.checkSingularityAccess("getAugmentationRepReq");
-      const aug = getAugmentation("getAugmentationRepReq", name);
-      return aug.baseRepRequirement;
+    getAugmentationPrice: (ctx) => (_augName) => {
+      helpers.checkSingularityAccess(ctx);
+      const augName = getEnumHelper("AugmentationName").nsGetMember(ctx, _augName);
+      const aug = Augmentations[augName];
+      return getAugCost(aug).moneyCost;
     },
-    getAugmentationStats: function (name: any): any {
-      helper.updateDynamicRam("getAugmentationStats", getRamCost(player, "getAugmentationStats"));
-      helper.checkSingularityAccess("getAugmentationStats");
-      const aug = getAugmentation("getAugmentationStats", name);
+    getAugmentationRepReq: (ctx) => (_augName) => {
+      helpers.checkSingularityAccess(ctx);
+      const augName = getEnumHelper("AugmentationName").nsGetMember(ctx, _augName);
+      const aug = Augmentations[augName];
+      return getAugCost(aug).repCost;
+    },
+    getAugmentationStats: (ctx) => (_augName) => {
+      helpers.checkSingularityAccess(ctx);
+      const augName = getEnumHelper("AugmentationName").nsGetMember(ctx, _augName);
+      const aug = Augmentations[augName];
       return Object.assign({}, aug.mults);
     },
-    purchaseAugmentation: function (faction: any, name: any): any {
-      helper.updateDynamicRam("purchaseAugmentation", getRamCost(player, "purchaseAugmentation"));
-      helper.checkSingularityAccess("purchaseAugmentation");
-      const fac = getFaction("purchaseAugmentation", faction);
-      const aug = getAugmentation("purchaseAugmentation", name);
+    purchaseAugmentation: (ctx) => (_facName, _augName) => {
+      helpers.checkSingularityAccess(ctx);
+      const facName = getEnumHelper("FactionName").nsGetMember(ctx, _facName);
+      const augName = getEnumHelper("AugmentationName").nsGetMember(ctx, _augName);
+      const faction = Factions[facName];
+      const augmentation = Augmentations[augName];
 
-      let augs = [];
-      if (player.hasGangWith(faction)) {
-        for (const augName of Object.keys(Augmentations)) {
-          if (augName === AugmentationNames.NeuroFluxGovernor) continue;
-          if (augName === AugmentationNames.TheRedPill && player.bitNodeN !== 2) continue;
-          const tempAug = Augmentations[augName];
-          if (!tempAug.isSpecial) {
-            augs.push(augName);
-          }
-        }
-      } else {
-        augs = fac.augmentations;
-      }
-
-      if (!augs.includes(name)) {
-        workerScript.log(
-          "purchaseAugmentation",
-          () => `Faction '${faction}' does not have the '${name}' augmentation.`,
-        );
+      const result = purchaseAugmentation(faction, augmentation, true);
+      if (!result.success) {
+        helpers.log(ctx, () => result.message);
         return false;
       }
-
-      const isNeuroflux = aug.name === AugmentationNames.NeuroFluxGovernor;
-      if (!isNeuroflux) {
-        for (let j = 0; j < player.queuedAugmentations.length; ++j) {
-          if (player.queuedAugmentations[j].name === aug.name) {
-            workerScript.log("purchaseAugmentation", () => `You already have the '${name}' augmentation.`);
-            return false;
-          }
-        }
-        for (let j = 0; j < player.augmentations.length; ++j) {
-          if (player.augmentations[j].name === aug.name) {
-            workerScript.log("purchaseAugmentation", () => `You already have the '${name}' augmentation.`);
-            return false;
-          }
-        }
-      }
-
-      if (fac.playerReputation < aug.baseRepRequirement) {
-        workerScript.log("purchaseAugmentation", () => `You do not have enough reputation with '${fac.name}'.`);
-        return false;
-      }
-
-      const res = purchaseAugmentation(aug, fac, true);
-      workerScript.log("purchaseAugmentation", () => res);
-      if (isString(res) && res.startsWith("You purchased")) {
-        player.gainIntelligenceExp(CONSTANTS.IntelligenceSingFnBaseExpGain * 10);
-        return true;
-      } else {
-        return false;
-      }
+      helpers.log(ctx, () => `You purchased ${augName}.`);
+      Player.gainIntelligenceExp(CONSTANTS.IntelligenceSingFnBaseExpGain * 10);
+      return true;
     },
-    softReset: function (cbScript: any): any {
-      helper.updateDynamicRam("softReset", getRamCost(player, "softReset"));
-      helper.checkSingularityAccess("softReset");
+    softReset: (ctx) => (_cbScript) => {
+      helpers.checkSingularityAccess(ctx);
+      const cbScript = _cbScript
+        ? resolveScriptFilePath(helpers.string(ctx, "cbScript", _cbScript), ctx.workerScript.name)
+        : false;
+      if (cbScript === null) throw helpers.errorMessage(ctx, `Could not resolve file path: ${_cbScript}`);
 
-      workerScript.log("softReset", () => "Soft resetting. This will cause this script to be killed");
-      setTimeout(() => {
-        prestigeAugmentation();
-        runAfterReset(cbScript);
-      }, 0);
-
-      // Prevent workerScript from "finishing execution naturally"
-      workerScript.running = false;
-      killWorkerScript(workerScript);
+      helpers.log(ctx, () => "Soft resetting. This will cause this script to be killed");
+      installAugmentations(true);
+      if (cbScript) setTimeout(() => runAfterReset(cbScript), 500);
     },
-    installAugmentations: function (cbScript: any): any {
-      helper.updateDynamicRam("installAugmentations", getRamCost(player, "installAugmentations"));
-      helper.checkSingularityAccess("installAugmentations");
+    installAugmentations: (ctx) => (_cbScript) => {
+      helpers.checkSingularityAccess(ctx);
+      const cbScript = _cbScript
+        ? resolveScriptFilePath(helpers.string(ctx, "cbScript", _cbScript), ctx.workerScript.name)
+        : false;
+      if (cbScript === null) throw helpers.errorMessage(ctx, `Could not resolve file path: ${_cbScript}`);
 
-      if (player.queuedAugmentations.length === 0) {
-        workerScript.log("installAugmentations", () => "You do not have any Augmentations to be installed.");
+      if (Player.queuedAugmentations.length === 0) {
+        helpers.log(ctx, () => "You do not have any Augmentations to be installed.");
         return false;
       }
-      player.gainIntelligenceExp(CONSTANTS.IntelligenceSingFnBaseExpGain * 10);
-      workerScript.log(
-        "installAugmentations",
-        () => "Installing Augmentations. This will cause this script to be killed",
-      );
-      setTimeout(() => {
-        installAugmentations();
-        runAfterReset(cbScript);
-      }, 0);
-
-      workerScript.running = false; // Prevent workerScript from "finishing execution naturally"
-      killWorkerScript(workerScript);
+      Player.gainIntelligenceExp(CONSTANTS.IntelligenceSingFnBaseExpGain * 10);
+      helpers.log(ctx, () => "Installing Augmentations. This will cause this script to be killed");
+      installAugmentations();
+      if (cbScript) setTimeout(() => runAfterReset(cbScript), 500);
     },
 
-    goToLocation: function (locationName: any): boolean {
-      helper.updateDynamicRam("goToLocation", getRamCost(player, "goToLocation"));
-      helper.checkSingularityAccess("goToLocation");
+    goToLocation: (ctx) => (_locationName) => {
+      helpers.checkSingularityAccess(ctx);
+      const locationName = helpers.string(ctx, "locationName", _locationName);
       const location = Object.values(Locations).find((l) => l.name === locationName);
       if (!location) {
-        workerScript.log("goToLocation", () => `No location named ${locationName}`);
+        helpers.log(ctx, () => `No location named ${locationName}`);
         return false;
       }
-      if (player.city !== location.city) {
-        workerScript.log("goToLocation", () => `No location named ${locationName} in ${player.city}`);
+      if (location.city && Player.city !== location.city) {
+        helpers.log(ctx, () => `No location named ${locationName} in ${Player.city}`);
         return false;
       }
-      Router.toLocation(location);
-      player.gainIntelligenceExp(CONSTANTS.IntelligenceSingFnBaseExpGain / 50000);
+      if (location.name === LocationName.TravelAgency) {
+        Router.toPage(Page.Travel);
+      } else if (location.name === LocationName.WorldStockExchange) {
+        Router.toPage(Page.StockMarket);
+      } else {
+        Router.toPage(Page.Location, { location });
+      }
+      Player.gainIntelligenceExp(CONSTANTS.IntelligenceSingFnBaseExpGain / 50000);
       return true;
     },
-    universityCourse: function (universityName: any, className: any, focus = true): any {
-      helper.updateDynamicRam("universityCourse", getRamCost(player, "universityCourse"));
-      helper.checkSingularityAccess("universityCourse");
-      const wasFocusing = player.focus;
-      if (player.isWorking) {
-        const txt = player.singularityStopWork();
-        workerScript.log("universityCourse", () => txt);
-      }
+    universityCourse:
+      (ctx) =>
+      (_universityName, _className, _focus = true) => {
+        helpers.checkSingularityAccess(ctx);
+        const universityName = helpers.string(ctx, "universityName", _universityName);
+        const classType = getEnumHelper("UniversityClassType").nsGetMember(ctx, _className);
+        const focus = !!_focus;
+        const wasFocusing = Player.focus;
 
-      let costMult, expMult;
-      switch (universityName.toLowerCase()) {
-        case LocationName.AevumSummitUniversity.toLowerCase():
-          if (player.city != CityName.Aevum) {
-            workerScript.log(
-              "universityCourse",
-              () => "You cannot study at 'Summit University' because you are not in 'Aevum'.",
-            );
+        switch (universityName) {
+          case LocationName.AevumSummitUniversity:
+            if (Player.city !== CityName.Aevum) {
+              helpers.log(
+                ctx,
+                () => `You cannot study at 'Summit University' because you are not in '${CityName.Aevum}'.`,
+              );
+              return false;
+            }
+            Player.gotoLocation(LocationName.AevumSummitUniversity);
+            break;
+          case LocationName.Sector12RothmanUniversity:
+            if (Player.city !== CityName.Sector12) {
+              helpers.log(
+                ctx,
+                () => `You cannot study at 'Rothman University' because you are not in '${CityName.Sector12}'.`,
+              );
+              return false;
+            }
+            Player.gotoLocation(LocationName.Sector12RothmanUniversity);
+            break;
+          case LocationName.VolhavenZBInstituteOfTechnology:
+            if (Player.city !== CityName.Volhaven) {
+              helpers.log(
+                ctx,
+                () => `You cannot study at 'ZB Institute of Technology' because you are not in '${CityName.Volhaven}'.`,
+              );
+              return false;
+            }
+            Player.gotoLocation(LocationName.VolhavenZBInstituteOfTechnology);
+            break;
+          default:
+            helpers.log(ctx, () => `Invalid university name: '${universityName}'.`);
             return false;
-          }
-          player.gotoLocation(LocationName.AevumSummitUniversity);
-          costMult = 4;
-          expMult = 3;
-          break;
-        case LocationName.Sector12RothmanUniversity.toLowerCase():
-          if (player.city != CityName.Sector12) {
-            workerScript.log(
-              "universityCourse",
-              () => "You cannot study at 'Rothman University' because you are not in 'Sector-12'.",
-            );
-            return false;
-          }
-          player.location = LocationName.Sector12RothmanUniversity;
-          costMult = 3;
-          expMult = 2;
-          break;
-        case LocationName.VolhavenZBInstituteOfTechnology.toLowerCase():
-          if (player.city != CityName.Volhaven) {
-            workerScript.log(
-              "universityCourse",
-              () => "You cannot study at 'ZB Institute of Technology' because you are not in 'Volhaven'.",
-            );
-            return false;
-          }
-          player.location = LocationName.VolhavenZBInstituteOfTechnology;
-          costMult = 5;
-          expMult = 4;
-          break;
-        default:
-          workerScript.log("universityCourse", () => `Invalid university name: '${universityName}'.`);
-          return false;
-      }
+        }
 
-      let task = "";
-      switch (className.toLowerCase()) {
-        case "Study Computer Science".toLowerCase():
-          task = CONSTANTS.ClassStudyComputerScience;
-          break;
-        case "Data Structures".toLowerCase():
-          task = CONSTANTS.ClassDataStructures;
-          break;
-        case "Networks".toLowerCase():
-          task = CONSTANTS.ClassNetworks;
-          break;
-        case "Algorithms".toLowerCase():
-          task = CONSTANTS.ClassAlgorithms;
-          break;
-        case "Management".toLowerCase():
-          task = CONSTANTS.ClassManagement;
-          break;
-        case "Leadership".toLowerCase():
-          task = CONSTANTS.ClassLeadership;
-          break;
-        default:
-          workerScript.log("universityCourse", () => `Invalid class name: ${className}.`);
-          return false;
-      }
-      player.startClass(costMult, expMult, task);
-      if (focus) {
-        player.startFocusing();
-        Router.toWork();
-      } else if (wasFocusing) {
-        player.stopFocusing();
-        Router.toTerminal();
-      }
-      workerScript.log("universityCourse", () => `Started ${task} at ${universityName}`);
-      return true;
-    },
+        Player.startWork(
+          new ClassWork({
+            classType,
+            location: Player.location,
+            singularity: true,
+          }),
+        );
+        if (focus) {
+          Player.startFocusing();
+          Router.toPage(Page.Work);
+        } else if (wasFocusing) {
+          Router.toPage(Page.Terminal);
+        }
+        helpers.log(ctx, () => `Started ${classType} at ${universityName}`);
+        return true;
+      },
 
-    gymWorkout: function (gymName: any, stat: any, focus = true): any {
-      helper.updateDynamicRam("gymWorkout", getRamCost(player, "gymWorkout"));
-      helper.checkSingularityAccess("gymWorkout");
-      const wasFocusing = player.focus;
-      if (player.isWorking) {
-        const txt = player.singularityStopWork();
-        workerScript.log("gymWorkout", () => txt);
-      }
-      let costMult, expMult;
-      switch (gymName.toLowerCase()) {
-        case LocationName.AevumCrushFitnessGym.toLowerCase():
-          if (player.city != CityName.Aevum) {
-            workerScript.log(
-              "gymWorkout",
-              () => "You cannot workout at 'Crush Fitness' because you are not in 'Aevum'.",
-            );
-            return false;
-          }
-          player.location = LocationName.AevumCrushFitnessGym;
-          costMult = 3;
-          expMult = 2;
-          break;
-        case LocationName.AevumSnapFitnessGym.toLowerCase():
-          if (player.city != CityName.Aevum) {
-            workerScript.log(
-              "gymWorkout",
-              () => "You cannot workout at 'Snap Fitness' because you are not in 'Aevum'.",
-            );
-            return false;
-          }
-          player.location = LocationName.AevumSnapFitnessGym;
-          costMult = 10;
-          expMult = 5;
-          break;
-        case LocationName.Sector12IronGym.toLowerCase():
-          if (player.city != CityName.Sector12) {
-            workerScript.log(
-              "gymWorkout",
-              () => "You cannot workout at 'Iron Gym' because you are not in 'Sector-12'.",
-            );
-            return false;
-          }
-          player.location = LocationName.Sector12IronGym;
-          costMult = 1;
-          expMult = 1;
-          break;
-        case LocationName.Sector12PowerhouseGym.toLowerCase():
-          if (player.city != CityName.Sector12) {
-            workerScript.log(
-              "gymWorkout",
-              () => "You cannot workout at 'Powerhouse Gym' because you are not in 'Sector-12'.",
-            );
-            return false;
-          }
-          player.location = LocationName.Sector12PowerhouseGym;
-          costMult = 20;
-          expMult = 10;
-          break;
-        case LocationName.VolhavenMilleniumFitnessGym.toLowerCase():
-          if (player.city != CityName.Volhaven) {
-            workerScript.log(
-              "gymWorkout",
-              () => "You cannot workout at 'Millenium Fitness Gym' because you are not in 'Volhaven'.",
-            );
-            return false;
-          }
-          player.location = LocationName.VolhavenMilleniumFitnessGym;
-          costMult = 7;
-          expMult = 4;
-          break;
-        default:
-          workerScript.log("gymWorkout", () => `Invalid gym name: ${gymName}. gymWorkout() failed`);
-          return false;
-      }
+    gymWorkout:
+      (ctx) =>
+      (_gymName, _stat, _focus = true) => {
+        helpers.checkSingularityAccess(ctx);
+        const gymName = helpers.string(ctx, "gymName", _gymName);
+        const classType = getEnumHelper("GymType").nsGetMember(ctx, _stat);
+        const focus = !!_focus;
+        const wasFocusing = Player.focus;
 
-      switch (stat.toLowerCase()) {
-        case "strength".toLowerCase():
-        case "str".toLowerCase():
-          player.startClass(costMult, expMult, CONSTANTS.ClassGymStrength);
-          break;
-        case "defense".toLowerCase():
-        case "def".toLowerCase():
-          player.startClass(costMult, expMult, CONSTANTS.ClassGymDefense);
-          break;
-        case "dexterity".toLowerCase():
-        case "dex".toLowerCase():
-          player.startClass(costMult, expMult, CONSTANTS.ClassGymDexterity);
-          break;
-        case "agility".toLowerCase():
-        case "agi".toLowerCase():
-          player.startClass(costMult, expMult, CONSTANTS.ClassGymAgility);
-          break;
-        default:
-          workerScript.log("gymWorkout", () => `Invalid stat: ${stat}.`);
-          return false;
-      }
-      if (focus) {
-        player.startFocusing();
-        Router.toWork();
-      } else if (wasFocusing) {
-        player.stopFocusing();
-        Router.toTerminal();
-      }
-      workerScript.log("gymWorkout", () => `Started training ${stat} at ${gymName}`);
-      return true;
-    },
+        switch (gymName) {
+          case LocationName.AevumCrushFitnessGym:
+            if (Player.city !== CityName.Aevum) {
+              helpers.log(
+                ctx,
+                () =>
+                  `You cannot workout at '${LocationName.AevumCrushFitnessGym}' because you are not in '${CityName.Aevum}'.`,
+              );
+              return false;
+            }
+            Player.gotoLocation(LocationName.AevumCrushFitnessGym);
+            break;
+          case LocationName.AevumSnapFitnessGym:
+            if (Player.city !== CityName.Aevum) {
+              helpers.log(
+                ctx,
+                () =>
+                  `You cannot workout at '${LocationName.AevumSnapFitnessGym}' because you are not in '${CityName.Aevum}'.`,
+              );
+              return false;
+            }
+            Player.gotoLocation(LocationName.AevumSnapFitnessGym);
+            break;
+          case LocationName.Sector12IronGym:
+            if (Player.city !== CityName.Sector12) {
+              helpers.log(
+                ctx,
+                () =>
+                  `You cannot workout at '${LocationName.Sector12IronGym}' because you are not in '${CityName.Sector12}'.`,
+              );
+              return false;
+            }
+            Player.gotoLocation(LocationName.Sector12IronGym);
+            break;
+          case LocationName.Sector12PowerhouseGym:
+            if (Player.city !== CityName.Sector12) {
+              helpers.log(
+                ctx,
+                () =>
+                  `You cannot workout at '${LocationName.Sector12PowerhouseGym}' because you are not in '${CityName.Sector12}'.`,
+              );
+              return false;
+            }
+            Player.gotoLocation(LocationName.Sector12PowerhouseGym);
+            break;
+          case LocationName.VolhavenMilleniumFitnessGym:
+            if (Player.city !== CityName.Volhaven) {
+              helpers.log(
+                ctx,
+                () =>
+                  `You cannot workout at '${LocationName.VolhavenMilleniumFitnessGym}' because you are not in '${CityName.Volhaven}'.`,
+              );
+              return false;
+            }
+            Player.gotoLocation(LocationName.VolhavenMilleniumFitnessGym);
+            break;
+          default:
+            helpers.log(ctx, () => `Invalid gym name: ${gymName}. gymWorkout() failed`);
+            return false;
+        }
 
-    travelToCity: function (cityname: any): any {
-      helper.updateDynamicRam("travelToCity", getRamCost(player, "travelToCity"));
-      helper.checkSingularityAccess("travelToCity");
+        Player.startWork(new ClassWork({ classType, location: Player.location, singularity: true }));
+        if (focus) {
+          Player.startFocusing();
+          Router.toPage(Page.Work);
+        } else if (wasFocusing) {
+          Router.toPage(Page.Terminal);
+        }
+        helpers.log(ctx, () => `Started training ${classType} at ${gymName}`);
+        return true;
+      },
 
-      switch (cityname) {
+    travelToCity: (ctx) => (_cityName) => {
+      helpers.checkSingularityAccess(ctx);
+      const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
+
+      switch (cityName) {
         case CityName.Aevum:
         case CityName.Chongqing:
         case CityName.Sector12:
         case CityName.NewTokyo:
         case CityName.Ishima:
         case CityName.Volhaven:
-          if (player.money < CONSTANTS.TravelCost) {
-            workerScript.log("travelToCity", () => "Not enough money to travel.");
-            return false
+          if (!Player.travel(cityName)) {
+            helpers.log(ctx, () => "Not enough money to travel.");
+            return false;
           }
-          player.loseMoney(CONSTANTS.TravelCost, "other");
-          player.city = cityname;
-          workerScript.log("travelToCity", () => `Traveled to ${cityname}`);
-          player.gainIntelligenceExp(CONSTANTS.IntelligenceSingFnBaseExpGain / 50000);
+          helpers.log(ctx, () => `Traveled to ${cityName}`);
+          Player.gainIntelligenceExp(CONSTANTS.IntelligenceSingFnBaseExpGain / 50000);
           return true;
         default:
-          throw helper.makeRuntimeErrorMsg("travelToCity", `Invalid city name: '${cityname}'.`);
+          throw helpers.errorMessage(ctx, `Invalid city name: '${cityName}'.`);
       }
     },
 
-    purchaseTor: function (): any {
-      helper.updateDynamicRam("purchaseTor", getRamCost(player, "purchaseTor"));
-      helper.checkSingularityAccess("purchaseTor");
+    purchaseTor: (ctx) => () => {
+      helpers.checkSingularityAccess(ctx);
 
-      if (player.hasTorRouter()) {
-        workerScript.log("purchaseTor", () => "You already have a TOR router!");
-        return false;
+      if (Player.hasTorRouter()) {
+        helpers.log(ctx, () => "You already have a TOR router!");
+        return true;
       }
 
-      if (player.money < CONSTANTS.TorRouterCost) {
-        workerScript.log("purchaseTor", () => "You cannot afford to purchase a Tor router.");
+      if (Player.money < CONSTANTS.TorRouterCost) {
+        helpers.log(ctx, () => "You cannot afford to purchase a Tor router.");
         return false;
       }
-      player.loseMoney(CONSTANTS.TorRouterCost, "other");
+      Player.loseMoney(CONSTANTS.TorRouterCost, "other");
 
-      const darkweb = safetlyCreateUniqueServer({
-        ip: createUniqueRandomIp(),
-        hostname: "darkweb",
-        organizationName: "",
-        isConnectedTo: false,
-        adminRights: false,
-        purchasedByPlayer: false,
-        maxRam: 1,
-      });
-      AddToAllServers(darkweb);
-
-      player.getHomeComputer().serversOnNetwork.push(darkweb.hostname);
-      darkweb.serversOnNetwork.push(player.getHomeComputer().hostname);
-      player.gainIntelligenceExp(CONSTANTS.IntelligenceSingFnBaseExpGain / 500);
-      workerScript.log("purchaseTor", () => "You have purchased a Tor router!");
+      getTorRouter();
+      Player.gainIntelligenceExp(CONSTANTS.IntelligenceSingFnBaseExpGain / 500);
+      helpers.log(ctx, () => "You have purchased a Tor router!");
       return true;
     },
-    purchaseProgram: function (programName: any): any {
-      helper.updateDynamicRam("purchaseProgram", getRamCost(player, "purchaseProgram"));
-      helper.checkSingularityAccess("purchaseProgram");
+    purchaseProgram: (ctx) => (_programName) => {
+      helpers.checkSingularityAccess(ctx);
+      const programName = helpers.string(ctx, "programName", _programName).toLowerCase();
 
-      if (!player.hasTorRouter()) {
-        workerScript.log("purchaseProgram", () => "You do not have the TOR router.");
+      if (!Player.hasTorRouter()) {
+        helpers.log(ctx, () => "You do not have the TOR router.");
         return false;
       }
-
-      programName = programName.toLowerCase();
 
       const item = Object.values(DarkWebItems).find((i) => i.program.toLowerCase() === programName);
       if (item == null) {
-        workerScript.log("purchaseProgram", () => `Invalid program name: '${programName}.`);
+        helpers.log(ctx, () => `Invalid program name: '${programName}.`);
         return false;
       }
 
-      if (player.money < item.price) {
-        workerScript.log(
-          "purchaseProgram",
-          () => `Not enough money to purchase '${item.program}'. Need ${numeralWrapper.formatMoney(item.price)}`,
-        );
-        return false;
-      }
-
-      if (player.hasProgram(item.program)) {
-        workerScript.log("purchaseProgram", () => `You already have the '${item.program}' program`);
+      if (Player.hasProgram(item.program)) {
+        helpers.log(ctx, () => `You already have the '${item.program}' program`);
         return true;
       }
 
-      player.loseMoney(item.price, "other");
-      player.getHomeComputer().programs.push(item.program);
-      workerScript.log(
-        "purchaseProgram",
+      if (Player.money < item.price) {
+        helpers.log(ctx, () => `Not enough money to purchase '${item.program}'. Need ${formatMoney(item.price)}`);
+        return false;
+      }
+
+      Player.getHomeComputer().pushProgram(item.program);
+      // Cancel if the program is in progress of writing
+      if (isCreateProgramWork(Player.currentWork) && Player.currentWork.programName === item.program) {
+        Player.finishWork(true);
+      }
+
+      Player.loseMoney(item.price, "other");
+      helpers.log(
+        ctx,
         () => `You have purchased the '${item.program}' program. The new program can be found on your home computer.`,
       );
-      player.gainIntelligenceExp(CONSTANTS.IntelligenceSingFnBaseExpGain / 5000);
+      Player.gainIntelligenceExp(CONSTANTS.IntelligenceSingFnBaseExpGain / 5000);
+
+      if (item.program === CompletedProgramName.darkscape) {
+        populateDarknet();
+      }
+
       return true;
     },
-    getCurrentServer: function (): any {
-      helper.updateDynamicRam("getCurrentServer", getRamCost(player, "getCurrentServer"));
-      helper.checkSingularityAccess("getCurrentServer");
-      return player.getCurrentServer().hostname;
+    getCurrentServer: (ctx) => (_returnOpts) => {
+      helpers.checkSingularityAccess(ctx);
+      const returnOpts = helpers.hostReturnOptions(_returnOpts);
+      const server = Player.getCurrentServer();
+      return helpers.returnServerID(server, returnOpts);
     },
-    connect: function (hostname: any): any {
-      helper.updateDynamicRam("connect", getRamCost(player, "connect"));
-      helper.checkSingularityAccess("connect");
-      if (!hostname) {
-        throw helper.makeRuntimeErrorMsg("connect", `Invalid hostname: '${hostname}'`);
-      }
-
-      const target = GetServer(hostname);
+    cat: (ctx) => (_filename) => {
+      helpers.checkSingularityAccess(ctx);
+      const filename = helpers.string(ctx, "filename", _filename);
+      const server = Player.getCurrentServer();
+      cat([filename], server);
+    },
+    connect: (ctx) => (_host?) => {
+      helpers.checkSingularityAccess(ctx);
+      const [target, host] = helpers.getServer(ctx, _host);
       if (target == null) {
-        throw helper.makeRuntimeErrorMsg("connect", `Invalid hostname: '${hostname}'`);
+        return false;
       }
 
-      if (hostname === "home") {
-        player.getCurrentServer().isConnectedTo = false;
-        player.currentServer = player.getHomeComputer().hostname;
-        player.getCurrentServer().isConnectedTo = true;
-        Terminal.setcwd("/");
-        return true;
-      }
-
-      const server = player.getCurrentServer();
+      // Adjacent servers
+      const server = Player.getCurrentServer();
       for (let i = 0; i < server.serversOnNetwork.length; i++) {
         const other = getServerOnNetwork(server, i);
-        if (other === null) continue;
-        if (other.hostname == hostname) {
-          player.getCurrentServer().isConnectedTo = false;
-          player.currentServer = target.hostname;
-          player.getCurrentServer().isConnectedTo = true;
-          Terminal.setcwd("/");
+        if (other === null) {
+          exceptionAlert(
+            new Error(
+              `${server.serversOnNetwork[i]} is on the network of ${server.hostname}, but we cannot find its data.`,
+            ),
+          );
+          return false;
+        }
+        if (other.hostname === target.hostname) {
+          Terminal.connectToServer(host, true);
           return true;
         }
       }
 
+      /**
+       * Backdoored + owned servers (home, private servers, or hacknet servers). With home computer, purchasedByPlayer
+       * is true.
+       */
+      if (target.backdoorInstalled || target.purchasedByPlayer) {
+        Terminal.connectToServer(host, true);
+        return true;
+      }
+
+      // Failure case
       return false;
     },
-    manualHack: function (): any {
-      helper.updateDynamicRam("manualHack", getRamCost(player, "manualHack"));
-      helper.checkSingularityAccess("manualHack");
-      const server = player.getCurrentServer();
-      return helper.hack(server.hostname, true);
+    manualHack: (ctx) => () => {
+      helpers.checkSingularityAccess(ctx);
+      const server = Player.getCurrentServer();
+      return helpers.hack(ctx, server.hostname, true, null);
     },
-    installBackdoor: function (): any {
-      helper.updateDynamicRam("installBackdoor", getRamCost(player, "installBackdoor"));
-      helper.checkSingularityAccess("installBackdoor");
-      const baseserver = player.getCurrentServer();
-      if (!(baseserver instanceof Server)) {
-        workerScript.log("installBackdoor", () => "cannot backdoor this kind of server");
-        return Promise.resolve();
+    installBackdoor: (ctx) => async (): Promise<void> => {
+      helpers.checkSingularityAccess(ctx);
+      const baseserver = Player.getCurrentServer();
+      if (!(baseserver instanceof Server || baseserver instanceof DarknetServer)) {
+        throw helpers.errorMessage(ctx, "Cannot backdoor this kind of server.");
       }
-      const server = baseserver as Server;
-      const installTime = (calculateHackingTime(server, player) / 4) * 1000;
+      const server = baseserver;
+      const installTime = (calculateHackingTime(server, Player) / 4) * 1000;
 
-      // No root access or skill level too low
-      const canHack = netscriptCanHack(server, player);
-      if (!canHack.res) {
-        throw helper.makeRuntimeErrorMsg("installBackdoor", canHack.msg || "");
+      if (server instanceof Server) {
+        // No root access or skill level too low
+        const canHack = netscriptCanHack(server, "backdoor");
+        if (!canHack.res) {
+          throw helpers.errorMessage(ctx, canHack.msg || "");
+        }
       }
 
-      workerScript.log(
-        "installBackdoor",
+      if (server.backdoorInstalled) {
+        helpers.log(
+          ctx,
+          () =>
+            "You have already installed a backdoor on this server. You can check if the server has a backdoor installed " +
+            "with ns.getServer().backdoorInstalled.",
+        );
+      }
+      helpers.log(
+        ctx,
         () => `Installing backdoor on '${server.hostname}' in ${convertTimeMsToTimeElapsedString(installTime, true)}`,
       );
 
-      return netscriptDelay(installTime, workerScript).then(function () {
-        workerScript.log("installBackdoor", () => `Successfully installed backdoor on '${server.hostname}'`);
-
+      return helpers.netscriptDelay(ctx, installTime).then(function () {
+        helpers.log(ctx, () => `Successfully installed backdoor on '${server.hostname}'`);
         server.backdoorInstalled = true;
 
         if (SpecialServers.WorldDaemon === server.hostname) {
-          Router.toBitVerse(false, false);
+          return Router.toPage(Page.BitVerse, { flume: false, quick: false });
         }
-        return Promise.resolve();
+        // Manunally check for faction invites
+        Engine.Counters.checkFactionInvitations = 0;
+        Engine.checkCounters();
       });
     },
-    isFocused: function (): boolean {
-      helper.updateDynamicRam("isFocused", getRamCost(player, "isFocused"));
-      helper.checkSingularityAccess("isFocused");
-      return player.focus;
+    isFocused: (ctx) => () => {
+      helpers.checkSingularityAccess(ctx);
+      return Player.focus;
     },
-    setFocus: function (afocus: any): boolean {
-      const focus = helper.boolean(afocus);
-      helper.updateDynamicRam("setFocus", getRamCost(player, "setFocus"));
-      helper.checkSingularityAccess("setFocus");
-      if (!player.isWorking) {
-        throw helper.makeRuntimeErrorMsg("setFocus", "Not currently working");
+    setFocus: (ctx) => (_focus) => {
+      helpers.checkSingularityAccess(ctx);
+      const focus = !!_focus;
+      if (Player.currentWork === null) {
+        throw helpers.errorMessage(ctx, "Not currently working");
       }
-      if (
-        !(
-          player.workType == CONSTANTS.WorkTypeFaction ||
-          player.workType == CONSTANTS.WorkTypeCompany ||
-          player.workType == CONSTANTS.WorkTypeCompanyPartTime ||
-          player.workType == CONSTANTS.WorkTypeCreateProgram ||
-          player.workType == CONSTANTS.WorkTypeStudyClass
-        )
-      ) {
-        throw helper.makeRuntimeErrorMsg("setFocus", "Cannot change focus for current job");
-      }
-      if (!player.focus && focus) {
-        player.startFocusing();
-        Router.toWork();
+
+      if (!Player.focus && focus) {
+        Player.startFocusing();
+        Router.toPage(Page.Work);
         return true;
-      } else if (player.focus && !focus) {
-        player.stopFocusing();
-        Router.toTerminal();
+      } else if (Player.focus && !focus) {
+        Router.toPage(Page.Terminal);
         return true;
       }
       return false;
     },
-    getStats: function (): any {
-      helper.updateDynamicRam("getStats", getRamCost(player, "getStats"));
-      helper.checkSingularityAccess("getStats");
-      workerScript.log("getStats", () => `getStats is deprecated, please use getplayer`);
-
-      return {
-        hacking: player.hacking,
-        strength: player.strength,
-        defense: player.defense,
-        dexterity: player.dexterity,
-        agility: player.agility,
-        charisma: player.charisma,
-        intelligence: player.intelligence,
-      };
+    hospitalize: (ctx) => () => {
+      helpers.checkSingularityAccess(ctx);
+      Player.hospitalize(true);
     },
-    getCharacterInformation: function (): any {
-      helper.updateDynamicRam("getCharacterInformation", getRamCost(player, "getCharacterInformation"));
-      helper.checkSingularityAccess("getCharacterInformation");
-      workerScript.log("getCharacterInformation", () => `getCharacterInformation is deprecated, please use getplayer`);
-
-      return {
-        bitnode: player.bitNodeN,
-        city: player.city,
-        factions: player.factions.slice(),
-        hp: player.hp,
-        jobs: Object.keys(player.jobs),
-        jobTitles: Object.values(player.jobs),
-        maxHp: player.max_hp,
-        mult: {
-          agility: player.agility_mult,
-          agilityExp: player.agility_exp_mult,
-          companyRep: player.company_rep_mult,
-          crimeMoney: player.crime_money_mult,
-          crimeSuccess: player.crime_success_mult,
-          defense: player.defense_mult,
-          defenseExp: player.defense_exp_mult,
-          dexterity: player.dexterity_mult,
-          dexterityExp: player.dexterity_exp_mult,
-          factionRep: player.faction_rep_mult,
-          hacking: player.hacking_mult,
-          hackingExp: player.hacking_exp_mult,
-          strength: player.strength_mult,
-          strengthExp: player.strength_exp_mult,
-          workMoney: player.work_money_mult,
-        },
-        timeWorked: player.timeWorked,
-        tor: player.hasTorRouter(),
-        workHackExpGain: player.workHackExpGained,
-        workStrExpGain: player.workStrExpGained,
-        workDefExpGain: player.workDefExpGained,
-        workDexExpGain: player.workDexExpGained,
-        workAgiExpGain: player.workAgiExpGained,
-        workChaExpGain: player.workChaExpGained,
-        workRepGain: player.workRepGained,
-        workMoneyGain: player.workMoneyGained,
-        hackingExp: player.hacking_exp,
-        strengthExp: player.strength_exp,
-        defenseExp: player.defense_exp,
-        dexterityExp: player.dexterity_exp,
-        agilityExp: player.agility_exp,
-        charismaExp: player.charisma_exp,
-      };
+    isBusy: (ctx) => () => {
+      helpers.checkSingularityAccess(ctx);
+      return Player.currentWork !== null || Router.page() === Page.Infiltration || Router.page() === Page.BitVerse;
     },
-    hospitalize: function (): any {
-      helper.updateDynamicRam("hospitalize", getRamCost(player, "hospitalize"));
-      helper.checkSingularityAccess("hospitalize");
-      if (player.isWorking || Router.page() === Page.Infiltration || Router.page() === Page.BitVerse) {
-        workerScript.log("hospitalize", () => "Cannot go to the hospital because the player is busy.");
-        return;
-      }
-      return player.hospitalize();
+    stopAction: (ctx) => () => {
+      helpers.checkSingularityAccess(ctx);
+      const wasWorking = Player.currentWork !== null;
+      Player.finishWork(true);
+      return wasWorking;
     },
-    isBusy: function (): any {
-      helper.updateDynamicRam("isBusy", getRamCost(player, "isBusy"));
-      helper.checkSingularityAccess("isBusy");
-      return player.isWorking || Router.page() === Page.Infiltration || Router.page() === Page.BitVerse;
-    },
-    stopAction: function (): any {
-      helper.updateDynamicRam("stopAction", getRamCost(player, "stopAction"));
-      helper.checkSingularityAccess("stopAction");
-      if (player.isWorking) {
-        if (player.focus) {
-          player.stopFocusing();
-          Router.toTerminal();
-        }
-        const txt = player.singularityStopWork();
-        workerScript.log("stopAction", () => txt);
-        return true;
-      }
-      return false;
-    },
-    upgradeHomeCores: function (): any {
-      helper.updateDynamicRam("upgradeHomeCores", getRamCost(player, "upgradeHomeCores"));
-      helper.checkSingularityAccess("upgradeHomeCores");
+    upgradeHomeCores: (ctx) => () => {
+      helpers.checkSingularityAccess(ctx);
 
       // Check if we're at max cores
-      const homeComputer = player.getHomeComputer();
-      if (homeComputer.cpuCores >= 8) {
-        workerScript.log("upgradeHomeCores", () => `Your home computer is at max cores.`);
+      const homeComputer = Player.getHomeComputer();
+      if (Player.bitNodeOptions.restrictHomePCUpgrade || homeComputer.cpuCores >= 8) {
+        helpers.log(ctx, () => `Your home computer is at max cores.`);
         return false;
       }
 
-      const cost = player.getUpgradeHomeCoresCost();
-      if (player.money < cost) {
-        workerScript.log(
-          "upgradeHomeCores",
-          () => `You don't have enough money. Need ${numeralWrapper.formatMoney(cost)}`,
-        );
+      const cost = Player.getUpgradeHomeCoresCost();
+      if (Player.money < cost) {
+        helpers.log(ctx, () => `You don't have enough money. Need ${formatMoney(cost)}`);
         return false;
       }
 
       homeComputer.cpuCores += 1;
-      player.loseMoney(cost, "servers");
+      Player.loseMoney(cost, "servers");
 
-      player.gainIntelligenceExp(CONSTANTS.IntelligenceSingFnBaseExpGain * 2);
-      workerScript.log(
-        "upgradeHomeCores",
+      Player.gainIntelligenceExp(CONSTANTS.IntelligenceSingFnBaseExpGain * 2);
+      helpers.log(
+        ctx,
         () => `Purchased an additional core for home computer! It now has ${homeComputer.cpuCores} cores.`,
       );
       return true;
     },
-    getUpgradeHomeCoresCost: function (): any {
-      helper.updateDynamicRam("getUpgradeHomeCoresCost", getRamCost(player, "getUpgradeHomeCoresCost"));
-      helper.checkSingularityAccess("getUpgradeHomeCoresCost");
+    getUpgradeHomeCoresCost: (ctx) => () => {
+      helpers.checkSingularityAccess(ctx);
 
-      return player.getUpgradeHomeCoresCost();
+      return Player.getUpgradeHomeCoresCost();
     },
-    upgradeHomeRam: function (): any {
-      helper.updateDynamicRam("upgradeHomeRam", getRamCost(player, "upgradeHomeRam"));
-      helper.checkSingularityAccess("upgradeHomeRam");
+    upgradeHomeRam: (ctx) => () => {
+      helpers.checkSingularityAccess(ctx);
 
       // Check if we're at max RAM
-      const homeComputer = player.getHomeComputer();
-      if (homeComputer.maxRam >= CONSTANTS.HomeComputerMaxRam) {
-        workerScript.log("upgradeHomeRam", () => `Your home computer is at max RAM.`);
+      const homeComputer = Player.getHomeComputer();
+      if (
+        (Player.bitNodeOptions.restrictHomePCUpgrade && homeComputer.maxRam >= 128) ||
+        homeComputer.maxRam >= ServerConstants.HomeComputerMaxRam
+      ) {
+        helpers.log(ctx, () => `Your home computer is at max RAM.`);
         return false;
       }
 
-      const cost = player.getUpgradeHomeRamCost();
-      if (player.money < cost) {
-        workerScript.log(
-          "upgradeHomeRam",
-          () => `You don't have enough money. Need ${numeralWrapper.formatMoney(cost)}`,
-        );
+      const cost = Player.getUpgradeHomeRamCost();
+      if (Player.money < cost) {
+        helpers.log(ctx, () => `You don't have enough money. Need ${formatMoney(cost)}`);
         return false;
       }
 
       homeComputer.maxRam *= 2;
-      player.loseMoney(cost, "servers");
+      Player.loseMoney(cost, "servers");
 
-      player.gainIntelligenceExp(CONSTANTS.IntelligenceSingFnBaseExpGain * 2);
-      workerScript.log(
-        "upgradeHomeRam",
-        () =>
-          `Purchased additional RAM for home computer! It now has ${numeralWrapper.formatRAM(
-            homeComputer.maxRam,
-          )} of RAM.`,
+      Player.gainIntelligenceExp(CONSTANTS.IntelligenceSingFnBaseExpGain * 2);
+      helpers.log(
+        ctx,
+        () => `Purchased additional RAM for home computer! It now has ${formatRam(homeComputer.maxRam)} of RAM.`,
       );
       return true;
     },
-    getUpgradeHomeRamCost: function (): any {
-      helper.updateDynamicRam("getUpgradeHomeRamCost", getRamCost(player, "getUpgradeHomeRamCost"));
-      helper.checkSingularityAccess("getUpgradeHomeRamCost");
+    getUpgradeHomeRamCost: (ctx) => () => {
+      helpers.checkSingularityAccess(ctx);
 
-      return player.getUpgradeHomeRamCost();
+      return Player.getUpgradeHomeRamCost();
     },
-    workForCompany: function (companyName: any, focus = true): any {
-      helper.updateDynamicRam("workForCompany", getRamCost(player, "workForCompany"));
-      helper.checkSingularityAccess("workForCompany");
+    getCompanyPositions: (ctx) => (_companyName) => {
+      helpers.checkSingularityAccess(ctx);
+      const companyName = getEnumHelper("CompanyName").nsGetMember(ctx, _companyName);
 
-      // Sanitize input
-      if (companyName == null) {
-        companyName = player.companyName;
-      }
-
-      // Make sure its a valid company
-      if (companyName == null || companyName === "" || !(Companies[companyName] instanceof Company)) {
-        workerScript.log("workForCompany", () => `Invalid company: '${companyName}'`);
-        return false;
-      }
-
-      // Make sure player is actually employed at the comapny
-      if (!Object.keys(player.jobs).includes(companyName)) {
-        workerScript.log("workForCompany", () => `You do not have a job at '${companyName}'`);
-        return false;
-      }
-
-      // Check to make sure company position data is valid
-      const companyPositionName = player.jobs[companyName];
-      const companyPosition = CompanyPositions[companyPositionName];
-      if (companyPositionName === "" || !(companyPosition instanceof CompanyPosition)) {
-        workerScript.log("workForCompany", () => "You do not have a job");
-        return false;
-      }
-
-      const wasFocused = player.focus;
-      if (player.isWorking) {
-        const txt = player.singularityStopWork();
-        workerScript.log("workForCompany", () => txt);
-      }
-
-      if (companyPosition.isPartTimeJob()) {
-        player.startWorkPartTime(companyName);
-      } else {
-        player.startWork(companyName);
-      }
-
-      if (focus) {
-        player.startFocusing();
-        Router.toWork();
-      } else if (wasFocused) {
-        player.stopFocusing();
-        Router.toTerminal();
-      }
-      workerScript.log(
-        "workForCompany",
-        () => `Began working at '${player.companyName}' as a '${companyPositionName}'`,
-      );
-      return true;
+      return getRecordEntries(CompanyPositions)
+        .filter((_position) => Companies[companyName].hasPosition(_position[0]))
+        .map((_position) => _position[1].name);
     },
-    applyToCompany: function (companyName: any, field: any): any {
-      helper.updateDynamicRam("applyToCompany", getRamCost(player, "applyToCompany"));
-      helper.checkSingularityAccess("applyToCompany");
-      getCompany("applyToCompany", companyName);
+    getCompanyPositionInfo: (ctx) => (_companyName, _positionName) => {
+      helpers.checkSingularityAccess(ctx);
+      const companyName = getEnumHelper("CompanyName").nsGetMember(ctx, _companyName);
+      const positionName = getEnumHelper("JobName").nsGetMember(ctx, _positionName, "positionName");
+      const company = Companies[companyName];
 
-      player.location = companyName;
-      let res;
-      switch (field.toLowerCase()) {
-        case "software":
-          res = player.applyForSoftwareJob(true);
-          break;
-        case "software consultant":
-          res = player.applyForSoftwareConsultantJob(true);
-          break;
-        case "it":
-          res = player.applyForItJob(true);
-          break;
-        case "security engineer":
-          res = player.applyForSecurityEngineerJob(true);
-          break;
-        case "network engineer":
-          res = player.applyForNetworkEngineerJob(true);
-          break;
-        case "business":
-          res = player.applyForBusinessJob(true);
-          break;
-        case "business consultant":
-          res = player.applyForBusinessConsultantJob(true);
-          break;
-        case "security":
-          res = player.applyForSecurityJob(true);
-          break;
-        case "agent":
-          res = player.applyForAgentJob(true);
-          break;
-        case "employee":
-          res = player.applyForEmployeeJob(true);
-          break;
-        case "part-time employee":
-          res = player.applyForPartTimeEmployeeJob(true);
-          break;
-        case "waiter":
-          res = player.applyForWaiterJob(true);
-          break;
-        case "part-time waiter":
-          res = player.applyForPartTimeWaiterJob(true);
-          break;
-        default:
-          workerScript.log("applyToCompany", () => `Invalid job: '${field}'.`);
-          return false;
+      if (!company.hasPosition(positionName)) {
+        throw helpers.errorMessage(ctx, `Company '${companyName}' does not have position '${positionName}'`);
       }
-      // TODO https://github.com/danielyxie/bitburner/issues/1378
-      // The player object's applyForJob function can return string with special error messages
-      // if (isString(res)) {
-      //   workerScript.log("applyToCompany",()=> res);
-      //   return false;
-      // }
-      if (res) {
-        workerScript.log(
-          "applyToCompany",
-          () => `You were offered a new job at '${companyName}' as a '${player.jobs[companyName]}'`,
-        );
-      } else {
-        workerScript.log(
-          "applyToCompany",
-          () => `You failed to get a new job/promotion at '${companyName}' in the '${field}' field.`,
-        );
-      }
+
+      const job = CompanyPositions[positionName];
+      const res = {
+        name: job.name,
+        field: job.field,
+        nextPosition: job.nextPosition,
+        salary: job.baseSalary * company.salaryMultiplier,
+        requiredReputation: calculateEffectiveRequiredReputation(companyName, job.requiredReputation),
+        requiredSkills: job.requiredSkills(company.jobStatReqOffset),
+      };
       return res;
     },
-    getCompanyRep: function (companyName: any): any {
-      helper.updateDynamicRam("getCompanyRep", getRamCost(player, "getCompanyRep"));
-      helper.checkSingularityAccess("getCompanyRep");
-      const company = getCompany("getCompanyRep", companyName);
-      return company.playerReputation;
-    },
-    getCompanyFavor: function (companyName: any): any {
-      helper.updateDynamicRam("getCompanyFavor", getRamCost(player, "getCompanyFavor"));
-      helper.checkSingularityAccess("getCompanyFavor");
-      const company = getCompany("getCompanyFavor", companyName);
-      return company.favor;
-    },
-    getCompanyFavorGain: function (companyName: any): any {
-      helper.updateDynamicRam("getCompanyFavorGain", getRamCost(player, "getCompanyFavorGain"));
-      helper.checkSingularityAccess("getCompanyFavorGain");
-      const company = getCompany("getCompanyFavorGain", companyName);
-      return company.getFavorGain();
-    },
-    checkFactionInvitations: function (): any {
-      helper.updateDynamicRam("checkFactionInvitations", getRamCost(player, "checkFactionInvitations"));
-      helper.checkSingularityAccess("checkFactionInvitations");
-      // Make a copy of player.factionInvitations
-      return player.factionInvitations.slice();
-    },
-    joinFaction: function (name: any): any {
-      helper.updateDynamicRam("joinFaction", getRamCost(player, "joinFaction"));
-      helper.checkSingularityAccess("joinFaction");
-      getFaction("joinFaction", name);
+    workForCompany:
+      (ctx) =>
+      (_companyName, _focus = true) => {
+        helpers.checkSingularityAccess(ctx);
+        const companyName = getEnumHelper("CompanyName").nsGetMember(ctx, _companyName);
+        const focus = !!_focus;
 
-      if (!player.factionInvitations.includes(name)) {
-        workerScript.log("joinFaction", () => `You have not been invited by faction '${name}'`);
+        const jobName = Player.jobs[companyName];
+        // Make sure player is actually employed at the company
+        if (!jobName) {
+          throw helpers.errorMessage(ctx, `You do not have a job at: '${companyName}'`);
+        }
+
+        const wasFocused = Player.focus;
+
+        Player.startWork(
+          new CompanyWork({
+            singularity: true,
+            companyName: companyName,
+          }),
+        );
+        if (focus) {
+          Player.startFocusing();
+          Router.toPage(Page.Work);
+        } else if (wasFocused) {
+          Router.toPage(Page.Terminal);
+        }
+        helpers.log(ctx, () => `Began working at '${companyName}' with position '${jobName}'`);
+        return true;
+      },
+    applyToCompany: (ctx) => (_companyName, _field) => {
+      helpers.checkSingularityAccess(ctx);
+      const companyName = getEnumHelper("CompanyName").nsGetMember(ctx, _companyName);
+      const field = getEnumHelper("JobField").nsGetMember(ctx, _field, "field");
+      const company = Companies[companyName];
+      const entryPos = CompanyPositions[JobTracks[field][0]];
+
+      const result = Player.applyForJob(company, entryPos);
+      if (!result.success) {
+        helpers.log(
+          ctx,
+          () =>
+            `You failed to get a new job/promotion at '${companyName}' in the '${field}' field. Reason: ${result.message}`,
+        );
+        return null;
+      }
+      helpers.log(ctx, () => `You were offered a new job at '${companyName}' with position '${result.jobName}'.`);
+      return result.jobName;
+    },
+    quitJob: (ctx) => (_companyName) => {
+      helpers.checkSingularityAccess(ctx);
+      const companyName = getEnumHelper("CompanyName").nsGetMember(ctx, _companyName);
+      Player.quitJob(companyName, true);
+    },
+    getCompanyRep: (ctx) => (_companyName) => {
+      helpers.checkSingularityAccess(ctx);
+      const companyName = getEnumHelper("CompanyName").nsGetMember(ctx, _companyName);
+      return Companies[companyName].playerReputation;
+    },
+    getCompanyFavor: (ctx) => (_companyName) => {
+      helpers.checkSingularityAccess(ctx);
+      const companyName = getEnumHelper("CompanyName").nsGetMember(ctx, _companyName);
+      return Companies[companyName].favor;
+    },
+    getCompanyFavorGain: (ctx) => (_companyName) => {
+      helpers.checkSingularityAccess(ctx);
+      const companyName = getEnumHelper("CompanyName").nsGetMember(ctx, _companyName);
+      const company = Companies[companyName];
+      return addRepToFavor(company.favor, company.playerReputation) - company.favor;
+    },
+    getFactionInviteRequirements: (ctx) => (_facName) => {
+      helpers.checkSingularityAccess(ctx);
+      const facName = getEnumHelper("FactionName").nsGetMember(ctx, _facName);
+      const fac = Factions[facName];
+      return [...fac.getInfo().inviteReqs].map((condition) => condition.toJSON());
+    },
+    getFactionEnemies: (ctx) => (_facName) => {
+      helpers.checkSingularityAccess(ctx);
+      const facName = getEnumHelper("FactionName").nsGetMember(ctx, _facName);
+      const fac = Factions[facName];
+      return fac.getInfo().enemies.slice();
+    },
+    checkFactionInvitations: (ctx) => () => {
+      helpers.checkSingularityAccess(ctx);
+      // Manually trigger a check for faction invites
+      Engine.Counters.checkFactionInvitations = 0;
+      Engine.checkCounters();
+      // Make a copy of player.factionInvitations
+      return Player.factionInvitations.slice();
+    },
+    joinFaction: (ctx) => (_facName) => {
+      helpers.checkSingularityAccess(ctx);
+      const facName = getEnumHelper("FactionName").nsGetMember(ctx, _facName);
+
+      if (Player.factions.includes(facName)) {
+        helpers.log(ctx, () => `You are already a member of faction '${facName}'`);
         return false;
       }
-      const fac = Factions[name];
+
+      if (!Player.factionInvitations.includes(facName)) {
+        helpers.log(ctx, () => `You have not been invited by faction '${facName}'`);
+        return false;
+      }
+      const fac = Factions[facName];
       joinFaction(fac);
 
-      // Update Faction Invitation list to account for joined + banned factions
-      for (let i = 0; i < player.factionInvitations.length; ++i) {
-        if (player.factionInvitations[i] == name || Factions[player.factionInvitations[i]].isBanned) {
-          player.factionInvitations.splice(i, 1);
-          i--;
+      Player.gainIntelligenceExp(CONSTANTS.IntelligenceSingFnBaseExpGain * 5);
+      helpers.log(ctx, () => `Joined the '${facName}' faction.`);
+      return true;
+    },
+    workForFaction:
+      (ctx) =>
+      (_facName, _type, _focus = true) => {
+        helpers.checkSingularityAccess(ctx);
+        const facName = getEnumHelper("FactionName").nsGetMember(ctx, _facName);
+        const type = getEnumHelper("FactionWorkType").nsGetMember(ctx, _type);
+        const focus = !!_focus;
+        const faction = Factions[facName];
+
+        // if the player is in a gang and the target faction is any of the gang faction, fail
+        if (Player.gang && faction.name === Player.getGangFaction().name) {
+          helpers.log(ctx, () => `You can't work for '${facName}' because you are managing a gang for it`);
+          return false;
         }
+
+        if (!Player.factions.includes(facName)) {
+          helpers.log(ctx, () => `You are not a member of '${facName}'`);
+          return false;
+        }
+
+        const wasFocusing = Player.focus;
+
+        switch (type) {
+          case FactionWorkType.hacking:
+            if (!FactionInfos[faction.name].offerHackingWork) {
+              helpers.log(ctx, () => `Faction '${faction.name}' do not need help with hacking contracts.`);
+              return false;
+            }
+            Player.startWork(
+              new FactionWork({
+                singularity: true,
+                factionWorkType: FactionWorkType.hacking,
+                faction: faction.name,
+              }),
+            );
+            if (focus) {
+              Player.startFocusing();
+              Router.toPage(Page.Work);
+            } else if (wasFocusing) {
+              Router.toPage(Page.Terminal);
+            }
+            helpers.log(ctx, () => `Started carrying out hacking contracts for '${faction.name}'`);
+            return true;
+          case FactionWorkType.field:
+            if (!FactionInfos[faction.name].offerFieldWork) {
+              helpers.log(ctx, () => `Faction '${faction.name}' do not need help with field missions.`);
+              return false;
+            }
+            Player.startWork(
+              new FactionWork({
+                singularity: true,
+                factionWorkType: FactionWorkType.field,
+                faction: faction.name,
+              }),
+            );
+            if (focus) {
+              Player.startFocusing();
+              Router.toPage(Page.Work);
+            } else if (wasFocusing) {
+              Router.toPage(Page.Terminal);
+            }
+            helpers.log(ctx, () => `Started carrying out field missions for '${faction.name}'`);
+            return true;
+          case FactionWorkType.security:
+            if (!FactionInfos[faction.name].offerSecurityWork) {
+              helpers.log(ctx, () => `Faction '${faction.name}' do not need help with security work.`);
+              return false;
+            }
+            Player.startWork(
+              new FactionWork({
+                singularity: true,
+                factionWorkType: FactionWorkType.security,
+                faction: faction.name,
+              }),
+            );
+            if (focus) {
+              Player.startFocusing();
+              Router.toPage(Page.Work);
+            } else if (wasFocusing) {
+              Router.toPage(Page.Terminal);
+            }
+            helpers.log(ctx, () => `Started carrying out security work for '${faction.name}'`);
+            return true;
+          default:
+            helpers.log(ctx, () => `Invalid work type: '${type}`);
+            return false;
+        }
+      },
+    getFactionWorkTypes: (ctx) => (_facName) => {
+      helpers.checkSingularityAccess(ctx);
+      const facName = getEnumHelper("FactionName").nsGetMember(ctx, _facName);
+      // Gang does not offer normal work.
+      if (Player.gang?.facName === facName) {
+        return [];
       }
-      player.gainIntelligenceExp(CONSTANTS.IntelligenceSingFnBaseExpGain * 5);
-      workerScript.log("joinFaction", () => `Joined the '${name}' faction.`);
-      return true;
+      const factionInfo = Factions[facName].getInfo();
+      const workTypes = [];
+      if (factionInfo.offerHackingWork) {
+        workTypes.push(FactionWorkType.hacking);
+      }
+      if (factionInfo.offerFieldWork) {
+        workTypes.push(FactionWorkType.field);
+      }
+      if (factionInfo.offerSecurityWork) {
+        workTypes.push(FactionWorkType.security);
+      }
+      return workTypes;
     },
-    workForFaction: function (name: any, type: any, focus = true): any {
-      helper.updateDynamicRam("workForFaction", getRamCost(player, "workForFaction"));
-      helper.checkSingularityAccess("workForFaction");
-      getFaction("workForFaction", name);
-
-      // if the player is in a gang and the target faction is any of the gang faction, fail
-      if (player.inGang() && AllGangs[name] !== undefined) {
-        workerScript.log("workForFaction", () => `Faction '${name}' does not offer work at the moment.`);
-        return false;
-      }
-
-      if (!player.factions.includes(name)) {
-        workerScript.log("workForFaction", () => `You are not a member of '${name}'`);
-        return false;
-      }
-
-      const wasFocusing = player.focus;
-      if (player.isWorking) {
-        const txt = player.singularityStopWork();
-        workerScript.log("workForFaction", () => txt);
-      }
-
-      const fac = Factions[name];
-      // Arrays listing factions that allow each time of work
-      const hackAvailable = [
-        "Illuminati",
-        "Daedalus",
-        "The Covenant",
-        "ECorp",
-        "MegaCorp",
-        "Bachman & Associates",
-        "Blade Industries",
-        "NWO",
-        "Clarke Incorporated",
-        "OmniTek Incorporated",
-        "Four Sigma",
-        "KuaiGong International",
-        "Fulcrum Secret Technologies",
-        "BitRunners",
-        "The Black Hand",
-        "NiteSec",
-        "Chongqing",
-        "Sector-12",
-        "New Tokyo",
-        "Aevum",
-        "Ishima",
-        "Volhaven",
-        "Speakers for the Dead",
-        "The Dark Army",
-        "The Syndicate",
-        "Silhouette",
-        "Netburners",
-        "Tian Di Hui",
-        "CyberSec",
-      ];
-      const fdWkAvailable = [
-        "Illuminati",
-        "Daedalus",
-        "The Covenant",
-        "ECorp",
-        "MegaCorp",
-        "Bachman & Associates",
-        "Blade Industries",
-        "NWO",
-        "Clarke Incorporated",
-        "OmniTek Incorporated",
-        "Four Sigma",
-        "KuaiGong International",
-        "The Black Hand",
-        "Chongqing",
-        "Sector-12",
-        "New Tokyo",
-        "Aevum",
-        "Ishima",
-        "Volhaven",
-        "Speakers for the Dead",
-        "The Dark Army",
-        "The Syndicate",
-        "Silhouette",
-        "Tetrads",
-        "Slum Snakes",
-      ];
-      const scWkAvailable = [
-        "ECorp",
-        "MegaCorp",
-        "Bachman & Associates",
-        "Blade Industries",
-        "NWO",
-        "Clarke Incorporated",
-        "OmniTek Incorporated",
-        "Four Sigma",
-        "KuaiGong International",
-        "Fulcrum Secret Technologies",
-        "Chongqing",
-        "Sector-12",
-        "New Tokyo",
-        "Aevum",
-        "Ishima",
-        "Volhaven",
-        "Speakers for the Dead",
-        "The Syndicate",
-        "Tetrads",
-        "Slum Snakes",
-        "Tian Di Hui",
-      ];
-
-      switch (type.toLowerCase()) {
-        case "hacking":
-        case "hacking contracts":
-        case "hackingcontracts":
-          if (!hackAvailable.includes(fac.name)) {
-            workerScript.log("workForFaction", () => `Faction '${fac.name}' do not need help with hacking contracts.`);
-            return false;
-          }
-          player.startFactionHackWork(fac);
-          if (focus) {
-            player.startFocusing();
-            Router.toWork();
-          } else if (wasFocusing) {
-            player.stopFocusing();
-            Router.toTerminal();
-          }
-          workerScript.log("workForFaction", () => `Started carrying out hacking contracts for '${fac.name}'`);
-          return true;
-        case "field":
-        case "fieldwork":
-        case "field work":
-          if (!fdWkAvailable.includes(fac.name)) {
-            workerScript.log("workForFaction", () => `Faction '${fac.name}' do not need help with field missions.`);
-            return false;
-          }
-          player.startFactionFieldWork(fac);
-          if (focus) {
-            player.startFocusing();
-            Router.toWork();
-          } else if (wasFocusing) {
-            player.stopFocusing();
-            Router.toTerminal();
-          }
-          workerScript.log("workForFaction", () => `Started carrying out field missions for '${fac.name}'`);
-          return true;
-        case "security":
-        case "securitywork":
-        case "security work":
-          if (!scWkAvailable.includes(fac.name)) {
-            workerScript.log("workForFaction", () => `Faction '${fac.name}' do not need help with security work.`);
-            return false;
-          }
-          player.startFactionSecurityWork(fac);
-          if (focus) {
-            player.startFocusing();
-            Router.toWork();
-          } else if (wasFocusing) {
-            player.stopFocusing();
-            Router.toTerminal();
-          }
-          workerScript.log("workForFaction", () => `Started carrying out security work for '${fac.name}'`);
-          return true;
-        default:
-          workerScript.log("workForFaction", () => `Invalid work type: '${type}`);
-      }
-      return true;
-    },
-    getFactionRep: function (name: any): any {
-      helper.updateDynamicRam("getFactionRep", getRamCost(player, "getFactionRep"));
-      helper.checkSingularityAccess("getFactionRep");
-      const faction = getFaction("getFactionRep", name);
+    getFactionRep: (ctx) => (_facName) => {
+      helpers.checkSingularityAccess(ctx);
+      const facName = getEnumHelper("FactionName").nsGetMember(ctx, _facName);
+      const faction = Factions[facName];
       return faction.playerReputation;
     },
-    getFactionFavor: function (name: any): any {
-      helper.updateDynamicRam("getFactionFavor", getRamCost(player, "getFactionFavor"));
-      helper.checkSingularityAccess("getFactionFavor");
-      const faction = getFaction("getFactionFavor", name);
+    getFactionFavor: (ctx) => (_facName) => {
+      helpers.checkSingularityAccess(ctx);
+      const facName = getEnumHelper("FactionName").nsGetMember(ctx, _facName);
+      const faction = Factions[facName];
       return faction.favor;
     },
-    getFactionFavorGain: function (name: any): any {
-      helper.updateDynamicRam("getFactionFavorGain", getRamCost(player, "getFactionFavorGain"));
-      helper.checkSingularityAccess("getFactionFavorGain");
-      const faction = getFaction("getFactionFavorGain", name);
-      return faction.getFavorGain();
+    getFactionFavorGain: (ctx) => (_facName) => {
+      helpers.checkSingularityAccess(ctx);
+      const facName = getEnumHelper("FactionName").nsGetMember(ctx, _facName);
+      const faction = Factions[facName];
+      return addRepToFavor(faction.favor, faction.playerReputation) - faction.favor;
     },
-    donateToFaction: function (name: any, amt: any): any {
-      helper.updateDynamicRam("donateToFaction", getRamCost(player, "donateToFaction"));
-      helper.checkSingularityAccess("donateToFaction");
-      const faction = getFaction("donateToFaction", name);
-      if (!player.factions.includes(faction.name)) {
-        workerScript.log("donateToFaction", () => `You can't donate to '${name}' because you aren't a member`);
+    donateToFaction: (ctx) => (_facName, _amt) => {
+      helpers.checkSingularityAccess(ctx);
+      const facName = getEnumHelper("FactionName").nsGetMember(ctx, _facName);
+      const amt = helpers.number(ctx, "amt", _amt);
+      const faction = Factions[facName];
+      if (!Player.factions.includes(faction.name)) {
+        helpers.log(ctx, () => `You can't donate to '${facName}' because you aren't a member`);
         return false;
       }
-      if (player.inGang() && faction.name === player.getGangFaction().name) {
-        workerScript.log("donateToFaction", () => `You can't donate to '${name}' because youre managing a gang for it`);
+      if (Player.gang && faction.name === Player.getGangFaction().name) {
+        helpers.log(ctx, () => `You can't donate to '${facName}' because you are managing a gang for it`);
+        return false;
+      }
+      if (!faction.getInfo().offersWork()) {
+        helpers.log(ctx, () => `You can't donate to '${facName}' because this faction does not offer any type of work`);
         return false;
       }
       if (typeof amt !== "number" || amt <= 0 || isNaN(amt)) {
-        workerScript.log("donateToFaction", () => `Invalid donation amount: '${amt}'.`);
+        helpers.log(ctx, () => `Invalid donation amount: '${amt}'.`);
         return false;
       }
-      if (player.money < amt) {
-        workerScript.log(
-          "donateToFaction",
-          () => `You do not have enough money to donate ${numeralWrapper.formatMoney(amt)} to '${name}'`,
-        );
+      if (Player.money < amt) {
+        helpers.log(ctx, () => `You do not have enough money to donate ${formatMoney(amt)} to '${facName}'`);
         return false;
       }
-      const repNeededToDonate = Math.round(CONSTANTS.BaseFavorToDonate * BitNodeMultipliers.RepToDonateToFaction);
-      if (faction.favor < repNeededToDonate) {
-        workerScript.log(
-          "donateToFaction",
+
+      if (faction.favor < favorNeededToDonate()) {
+        helpers.log(
+          ctx,
           () =>
-            `You do not have enough favor to donate to this faction. Have ${faction.favor}, need ${repNeededToDonate}`,
+            `You do not have enough favor to donate to this faction. Have ${
+              faction.favor
+            }, need ${favorNeededToDonate()}`,
         );
         return false;
       }
-      const repGain = (amt / CONSTANTS.DonateMoneyToRepDivisor) * player.faction_rep_mult;
-      faction.playerReputation += repGain;
-      player.loseMoney(amt, "other");
-      workerScript.log(
-        "donateToFaction",
-        () =>
-          `${numeralWrapper.formatMoney(amt)} donated to '${name}' for ${numeralWrapper.formatReputation(
-            repGain,
-          )} reputation`,
-      );
+      const repGain = donate(amt, faction);
+      helpers.log(ctx, () => `${formatMoney(amt)} donated to '${facName}' for ${formatReputation(repGain)} reputation`);
       return true;
     },
-    createProgram: function (name: any, focus = true): any {
-      helper.updateDynamicRam("createProgram", getRamCost(player, "createProgram"));
-      helper.checkSingularityAccess("createProgram");
+    createProgram:
+      (ctx) =>
+      (_programName, _focus = true) => {
+        helpers.checkSingularityAccess(ctx);
+        const programName = helpers.string(ctx, "programName", _programName).toLowerCase();
+        const focus = !!_focus;
 
-      const wasFocusing = player.focus;
-      if (player.isWorking) {
-        const txt = player.singularityStopWork();
-        workerScript.log("createProgram", () => txt);
+        const wasFocusing = Player.focus;
+
+        const p = Object.values(Programs).find((p) => p.name.toLowerCase() === programName);
+
+        if (p == null) {
+          helpers.log(ctx, () => `The specified program does not exist: '${programName}'`);
+          return false;
+        }
+
+        if (Player.hasProgram(p.name)) {
+          helpers.log(ctx, () => `You already have the '${p.name}' program`);
+          return false;
+        }
+
+        const create = p.create;
+        if (create === null) {
+          helpers.log(ctx, () => `You cannot create the '${p.name}' program`);
+          return false;
+        }
+
+        if (!create.req()) {
+          helpers.log(ctx, () => `Hacking level is too low to create '${p.name}' (level ${create.level} req)`);
+          return false;
+        }
+        if (Player.currentWork) {
+          Player.finishWork(true);
+        }
+
+        Player.startWork(
+          new CreateProgramWork({
+            programName: p.name,
+            singularity: true,
+          }),
+        );
+        if (focus) {
+          Player.startFocusing();
+          Router.toPage(Page.Work);
+        } else if (wasFocusing) {
+          Router.toPage(Page.Terminal);
+        }
+        helpers.log(ctx, () => `Began creating program: '${programName}'`);
+        return true;
+      },
+    getHackingLevelRequirementOfProgram: (ctx) => (_programName) => {
+      helpers.checkSingularityAccess(ctx);
+      const programName = helpers.string(ctx, "programName", _programName).toLowerCase();
+
+      const program = Object.values(Programs).find((p) => p.name.toLowerCase() === programName);
+      if (program == null) {
+        throw helpers.errorMessage(ctx, `The specified program does not exist: '${programName}'`);
       }
 
-      name = name.toLowerCase();
-
-      const p = Object.values(Programs).find((p) => p.name.toLowerCase() === name);
-
-      if (p == null) {
-        workerScript.log("createProgram", () => `The specified program does not exist: '${name}`);
-        return false;
-      }
-
-      if (player.hasProgram(p.name)) {
-        workerScript.log("createProgram", () => `You already have the '${p.name}' program`);
-        return false;
-      }
-
-      const create = p.create;
+      const create = program.create;
+      // Return Infinity if this program cannot be created.
       if (create === null) {
-        workerScript.log("createProgram", () => `You cannot create the '${p.name}' program`);
-        return false;
+        return Infinity;
       }
 
-      if (!create.req(player)) {
-        workerScript.log(
-          "createProgram",
-          () => `Hacking level is too low to create '${p.name}' (level ${create.level} req)`,
-        );
-        return false;
+      // The hacking level requirement of bitFlume is exactly 1. It does not depend on Intelligence.
+      if (program.name === CompletedProgramName.bitFlume) {
+        return 1;
       }
 
-      player.startCreateProgramWork(p.name, create.time, create.level);
+      return getEffectiveHackingLevelRequirement(create.level);
+    },
+    commitCrime: (ctx) => (_crimeType, _focus) => {
+      helpers.checkSingularityAccess(ctx);
+      const crimeType = getEnumHelper("CrimeType").nsGetMember(ctx, _crimeType);
+      const focus = _focus === undefined ? true : !!_focus;
+      const wasFocusing = Player.focus;
+
+      if (Player.currentWork !== null) {
+        Player.finishWork(true);
+      }
+      Player.gotoLocation(LocationName.Slums);
+
+      const crime = Crimes[crimeType];
+      if (crime == null) {
+        throw helpers.errorMessage(ctx, `Invalid crime: '${crimeType}'`);
+      }
+
+      helpers.log(ctx, () => `Attempting to commit ${crime.type}...`);
+      const crimeTime = crime.commit(1, ctx.workerScript);
       if (focus) {
-        player.startFocusing();
-        Router.toWork();
+        Player.startFocusing();
+        Router.toPage(Page.Work);
       } else if (wasFocusing) {
-        player.stopFocusing();
-        Router.toTerminal();
+        Router.toPage(Page.Terminal);
       }
-      workerScript.log("createProgram", () => `Began creating program: '${name}'`);
-      return true;
+      return crimeTime;
     },
-    commitCrime: function (crimeRoughName: any): any {
-      helper.updateDynamicRam("commitCrime", getRamCost(player, "commitCrime"));
-      helper.checkSingularityAccess("commitCrime");
+    getCrimeChance: (ctx) => (_crimeType) => {
+      helpers.checkSingularityAccess(ctx);
+      const crimeType = getEnumHelper("CrimeType").nsGetMember(ctx, _crimeType);
 
-      if (player.isWorking) {
-        const txt = player.singularityStopWork();
-        workerScript.log("commitCrime", () => txt);
-      }
-
-      // Set Location to slums
-      player.gotoLocation(LocationName.Slums);
-
-      const crime = findCrime(crimeRoughName.toLowerCase());
+      const crime = Crimes[crimeType];
       if (crime == null) {
-        // couldn't find crime
-        throw helper.makeRuntimeErrorMsg("commitCrime", `Invalid crime: '${crimeRoughName}'`);
+        throw helpers.errorMessage(ctx, `Invalid crime: '${crimeType}'`);
       }
-      workerScript.log("commitCrime", () => `Attempting to commit ${crime.name}...`);
-      return crime.commit(Router, player, 1, workerScript);
+
+      return crime.successRate(Player);
     },
-    getCrimeChance: function (crimeRoughName: any): any {
-      helper.updateDynamicRam("getCrimeChance", getRamCost(player, "getCrimeChance"));
-      helper.checkSingularityAccess("getCrimeChance");
+    getCrimeStats: (ctx) => (_crimeType) => {
+      helpers.checkSingularityAccess(ctx);
+      const crimeType = getEnumHelper("CrimeType").nsGetMember(ctx, _crimeType);
 
-      const crime = findCrime(crimeRoughName.toLowerCase());
+      const crime = Crimes[crimeType];
       if (crime == null) {
-        throw helper.makeRuntimeErrorMsg("getCrimeChance", `Invalid crime: ${crimeRoughName}`);
+        throw helpers.errorMessage(ctx, `Invalid crime: '${crimeType}'`);
       }
 
-      return crime.successRate(player);
+      const crimeStatsWithMultipliers = calculateCrimeWorkStats(Player, crime);
+
+      return Object.assign({}, crime, {
+        money: crimeStatsWithMultipliers.money,
+        reputation: crimeStatsWithMultipliers.reputation,
+        hacking_exp: crimeStatsWithMultipliers.hackExp,
+        strength_exp: crimeStatsWithMultipliers.strExp,
+        defense_exp: crimeStatsWithMultipliers.defExp,
+        dexterity_exp: crimeStatsWithMultipliers.dexExp,
+        agility_exp: crimeStatsWithMultipliers.agiExp,
+        charisma_exp: crimeStatsWithMultipliers.chaExp,
+        intelligence_exp: crimeStatsWithMultipliers.intExp,
+      });
     },
-    getCrimeStats: function (crimeRoughName: any): any {
-      helper.updateDynamicRam("getCrimeStats", getRamCost(player, "getCrimeStats"));
-      helper.checkSingularityAccess("getCrimeStats");
+    getDarkwebPrograms: (ctx) => () => {
+      helpers.checkSingularityAccess(ctx);
 
-      const crime = findCrime(crimeRoughName.toLowerCase());
-      if (crime == null) {
-        throw helper.makeRuntimeErrorMsg("getCrimeStats", `Invalid crime: ${crimeRoughName}`);
+      // If we don't have Tor, log it and return [] (empty list)
+      if (!Player.hasTorRouter()) {
+        helpers.log(ctx, () => "You do not have the TOR router.");
+        return [];
+      }
+      return Object.values(DarkWebItems).map((p) => p.program);
+    },
+    getDarkwebProgramCost: (ctx) => (_programName) => {
+      helpers.checkSingularityAccess(ctx);
+      const programName = helpers.string(ctx, "programName", _programName).toLowerCase();
+
+      // If we don't have Tor, log it and return -1
+      if (!Player.hasTorRouter()) {
+        helpers.log(ctx, () => "You do not have the TOR router.");
+        // returning -1 rather than throwing an error to be consistent with purchaseProgram
+        // which returns false if tor has
+        return -1;
       }
 
-      return Object.assign({}, crime);
+      const item = Object.values(DarkWebItems).find((i) => i.program.toLowerCase() === programName);
+
+      // If the program doesn't exist, throw an error. The reasoning here is that the 99% case is that
+      // the player will be using this in automation scripts, and if they're asking for a program that
+      // doesn't exist, it's the first time they've run the script. So throw an error to let them know
+      // that they need to fix it.
+      if (item == null) {
+        throw helpers.errorMessage(
+          ctx,
+          `No such exploit ('${programName}') found on the darkweb! ` +
+            `\nThis function is not case-sensitive. Did you perhaps forget .exe at the end?`,
+        );
+      }
+
+      if (Player.hasProgram(item.program)) {
+        helpers.log(ctx, () => `You already have the '${item.program}' program`);
+        return 0;
+      }
+      return item.price;
+    },
+    b1tflum3: (ctx) => (_nextBN, _cbScript, _bitNodeOptions) => {
+      helpers.checkSingularityAccess(ctx);
+      const nextBN = helpers.number(ctx, "nextBN", _nextBN);
+      const cbScript = _cbScript
+        ? resolveScriptFilePath(helpers.string(ctx, "cbScript", _cbScript), ctx.workerScript.name)
+        : false;
+      if (cbScript === null) {
+        throw helpers.errorMessage(ctx, `Could not resolve file path. callbackScript is null.`);
+      }
+      enterBitNode(true, Player.bitNodeN, nextBN, helpers.validateBitNodeOptions(ctx, _bitNodeOptions));
+      if (cbScript) {
+        setTimeout(() => runAfterReset(cbScript), 500);
+      }
+    },
+    destroyW0r1dD43m0n: (ctx) => (_nextBN, _cbScript, _bitNodeOptions) => {
+      helpers.checkSingularityAccess(ctx);
+      const nextBN = helpers.number(ctx, "nextBN", _nextBN);
+      if (!validBitNodes.includes(nextBN)) {
+        throw new Error(`Invalid BitNode: ${_nextBN}.`);
+      }
+      const cbScript = _cbScript
+        ? resolveScriptFilePath(helpers.string(ctx, "cbScript", _cbScript), ctx.workerScript.name)
+        : false;
+      if (cbScript === null) {
+        throw helpers.errorMessage(ctx, `Could not resolve file path. callbackScript is null.`);
+      }
+
+      const wd = GetServer(SpecialServers.WorldDaemon);
+      if (!(wd instanceof Server)) {
+        throw new Error("WorldDaemon is not a normal server. This is a bug. Please contact developers.");
+      }
+      const hackingRequirements = () => {
+        if (Player.skills.hacking < wd.requiredHackingSkill || !wd.hasAdminRights) {
+          return false;
+        }
+        return true;
+      };
+      const bladeburnerRequirements = () => {
+        if (!Player.bladeburner) {
+          return false;
+        }
+        return Player.bladeburner.numBlackOpsComplete >= numberOfBlackOperations;
+      };
+
+      if (!hackingRequirements() && !bladeburnerRequirements()) {
+        helpers.log(ctx, () => "Requirements not met to destroy the world daemon");
+        return;
+      }
+
+      wd.backdoorInstalled = true;
+      calculateAchievements();
+      enterBitNode(false, Player.bitNodeN, nextBN, helpers.validateBitNodeOptions(ctx, _bitNodeOptions));
+      if (cbScript) {
+        setTimeout(() => runAfterReset(cbScript), 500);
+      }
+    },
+    getCurrentWork: (ctx) => () => {
+      helpers.checkSingularityAccess(ctx);
+      if (!Player.currentWork) return null;
+      return Player.currentWork.APICopy();
+    },
+    getSaveData: (ctx) => async () => {
+      helpers.checkSingularityAccess(ctx);
+      const saveData = await saveObject.getSaveData();
+      if (typeof saveData === "string") {
+        // saveData is the base64-encoded json save string. A base64-encoded string only uses ASCII characters, so it's
+        // fine to use new TextEncoder().encode() to encode it to a Uint8Array.
+        return new TextEncoder().encode(saveData);
+      }
+      // saveData is the compressed json save string.
+      return saveData;
+    },
+    exportGame: (ctx) => () => {
+      helpers.checkSingularityAccess(ctx);
+      return saveObject.exportGame();
+    },
+    exportGameBonus: (ctx) => () => {
+      helpers.checkSingularityAccess(ctx);
+      return canGetBonus();
+    },
+    getUnlockedAchievements: (ctx) => () => {
+      helpers.checkSingularityAccess(ctx);
+      return Object.values(Player.achievements).map((a) => a.ID);
     },
   };
+
+  // Removed functions
+  setRemovedFunctions(singularityAPI, {
+    getAugmentationCost: {
+      version: "2.2.0",
+      replacement: "singularity.getAugmentationPrice and singularity.getAugmentationRepReq",
+    },
+  });
+  return singularityAPI;
 }

@@ -4,9 +4,9 @@
 
 ## WarehouseAPI.setProductMarketTA1() method
 
-Set market TA 1 for a product.
+Set Market-TA1 for a product.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 setProductMarketTA1(divisionName: string, productName: string, on: boolean): void;
@@ -14,13 +14,77 @@ setProductMarketTA1(divisionName: string, productName: string, on: boolean): voi
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  divisionName | string | Name of the division |
-|  productName | string | Name of the product |
-|  on | boolean | market ta enabled |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+divisionName
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the division
+
+
+</td></tr>
+<tr><td>
+
+productName
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the product
+
+
+</td></tr>
+<tr><td>
+
+on
+
+
+</td><td>
+
+boolean
+
+
+</td><td>
+
+Use true to enable, false otherwise.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 void
+
+## Remarks
+
+RAM cost: 20 GB
 

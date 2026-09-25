@@ -4,9 +4,9 @@
 
 ## CrimeStats.dexterity\_success\_weight property
 
-dexterity level impact on success change of the crime
+Impact of dexterity level on success chance of the crime
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 dexterity_success_weight: number;

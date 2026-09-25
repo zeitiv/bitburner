@@ -1,14 +1,13 @@
+/* eslint-disable no-await-in-loop */
 import { Octokit } from "@octokit/rest";
 import commandLineArgs from "command-line-args";
 
-const owner = "danielyxie";
-const repo = "bitburner"
-const basePath = `https://github.com/${owner}/${repo}`;
+const owner = "bitburner-official";
+const repo = "bitburner-src";
 
 const cliArgs = commandLineArgs([
-  { name: 'from', alias: 'f', type: String },
-  { name: 'to', alias: 't', type: String },
-  { name: 'detailed', alias: 'd', type: Boolean }
+  { name: "from", alias: "f", type: String },
+  { name: "to", alias: "t", type: String, defaultValue: undefined },
 ]);
 
 class MergeChangelog {
@@ -17,25 +16,23 @@ class MergeChangelog {
   }
 
   async getCommitsSearchResults(query) {
-    const iterator = this.octokit.paginate.iterator(
-      this.octokit.rest.search.commits,
-      {
-        owner, repo,
-        q: query,
-        sort: 'updated',
-        direction: 'desc',
-      },
-    );
+    const iterator = this.octokit.paginate.iterator(this.octokit.rest.search.commits, {
+      owner,
+      repo,
+      q: query,
+      sort: "updated",
+      direction: "desc",
+    });
     const searchResults = [];
     for await (const response of iterator) {
       const entries = response.data.map((entry) => ({
         sha: entry.sha,
         url: entry.html_url,
         user: {
-          id: entry.author.id,
-          login: entry.author.login,
-          avatar: entry.author.avatar_url,
-          url: entry.author.html_url,
+          id: entry.author?.id,
+          login: entry.author?.login,
+          avatar: entry.author?.avatar_url,
+          url: entry.author?.html_url,
         },
         commit_date: entry.commit.committer.date,
         message: entry.commit.message,
@@ -46,15 +43,13 @@ class MergeChangelog {
   }
 
   async getPullsSearchResults(query) {
-    const iterator = this.octokit.paginate.iterator(
-      this.octokit.rest.search.issuesAndPullRequests,
-      {
-        owner, repo,
-        q: query,
-        sort: 'committer-date',
-        direction: 'desc',
-      },
-    );
+    const iterator = this.octokit.paginate.iterator(this.octokit.rest.search.issuesAndPullRequests, {
+      owner,
+      repo,
+      q: query,
+      sort: "committer-date",
+      direction: "desc",
+    });
 
     const searchResults = [];
     for await (const response of iterator) {
@@ -78,26 +73,33 @@ class MergeChangelog {
       searchResults.push(...entries);
     }
 
-    const pullRequestPromises = [];
+    const pulls = [];
     for (const entry of searchResults) {
-      pullRequestPromises.push(
-        this.octokit.rest.pulls.get({
-          owner, repo,
+      await this.octokit.rest.pulls
+        .get({
+          owner,
+          repo,
           pull_number: entry.number,
-        }).then((response) => ({
-          ...entry,
-          merge_commit_sha: response.data.merge_commit_sha,
-          head_commit_sha: response.data.head.sha,
-      })));
+        })
+        .then((response) =>
+          pulls.push({
+            ...entry,
+            merge_commit_sha: response.data.merge_commit_sha,
+            head_commit_sha: response.data.head.sha,
+          }),
+        )
+        .catch((e) => {
+          console.warn(`Encountered error retrieving pull: ${e}`);
+        });
+      await sleep(1000);
     }
-
-    const pulls = await Promise.all(pullRequestPromises);
     return pulls;
   }
 
   async getCommit(sha) {
     const response = await this.octokit.rest.git.getCommit({
-      owner, repo,
+      owner,
+      repo,
       commit_sha: sha,
     });
     const commit = {
@@ -105,7 +107,7 @@ class MergeChangelog {
       message: response.data.message,
       sha: response.data.sha,
       url: response.data.html_url,
-    }
+    };
     return commit;
   }
 
@@ -116,8 +118,8 @@ class MergeChangelog {
     from.date = new Date(from.commit.date);
 
     if (!sha_to) {
-      const newest = await this.getLastCommitByBranch('dev');
-      to.commit = await this.getCommit(newest)
+      const newest = await this.getLastCommitByBranch("dev");
+      to.commit = await this.getCommit(newest);
     } else {
       to.commit = await this.getCommit(sha_to);
     }
@@ -128,31 +130,35 @@ class MergeChangelog {
     const pullQuery = `user:${owner} repo:${repo} is:pr is:merged merged:"${from.date.toISOString()}..${to.date.toISOString()}"`;
 
     const commits = await this.getCommitsSearchResults(commitQuery);
+    await sleep(5000);
     const pulls = await this.getPullsSearchResults(pullQuery);
-
+    await sleep(5000);
     // We only have the merge commit sha & the HEAD sha in this data, but it can exclude some entries
-    const pullsCommitSha = pulls.
-      map((p) => [p.merge_commit_sha, p.head_commit_sha]).
-      reduce((all, current) => [...all, ...current]);
+    const pullsCommitSha = pulls
+      .map((p) => [p.merge_commit_sha, p.head_commit_sha])
+      .reduce((all, current) => [...all, ...current]);
 
     let danglingCommits = commits.filter((c) => !pullsCommitSha.includes(c.sha));
     const listPullsPromises = [];
     for (const commit of danglingCommits) {
-      const promise = this.octokit.rest.repos.listPullRequestsAssociatedWithCommit({
-        owner, repo, commit_sha: commit.sha
-      }).then((response) => ({
-        ...commit,
-        nbPulls: response.data.length,
-      }));
+      const promise = this.octokit.rest.repos
+        .listPullRequestsAssociatedWithCommit({
+          owner,
+          repo,
+          commit_sha: commit.sha,
+        })
+        .then((response) => ({
+          ...commit,
+          nbPulls: response.data.length,
+        }));
       listPullsPromises.push(promise);
     }
 
-    const commitsThatAreIncludedInPulls = (await Promise.all(listPullsPromises)).
-      filter((c) => c.nbPulls > 0).
-      map((c) => c.sha);
+    const commitsThatAreIncludedInPulls = (await Promise.all(listPullsPromises))
+      .filter((c) => c.nbPulls > 0)
+      .map((c) => c.sha);
 
-    danglingCommits = danglingCommits.
-      filter((c) => !commitsThatAreIncludedInPulls.includes(c.sha));
+    danglingCommits = danglingCommits.filter((c) => !commitsThatAreIncludedInPulls.includes(c.sha));
     return {
       from,
       to,
@@ -160,7 +166,7 @@ class MergeChangelog {
       danglingCommits,
       pullQuery,
       commitQuery,
-    }
+    };
   }
 
   async getLastCommitByBranch(branch) {
@@ -172,69 +178,77 @@ class MergeChangelog {
     return response.data.commit.sha;
   }
 
-  async getChangelog(from, to, detailedOutput) {
+  async getChangelog(from, to) {
     const changes = await this.getPullsMergedBetween(from, to);
-    const pullLines = changes.pulls.map((line) => this.getPullMarkdown(line, detailedOutput));
-    const commitLines = changes.danglingCommits.map((line) => this.getCommitMarkdown(line, detailedOutput));
-    commitLines.push(`* Nerf noodle bar.`)
-    const shortFrom = changes.from.date.toISOString().split('T')[0];
-    const shortTo = changes.to.date.toISOString().split('T')[0]
-    const shortFromSha = changes.from.commit.sha.slice(0, 7);
-    const shortToSha = changes.to.commit.sha.slice(0, 7);
-    const title = `## [draft] v1.x.x - ${shortFrom} to ${shortTo}`;
-    let log = `
-${title}
+    const pullLines = changes.pulls
+      .map((line) => this.getPullMarkdown(line))
+      .concat(changes.danglingCommits.map((line) => this.getCommitMarkdown(line)));
+    pullLines.push({ category: "MISC", title: "Nerf Noodle bar" });
+    const title = `v2.x.x - ${new Date().toISOString().slice(0, 10)}  TITLE\n\n`;
+    const map = {};
+    pullLines.forEach((c) => {
+      if (c.title.includes("allbuild commit")) return;
+      let array = map[c.category];
+      if (!array) {
+        array = [];
+        map[c.category] = array;
+      }
+      array.push(c);
+    });
 
-#### Information
+    let log = title;
+    Object.entries(map).forEach(([key, value]) => {
+      log += `  ${key}\n`;
+      value.forEach((v) => (log += `  * ${v.title} ${v.by ? `(by @${v.by})` : ""}\n`));
+      log += "\n";
+    });
 
-Modifications included between **${shortFrom}** and **${shortTo}** (\`${shortFromSha}\` to \`${shortToSha}\`).
-
-*[See Pull Requests on GitHub](https://github.com/search?q=${encodeURIComponent(changes.pullQuery)})*
-
-#### Merged Pull Requests
-
-${pullLines.join('\n')}
-
-`;
-
-    if (commitLines.length > 0) {
-      log += `
-#### Other Changes
-
-${commitLines.join('\n')}
-`;
-    }
     return {
-      log: log.trim(),
+      log: log,
       changes: changes,
     };
   }
 
-  getPullMarkdown(pr, detailedOutput) {
-    if (!detailedOutput) {
-      return `* ` +
-        `${pr.title} (by @${pr.user.login})` +
-        ` #[${pr.number}](${pr.url})`;
-    } else {
-      return `* [${pr.merge_commit_sha.slice(0, 7)}](${basePath}/commit/${pr.merge_commit_sha}) | ` +
-        `${pr.title} ([@${pr.user.login}](${pr.user.url}))` +
-        ` PR #[${pr.number}](${pr.url})`;
-      }
+  getPullMarkdown(pr) {
+    let category = "MISC";
+    let title = pr.title;
+    if (pr.title.includes(":")) {
+      category = pr.title.split(":")[0];
+      title = pr.title.split(":")[1];
+    }
+    return {
+      category: category,
+      title: title,
+      by: pr.user.login,
+    };
   }
 
-  getCommitMarkdown(commit, detailedOutput) {
-    if (!detailedOutput) {
-      return `* ` +
-      `${commit.message} (by @${commit.user.login})` +
-      ` - [${commit.sha.slice(0, 7)}](${commit.url})`;
-    } else {
-      return `* [${commit.sha.slice(0, 7)}](${commit.url}) | ` +
-      `${commit.message} ([@${commit.user.login}](${commit.user.url}))`;
-    }
+  getCommitMarkdown(commit) {
+    return {
+      category: "MISC",
+      title: commit.message,
+      by: commit.user.login,
+    };
   }
 }
 
+const sleep = async (wait) => {
+  return new Promise((resolve) => {
+    setTimeout(resolve, wait);
+  });
+};
+
+const token = process.env.GITHUB_API_TOKEN;
+if (!token) {
+  console.log("You need to set the env var GITHUB_API_TOKEN.");
+  process.exit(1);
+}
 const api = new MergeChangelog({ auth: process.env.GITHUB_API_TOKEN });
-api.getChangelog(cliArgs.from, cliArgs.to, cliArgs.detailed).then((data) => {
+if (!cliArgs.from) {
+  console.error("USAGE: node index.js --from hash [--to hash]");
+  process.exit();
+}
+cliArgs.to ??= await api.getLastCommitByBranch("dev");
+api.getChangelog(cliArgs.from, cliArgs.to).then((data) => {
   console.log(data.log);
 });

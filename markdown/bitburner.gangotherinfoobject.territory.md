@@ -4,9 +4,9 @@
 
 ## GangOtherInfoObject.territory property
 
-Gang territory, in decimal form
+Gang territory, in the range 0-1
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 territory: number;

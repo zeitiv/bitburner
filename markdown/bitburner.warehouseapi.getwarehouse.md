@@ -4,24 +4,73 @@
 
 ## WarehouseAPI.getWarehouse() method
 
-Get warehouse data
+Get warehouse data.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getWarehouse(divisionName: string, cityName: string): Warehouse;
+getWarehouse(divisionName: string, city: CityName): Warehouse;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  divisionName | string | Name of the division |
-|  cityName | string | Name of the city |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+divisionName
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the division
+
+
+</td></tr>
+<tr><td>
+
+city
+
+
+</td><td>
+
+[CityName](./bitburner.cityname.md)
+
+
+</td><td>
+
+Name of the city
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 [Warehouse](./bitburner.warehouse.md)
 
-warehouse data
+Warehouse data
+
+## Remarks
+
+RAM cost: 10 GB
 

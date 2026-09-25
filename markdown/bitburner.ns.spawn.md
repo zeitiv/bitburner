@@ -4,23 +4,83 @@
 
 ## NS.spawn() method
 
-Terminate current script and start another in 10s.
+Terminate current script and start another in a defined number of milliseconds.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-spawn(script: string, numThreads?: number, ...args: string[]): void;
+spawn(script: string, threadOrOptions?: number | SpawnOptions, ...args: ScriptArg[]): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  script | string | Filename of script to execute. |
-|  numThreads | number | Number of threads to spawn new script with. Will be rounded to nearest integer. |
-|  args | string\[\] | Additional arguments to pass into the new script that is being run. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+script
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Filename of script to execute.
+
+
+</td></tr>
+<tr><td>
+
+threadOrOptions
+
+
+</td><td>
+
+number \| [SpawnOptions](./bitburner.spawnoptions.md)
+
+
+</td><td>
+
+_(Optional)_ Either an integer number of threads for new script, or a [SpawnOptions](./bitburner.spawnoptions.md) object. Threads defaults to 1 and spawnDelay defaults to 10,000 ms.
+
+
+</td></tr>
+<tr><td>
+
+args
+
+
+</td><td>
+
+[ScriptArg](./bitburner.scriptarg.md)<!-- -->\[\]
+
+
+</td><td>
+
+Additional arguments to pass into the new script that is being run.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 void
 
@@ -28,25 +88,21 @@ void
 
 RAM cost: 2 GB
 
-Terminates the current script, and then after a delay of about 10 seconds it will execute the newly-specified script. The purpose of this function is to execute a new script without being constrained by the RAM usage of the current one. This function can only be used to run scripts on the local server.
+Terminates the current script, and then after a defined delay it will execute the newly-specified script. The purpose of this function is to execute a new script without being constrained by the RAM usage of the current one. This function can only be used to run scripts on the local server.
+
+The delay specified can be 0; in this case the new script will synchronously replace the old one. (There will not be any opportunity for other scripts to use up the RAM in-between.)
 
 Because this function immediately terminates the script, it does not have a return value.
 
-## Example 1
+Running this function with 0 or fewer threads will cause a runtime error.
+
+For password-protected servers (such as darknet servers), a session must be established with the destination server before using this function.
+
+## Example
 
 
-```ts
-// NS1:
-//The following example will execute the script ‘foo.script’ with 10 threads and the arguments ‘foodnstuff’ and 90:
-spawn('foo.script', 10, 'foodnstuff', 90);
-```
-
-## Example 2
-
-
-```ts
-// NS2:
-//The following example will execute the script ‘foo.script’ with 10 threads and the arguments ‘foodnstuff’ and 90:
-ns.spawn('foo.script', 10, 'foodnstuff', 90);
+```js
+//The following example will execute the script ‘foo.js’ with 10 threads, in 500 milliseconds and the arguments ‘foodnstuff’ and 90:
+ns.spawn("foo.js", {threads: 10, spawnDelay: 500}, "foodnstuff", 90);
 ```
 

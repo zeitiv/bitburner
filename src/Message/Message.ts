@@ -1,31 +1,19 @@
-import { Reviver, Generic_toJSON, Generic_fromJSON } from "../utils/JSONReviver";
+import { FilePath, asFilePath } from "../Paths/FilePath";
+import { MessageFilename, FactionName } from "@enums";
 
 export class Message {
   // Name of Message file
-  filename = "";
+  filename: MessageFilename & FilePath;
 
   // The text contains in the Message
-  msg = "";
+  msg: string;
 
-  // Flag indicating whether this Message has been received by the player
-  recvd = false;
+  // Faction hinted at by the message
+  factionRumors: FactionName[];
 
-  constructor(filename = "", msg = "") {
-    this.filename = filename;
+  constructor(filename: MessageFilename, msg: string, factionRumor?: FactionName) {
+    this.filename = asFilePath(filename);
     this.msg = msg;
-    this.recvd = false;
-  }
-
-  // Serialize the current object to a JSON save state
-  toJSON(): any {
-    return Generic_toJSON("Message", this);
-  }
-
-  // Initializes a Message Object from a JSON save state
-  // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
-  static fromJSON(value: any): Message {
-    return Generic_fromJSON(Message, value.data);
+    this.factionRumors = factionRumor ? [factionRumor] : [];
   }
 }
-
-Reviver.constructors.Message = Message;

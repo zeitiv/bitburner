@@ -6,19 +6,65 @@
 
 Get the cost of a hash upgrade.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-hashCost(upgName: string): number;
+hashCost(upgName: HacknetServerHashUpgrade, count?: number): number;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  upgName | string | Name of the upgrade of Hacknet Node. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+upgName
+
+
+</td><td>
+
+[HacknetServerHashUpgrade](./bitburner.hacknetserverhashupgrade.md)
+
+
+</td><td>
+
+Name of the upgrade using hash of Hacknet Server.
+
+
+</td></tr>
+<tr><td>
+
+count
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Number of upgrades to buy at once. Defaults to 1 if not specified.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 
@@ -26,31 +72,19 @@ Number of hashes required for the specified upgrade.
 
 ## Remarks
 
-RAM cost: 0 GB
+RAM cost: 0.5 GB
 
 This function is only applicable for Hacknet Servers (the upgraded version of a Hacknet Node).
 
 Returns the number of hashes required for the specified upgrade. The name of the upgrade must be an exact match.
 
-## Example 1
+## Example
 
 
-```ts
-// NS1:
-var upgradeName = "Sell for Corporation Funds";
-if (hacknet.numHashes() > hacknet.hashCost(upgradeName)) {
-   hacknet.spendHashes(upgName);
-}
-```
-
-## Example 2
-
-
-```ts
-// NS2:
+```js
 const upgradeName = "Sell for Corporation Funds";
 if (ns.hacknet.numHashes() > ns.hacknet.hashCost(upgradeName)) {
-   ns.hacknet.spendHashes(upgName);
+  ns.hacknet.spendHashes(upgradeName);
 }
 ```
 

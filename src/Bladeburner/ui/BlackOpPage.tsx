@@ -1,15 +1,23 @@
-import * as React from "react";
-import { BlackOpList } from "./BlackOpList";
-import { IBladeburner } from "../IBladeburner";
-import { IPlayer } from "../../PersonObjects/IPlayer";
-import Typography from "@mui/material/Typography";
+import type { Bladeburner } from "../Bladeburner";
 
-interface IProps {
-  bladeburner: IBladeburner;
-  player: IPlayer;
+import React from "react";
+import { Button, Typography } from "@mui/material";
+import { FactionName } from "@enums";
+import { BlackOpElem } from "./BlackOpElem";
+import { Router } from "../../ui/GameRoot";
+import { Page } from "../../ui/Router";
+import { CorruptibleText } from "../../ui/React/CorruptibleText";
+import { numberOfBlackOperations } from "../data/BlackOperations";
+import { finishBitNode } from "../../BitNode/BitNodeUtils";
+import { Player } from "@player";
+
+interface BlackOpPageProps {
+  bladeburner: Bladeburner;
 }
 
-export function BlackOpPage(props: IProps): React.ReactElement {
+export function BlackOpPage({ bladeburner }: BlackOpPageProps): React.ReactElement {
+  const blackOperations = bladeburner.blackOperationArray.slice(0, bladeburner.numBlackOpsComplete + 1).reverse();
+
   return (
     <>
       <Typography>
@@ -17,13 +25,35 @@ export function BlackOpPage(props: IProps): React.ReactElement {
         successively by completing the one before it.
         <br />
         <br />
-        <b>Your ultimate goal to climb through the ranks of Bladeburners is to complete all of the Black Ops.</b>
+        <b>
+          Your ultimate goal to climb through the ranks of {FactionName.Bladeburners} is to complete all of the Black
+          Ops.
+        </b>
         <br />
         <br />
         Like normal operations, you may use a team for Black Ops. Failing a black op will incur heavy HP and rank
-        losses.
+        losses. Black Ops success significantly affected by combat stats. Many Ops benefit from Hacking skill.
+        Unaffected by Charisma.
       </Typography>
-      <BlackOpList bladeburner={props.bladeburner} player={props.player} />
+
+      {bladeburner.numBlackOpsComplete >= numberOfBlackOperations && (
+        <Button
+          sx={{ my: 1, p: 1 }}
+          onClick={() => {
+            if (!Player.bladeburner || Player.bladeburner.numBlackOpsComplete < numberOfBlackOperations) {
+              return;
+            }
+            finishBitNode();
+            Router.toPage(Page.BitVerse, { flume: false, quick: false });
+          }}
+        >
+          <CorruptibleText content="Destroy w0r1d_d43m0n" spoiler={false}></CorruptibleText>
+        </Button>
+      )}
+
+      {blackOperations.map((blackOperation) => (
+        <BlackOpElem key={blackOperation.name} bladeburner={bladeburner} action={blackOperation} />
+      ))}
     </>
   );
 }

@@ -1,10 +1,9 @@
 import React from "react";
-import { CityName } from "../../Locations/data/CityNames";
-import Typography from "@mui/material/Typography";
-import Tooltip from "@mui/material/Tooltip";
+import { makeStyles } from "tss-react/mui";
+import { Tooltip, Typography } from "@mui/material";
 import { Theme } from "@mui/material/styles";
-import makeStyles from "@mui/styles/makeStyles";
-import createStyles from "@mui/styles/createStyles";
+
+import { CityName } from "@enums";
 
 interface ICityProps {
   currentCity: CityName;
@@ -12,32 +11,32 @@ interface ICityProps {
   onTravel: (city: CityName) => void;
 }
 
-const useStyles = makeStyles((theme: Theme) =>
-  createStyles({
-      travel: {
-        color: theme.colors.white,
-        lineHeight: "1em",
-        whiteSpace: "pre",
-        cursor: "pointer"
-      },
-    })
-);
+const useStyles = makeStyles()((theme: Theme) => ({
+  travel: {
+    color: theme.colors.maplocation,
+    lineHeight: "1em",
+    whiteSpace: "pre",
+    cursor: "pointer",
+  },
+  currentCity: {
+    color: theme.colors.disabled,
+    lineHeight: "1em",
+    whiteSpace: "pre",
+  },
+}));
 
 function City(props: ICityProps): React.ReactElement {
-  const classes = useStyles();
+  const { classes } = useStyles();
   if (props.city !== props.currentCity) {
     return (
       <Tooltip title={<Typography>{props.city}</Typography>}>
-        <span
-          onClick={() => props.onTravel(props.city)}
-          className={classes.travel}
-        >
+        <span onClick={() => props.onTravel(props.city)} className={classes.travel}>
           {props.city[0]}
         </span>
       </Tooltip>
     );
   }
-  return <span>{props.city[0]}</span>;
+  return <span className={classes.currentCity}>{props.city[0]}</span>;
 }
 
 interface IProps {

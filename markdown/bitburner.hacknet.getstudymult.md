@@ -4,14 +4,14 @@
 
 ## Hacknet.getStudyMult() method
 
-Get the multipler to study.
+Get the multiplier to study.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 getStudyMult(): number;
 ```
-<b>Returns:</b>
+**Returns:**
 
 number
 
@@ -19,7 +19,7 @@ Multiplier.
 
 ## Remarks
 
-RAM cost: 0 GB
+RAM cost: 0.5 GB
 
 This function is only applicable for Hacknet Servers (the upgraded version of a Hacknet Node).
 

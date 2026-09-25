@@ -1,19 +1,10 @@
-import { ITerminal } from "../ITerminal";
-import { IRouter } from "../../ui/Router";
-import { IPlayer } from "../../PersonObjects/IPlayer";
+import { Terminal } from "../../Terminal";
 import { BaseServer } from "../../Server/BaseServer";
-import { getRamUsageFromRunningScript } from "../../Script/RunningScriptHelpers";
-import { numeralWrapper } from "../../ui/numeralFormat";
+import { formatRam } from "../../ui/formatNumber";
 
-export function top(
-  terminal: ITerminal,
-  router: IRouter,
-  player: IPlayer,
-  server: BaseServer,
-  args: (string | number | boolean)[],
-): void {
+export function top(args: (string | number | boolean)[], server: BaseServer): void {
   if (args.length !== 0) {
-    terminal.error("Incorrect usage of top command. Usage: top");
+    Terminal.error("Incorrect usage of top command. Usage: top");
     return;
   }
 
@@ -33,31 +24,31 @@ export function top(
 
   const headers = `${scriptTxt}${spacesAfterScriptTxt}${pidTxt}${spacesAfterPidTxt}${threadsTxt}${spacesAfterThreadsTxt}${ramTxt}`;
 
-  terminal.print(headers);
+  Terminal.print(headers);
 
-  const currRunningScripts = server.runningScripts;
+  const currRunningScripts = server.runningScriptMap;
   // Iterate through scripts on current server
-  for (let i = 0; i < currRunningScripts.length; i++) {
-    const script = currRunningScripts[i];
+  for (const byPid of currRunningScripts.values()) {
+    for (const script of byPid.values()) {
+      // Calculate name padding
+      const numSpacesScript = Math.max(0, scriptWidth - script.filename.length);
+      const spacesScript = " ".repeat(numSpacesScript);
 
-    // Calculate name padding
-    const numSpacesScript = Math.max(0, scriptWidth - script.filename.length);
-    const spacesScript = " ".repeat(numSpacesScript);
+      // Calculate PID padding
+      const numSpacesPid = Math.max(0, pidWidth - (script.pid + "").length);
+      const spacesPid = " ".repeat(numSpacesPid);
 
-    // Calculate PID padding
-    const numSpacesPid = Math.max(0, pidWidth - (script.pid + "").length);
-    const spacesPid = " ".repeat(numSpacesPid);
+      // Calculate thread padding
+      const numSpacesThread = Math.max(0, threadsWidth - (script.threads + "").length);
+      const spacesThread = " ".repeat(numSpacesThread);
 
-    // Calculate thread padding
-    const numSpacesThread = Math.max(0, threadsWidth - (script.threads + "").length);
-    const spacesThread = " ".repeat(numSpacesThread);
+      // Calculate and transform RAM usage
+      const ramUsage = formatRam(script.ramUsage * script.threads);
 
-    // Calculate and transform RAM usage
-    const ramUsage = numeralWrapper.formatRAM(getRamUsageFromRunningScript(script) * script.threads);
-
-    const entry = [script.filename, spacesScript, script.pid, spacesPid, script.threads, spacesThread, ramUsage].join(
-      "",
-    );
-    terminal.print(entry);
+      const entry = [script.filename, spacesScript, script.pid, spacesPid, script.threads, spacesThread, ramUsage].join(
+        "",
+      );
+      Terminal.print(entry);
+    }
   }
 }

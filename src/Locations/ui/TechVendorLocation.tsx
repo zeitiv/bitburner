@@ -3,7 +3,7 @@
  *
  * This subcomponent renders all of the buttons for purchasing things from tech vendors
  */
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
 
@@ -12,77 +12,55 @@ import { RamButton } from "./RamButton";
 import { TorButton } from "./TorButton";
 import { CoresButton } from "./CoresButton";
 
-import { getPurchaseServerCost } from "../../Server/ServerPurchases";
+import { getCloudServerCost, getCloudServerLimit, getCloudServerMaxRam } from "../../Server/ServerPurchases";
 
 import { Money } from "../../ui/React/Money";
-import { use } from "../../ui/Context";
+import { Player } from "@player";
 import { PurchaseServerModal } from "./PurchaseServerModal";
-import { numeralWrapper } from "../../ui/numeralFormat";
+import { formatRam } from "../../ui/formatNumber";
 import { Box } from "@mui/material";
+import { useCycleRerender } from "../../ui/React/hooks";
 
-interface IServerProps {
-  ram: number;
-  rerender: () => void;
-}
-
-function ServerButton(props: IServerProps): React.ReactElement {
+function ServerButton(props: { ram: number }): React.ReactElement {
   const [open, setOpen] = useState(false);
-  const player = use.Player();
-  const cost = getPurchaseServerCost(props.ram);
+  const cost = getCloudServerCost(props.ram);
+  const reachLimitOfPrivateServer = Player.purchasedServers.length >= getCloudServerLimit();
   return (
     <>
-      <Button onClick={() => setOpen(true)} disabled={!player.canAfford(cost)}>
-        Purchase {numeralWrapper.formatRAM(props.ram)} Server&nbsp;-&nbsp;
-        <Money money={cost} player={player} />
+      <Button onClick={() => setOpen(true)} disabled={!Player.canAfford(cost) || reachLimitOfPrivateServer}>
+        Purchase {formatRam(props.ram)} Cloud Server -&nbsp;
+        {reachLimitOfPrivateServer ? "Max" : <Money money={cost} forPurchase={true} />}
       </Button>
-      <PurchaseServerModal
-        open={open}
-        onClose={() => setOpen(false)}
-        ram={props.ram}
-        cost={cost}
-        rerender={props.rerender}
-      />
+      <PurchaseServerModal open={open} onClose={() => setOpen(false)} ram={props.ram} cost={cost} />
     </>
   );
 }
 
-type IProps = {
-  loc: Location;
-};
-
-export function TechVendorLocation(props: IProps): React.ReactElement {
-  const player = use.Player();
-  const setRerender = useState(false)[1];
-  function rerender(): void {
-    setRerender((old) => !old);
-  }
-
-  useEffect(() => {
-    const id = setInterval(rerender, 1000);
-    return () => clearInterval(id);
-  }, []);
+export function TechVendorLocation(props: { loc: Location }): React.ReactElement {
+  const rerender = useCycleRerender();
 
   const purchaseServerButtons: React.ReactNode[] = [];
-  for (let i = props.loc.techVendorMinRam; i <= props.loc.techVendorMaxRam; i *= 2) {
-    purchaseServerButtons.push(<ServerButton key={i} ram={i} rerender={rerender} />);
+  for (let ram = props.loc.techVendorMinRam; ram <= props.loc.techVendorMaxRam; ram *= 2) {
+    if (ram > getCloudServerMaxRam()) {
+      break;
+    }
+    purchaseServerButtons.push(<ServerButton key={ram} ram={ram} />);
   }
 
   return (
     <>
       <br />
-      <Box sx={{ display: 'grid', width: 'fit-content' }}>
-        {purchaseServerButtons}
-      </Box>
+      <Box sx={{ display: "grid", width: "fit-content" }}>{purchaseServerButtons}</Box>
       <br />
       <Typography>
-        <i>"You can order bigger servers via scripts. We don't take custom orders in person."</i>
+        <i>"You can order bigger cloud servers via scripts. We don't take custom orders in person."</i>
       </Typography>
       <br />
-      <TorButton p={player} rerender={rerender} />
+      <TorButton rerender={rerender} />
       <br />
-      <RamButton p={player} rerender={rerender} />
+      <RamButton rerender={rerender} />
       <br />
-      <CoresButton p={player} rerender={rerender} />
+      <CoresButton rerender={rerender} />
     </>
   );
 }

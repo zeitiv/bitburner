@@ -4,15 +4,10 @@
 
 ## NS.bladeburner property
 
-Namespace for bladeburner functions.
+Namespace for [Bladeburner](./bitburner.bladeburner.md) functions. Contains spoilers.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 readonly bladeburner: Bladeburner;
 ```
-
-## Remarks
-
-RAM cost: 0 GB
-

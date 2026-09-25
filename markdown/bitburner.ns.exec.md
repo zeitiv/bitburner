@@ -6,22 +6,97 @@
 
 Start another script on any server.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-exec(script: string, host: string, numThreads?: number, ...args: Array<string | number | boolean>): number;
+exec(script: string, host: string, threadOrOptions?: number | RunOptions, ...args: ScriptArg[]): number;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  script | string | Filename of script to execute. |
-|  host | string | Hostname of the <code>target server</code> on which to execute the script. |
-|  numThreads | number | Optional thread count for new script. Set to 1 by default. Will be rounded to nearest integer. |
-|  args | Array&lt;string \| number \| boolean&gt; | Additional arguments to pass into the new script that is being run. Note that if any arguments are being passed into the new script, then the third argument numThreads must be filled in with a value. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+script
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Filename of script to execute. This file must already exist on the target server.
+
+
+</td></tr>
+<tr><td>
+
+host
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Hostname/IP of the target server on which to execute the script.
+
+
+</td></tr>
+<tr><td>
+
+threadOrOptions
+
+
+</td><td>
+
+number \| [RunOptions](./bitburner.runoptions.md)
+
+
+</td><td>
+
+_(Optional)_ Either an integer number of threads for new script, or a [RunOptions](./bitburner.runoptions.md) object. Threads defaults to 1.
+
+
+</td></tr>
+<tr><td>
+
+args
+
+
+</td><td>
+
+[ScriptArg](./bitburner.scriptarg.md)<!-- -->\[\]
+
+
+</td><td>
+
+Additional arguments to pass into the new script that is being run. Note that if any arguments are being passed into the new script, then the third argument threadOrOptions must be filled in with a value.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 
@@ -31,42 +106,31 @@ Returns the PID of a successfully started script, and 0 otherwise.
 
 RAM cost: 1.3 GB
 
-Run a script as a separate process on a specified server. This is similar to the run function except that it can be used to run a script on any server, instead of just the current server.
+Run a script as a separate process on a specified server. This is similar to the function [run](./bitburner.ns.run.md)<!-- -->, except that it can be used to run a script that already exists on any server, instead of just the current server.
 
-If the script was successfully started, then this functions returns the PID of that script. Otherwise, it returns 0.
+If the script was successfully started, then this function returns the PID of that script. Otherwise, it returns 0.
 
-PID stands for Process ID. The PID is a unique identifier for each script. The PID will always be a positive integer.
+PID stands for Process ID. The PID is a unique identifier for each script across all hosts. The PID will always be a positive integer.
 
-Running this function with a numThreads argument of 0 will return 0 without running the script. However, running this function with a negative numThreads argument will cause a runtime error.
+Running this function with 0 or fewer threads will cause a runtime error.
 
-## Example 1
+## Example
 
 
-```ts
-// NS1:
-//The simplest way to use the exec command is to call it with just the script name and the target server. The following example will try to run generic-hack.script on the foodnstuff server:
-exec("generic-hack.script", "foodnstuff");
+```js
+// The simplest way to use the exec command is to call it with just the script name
+// and the target server. The following example will try to run generic-hack.js
+// on the foodnstuff server.
+ns.exec("generic-hack.js", "foodnstuff");
 
-//The following example will try to run the script generic-hack.script on the joesguns server with 10 threads:
-exec("generic-hack.script", "joesguns", 10);
+// The following example will try to run the script generic-hack.js on the
+// joesguns server with 10 threads.
+ns.exec("generic-hack.js", "joesguns", {threads: 10});
 
-//This last example will try to run the script foo.script on the foodnstuff server with 5 threads. It will also pass the number 1 and the string “test” in as arguments to the script:
-exec("foo.script", "foodnstuff", 5, 1, "test");
+// This last example will try to run the script foo.js on the foodnstuff server
+// with 5 threads. It will also pass the number 1 and the string “test” in as
+// arguments to the script.
+ns.exec("foo.js", "foodnstuff", 5, 1, "test");
 ```
-\*
-
-## Example 2
-
-
-```ts
-// NS2:
-//The simplest way to use the exec command is to call it with just the script name and the target server. The following example will try to run generic-hack.script on the foodnstuff server:
-ns.exec("generic-hack.script", "foodnstuff");
-
-//The following example will try to run the script generic-hack.script on the joesguns server with 10 threads:
-ns.exec("generic-hack.script", "joesguns", 10);
-
-//This last example will try to run the script foo.script on the foodnstuff server with 5 threads. It will also pass the number 1 and the string “test” in as arguments to the script:
-ns.exec("foo.script", "foodnstuff", 5, 1, "test");
-```
+For darknet servers: A session must be established with the target server, and the script must be running on a server that is directly connected to the target, or the target must have a backdoor or stasis link installed.
 

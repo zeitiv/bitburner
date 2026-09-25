@@ -4,7 +4,9 @@
 
 ## GangMemberInfo.hack\_exp property
 
-<b>Signature:</b>
+Current hack experience
+
+**Signature:**
 
 ```typescript
 hack_exp: number;

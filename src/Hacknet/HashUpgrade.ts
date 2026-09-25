@@ -1,12 +1,14 @@
-/**
- * Object representing an upgrade that can be purchased with hashes
- */
-export interface IConstructorParams {
+import type { ReactNode } from "react";
+import type { HashUpgradeEnum } from "./Enums";
+
+/** Object representing an upgrade that can be purchased with hashes */
+export interface HashUpgradeParams {
   cost?: number;
   costPerLevel: number;
-  desc: string;
+  desc: ReactNode;
   hasTargetServer?: boolean;
-  name: string;
+  hasTargetCompany?: boolean;
+  name: HashUpgradeEnum;
   value: number;
   effectText?: (level: number) => JSX.Element | null;
 }
@@ -26,10 +28,8 @@ export class HashUpgrade {
    */
   costPerLevel = 0;
 
-  /**
-   * Description of what the upgrade does
-   */
-  desc = "";
+  /** Description of what the upgrade does */
+  desc: ReactNode = "";
 
   /**
    * Boolean indicating that this upgrade's effect affects a single server,
@@ -37,14 +37,20 @@ export class HashUpgrade {
    */
   hasTargetServer = false;
 
-  // Name of upgrade
-  name = "";
+  /**
+   * Boolean indicating that this upgrade's effect affects a single company,
+   * the "target" company
+   */
+  hasTargetCompany = false;
+
+  /** Name of upgrade */
+  name: HashUpgradeEnum;
 
   // Generic value used to indicate the potency/amount of this upgrade's effect
   // The meaning varies between different upgrades
   value = 0;
 
-  constructor(p: IConstructorParams) {
+  constructor(p: HashUpgradeParams) {
     if (p.cost != null) {
       this.cost = p.cost;
     }
@@ -55,6 +61,7 @@ export class HashUpgrade {
     this.costPerLevel = p.costPerLevel;
     this.desc = p.desc;
     this.hasTargetServer = p.hasTargetServer ? p.hasTargetServer : false;
+    this.hasTargetCompany = p.hasTargetCompany ? p.hasTargetCompany : false;
     this.name = p.name;
     this.value = p.value;
   }
@@ -62,11 +69,15 @@ export class HashUpgrade {
   // Functions that returns the UI element to display the effect of this upgrade.
   effectText: (level: number) => JSX.Element | null = () => null;
 
-  getCost(levels: number): number {
+  getCost(currentLevel: number, count = 1): number {
     if (typeof this.cost === "number") {
-      return this.cost;
+      return this.cost * count;
     }
 
-    return Math.round((levels + 1) * this.costPerLevel);
+    //This formula is equivalent to
+    //(currentLevel + 1) * this.costPerLevel
+    //being performed repeatedly
+    const collapsedSum = 0.5 * count * (count + 2 * currentLevel + 1);
+    return this.costPerLevel * collapsedSum;
   }
 }

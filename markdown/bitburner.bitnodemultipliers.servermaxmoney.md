@@ -4,9 +4,9 @@
 
 ## BitNodeMultipliers.ServerMaxMoney property
 
-Influences the maxmimum money that a server can grow to.
+Influences the maximum money that a server can grow to.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 ServerMaxMoney: number;

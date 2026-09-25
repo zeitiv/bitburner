@@ -7,51 +7,44 @@ import * as React from "react";
 
 import { City } from "../City";
 import { Cities } from "../Cities";
-import { LocationName } from "../data/LocationNames";
+import { LocationName, LocationType } from "@enums";
 import { Locations } from "../Locations";
 import { Location } from "../Location";
 import { Settings } from "../../Settings/Settings";
 
-import { use } from "../../ui/Context";
-import { IRouter } from "../../ui/Router";
+import { Player } from "@player";
+import { Router } from "../../ui/GameRoot";
+import { Page } from "../../ui/Router";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
-import { LocationType } from "../LocationTypeEnum";
 import { Theme } from "@mui/material/styles";
-import makeStyles from "@mui/styles/makeStyles";
-import createStyles from "@mui/styles/createStyles";
+import { makeStyles } from "tss-react/mui";
 
-type IProps = {
+interface IProps {
   city: City;
-};
+}
 
-const useStyles = makeStyles((theme: Theme) =>
-  createStyles({
-    location: {
-      color: theme.colors.white,
-      whiteSpace: "nowrap",
-      margin: "0px",
-      padding: "0px",
-      cursor: "pointer",
-    },
-  })
-);
+const useStyles = makeStyles()((theme: Theme) => ({
+  location: {
+    color: theme.colors.maplocation,
+    whiteSpace: "nowrap",
+    margin: "0px",
+    padding: "0px",
+    cursor: "pointer",
+  },
+}));
 
-
-function toLocation(router: IRouter, location: Location): void {
+function toLocation(location: Location): void {
   if (location.name === LocationName.TravelAgency) {
-    router.toTravel();
+    Router.toPage(Page.Travel);
   } else if (location.name === LocationName.WorldStockExchange) {
-    router.toStockMarket();
+    Router.toPage(Page.StockMarket);
   } else {
-    router.toLocation(location);
+    Router.toPage(Page.Location, { location });
   }
 }
 
-function LocationLetter(location: Location): React.ReactElement {
-  location.types;
-  const router = use.Router();
-  const classes = useStyles();
+function LocationLetter(location: Location, className: string): React.ReactElement {
   let L = "X";
   if (location.types.includes(LocationType.Company)) L = "C";
   if (location.types.includes(LocationType.Gym)) L = "G";
@@ -65,12 +58,7 @@ function LocationLetter(location: Location): React.ReactElement {
   if (location.types.includes(LocationType.Special)) L = "?";
   if (!location) return <span>*</span>;
   return (
-    <span
-      aria-label={location.name}
-      key={location.name}
-      className={classes.location}
-      onClick={() => toLocation(router, location)}
-    >
+    <span aria-label={location.name} key={location.name} className={className} onClick={() => toLocation(location)}>
       <b>{L}</b>
     </span>
   );
@@ -78,7 +66,7 @@ function LocationLetter(location: Location): React.ReactElement {
 
 function ASCIICity(props: IProps): React.ReactElement {
   const locationLettersRegex = /[A-Z]/g;
-  const letterMap: any = {
+  const letterMap: Record<string, number> = {
     A: 0,
     B: 1,
     C: 2,
@@ -106,11 +94,12 @@ function ASCIICity(props: IProps): React.ReactElement {
     Y: 24,
     Z: 25,
   };
+  const { classes } = useStyles();
 
-  const lineElems = (s: string): JSX.Element[] => {
-    const elems: any[] = [];
-    const matches: any[] = [];
-    let match: any;
+  const lineElems = (s: string): (string | React.ReactElement)[] => {
+    const elems: (string | React.ReactElement)[] = [];
+    const matches: RegExpExecArray[] = [];
+    let match: RegExpExecArray | null = null;
     while ((match = locationLettersRegex.exec(s)) !== null) {
       matches.push(match);
     }
@@ -124,7 +113,7 @@ function ASCIICity(props: IProps): React.ReactElement {
       const endI = matches[i].index;
       elems.push(s.slice(startI, endI));
       const locationI = letterMap[s[matches[i].index]];
-      elems.push(LocationLetter(Locations[props.city.locations[locationI]]));
+      elems.push(LocationLetter(Locations[props.city.locations[locationI]], classes.location));
     }
     elems.push(s.slice(matches[matches.length - 1].index + 1));
     return elems;
@@ -132,23 +121,24 @@ function ASCIICity(props: IProps): React.ReactElement {
 
   const elems: JSX.Element[] = [];
   const lines = props.city.asciiArt.split("\n");
+  let i = 0;
   for (const line of lines) {
     elems.push(
-      <Typography key={line} sx={{ lineHeight: "1em", whiteSpace: "pre" }}>
+      <Typography key={i} sx={{ lineHeight: "1em", whiteSpace: "pre" }}>
         {lineElems(line)}
       </Typography>,
     );
+    i++;
   }
 
   return <>{elems}</>;
 }
 
 function ListCity(props: IProps): React.ReactElement {
-  const router = use.Router();
   const locationButtons = props.city.locations.map((locName) => {
     return (
       <React.Fragment key={locName}>
-        <Button onClick={() => toLocation(router, Locations[locName])}>{locName}</Button>
+        <Button onClick={() => toLocation(Locations[locName])}>{locName}</Button>
         <br />
       </React.Fragment>
     );
@@ -158,8 +148,7 @@ function ListCity(props: IProps): React.ReactElement {
 }
 
 export function LocationCity(): React.ReactElement {
-  const player = use.Player();
-  const city = Cities[player.city];
+  const city = Cities[Player.city];
   return (
     <>
       <Typography>{city.name}</Typography>

@@ -1,19 +1,21 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import Draggable, { DraggableEventHandler } from "react-draggable";
-import makeStyles from "@mui/styles/makeStyles";
+import { makeStyles } from "tss-react/mui";
 import Collapse from "@mui/material/Collapse";
 import Paper from "@mui/material/Paper";
+import { useTheme } from "@mui/material/styles";
+import useMediaQuery from "@mui/material/useMediaQuery";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
 import EqualizerIcon from "@mui/icons-material/Equalizer";
 import SchoolIcon from "@mui/icons-material/School";
-import { use } from "../Context";
+import { Router } from "../GameRoot";
 import { Page } from "../Router";
 import { Settings } from "../../Settings/Settings";
 import { Box, Button, Typography } from "@mui/material";
 import { debounce } from "lodash";
 
-const useStyles = makeStyles({
+const useStyles = makeStyles()({
   overviewContainer: {
     position: "fixed",
     top: 0,
@@ -22,6 +24,8 @@ const useStyles = makeStyles({
     display: "flex",
     justifyContent: "flex-end",
     flexDirection: "column",
+    maxWidth: "100vw",
+    boxSizing: "border-box",
   },
 
   header: {
@@ -53,7 +57,7 @@ const useStyles = makeStyles({
 });
 
 interface IProps {
-  children: JSX.Element[] | JSX.Element | React.ReactElement[] | React.ReactElement;
+  children: (parentOpen: boolean) => JSX.Element[] | JSX.Element | React.ReactElement[] | React.ReactElement;
   mode: "tutorial" | "overview";
 }
 
@@ -65,11 +69,16 @@ export interface OverviewSettings {
 
 export function Overview({ children, mode }: IProps): React.ReactElement {
   const draggableRef = useRef<HTMLDivElement>(null);
-  const [open, setOpen] = useState(Settings.overview.opened);
+  const theme = useTheme();
+  // noSsr: this is a client-only app, so read the real match on first render.
+  const isMobile = useMediaQuery(theme.breakpoints.down("sm"), { noSsr: true });
+  // Start collapsed on mobile so the panel doesn't cover page content by default; desktop keeps
+  // the persisted preference, and the (onboarding-critical) tutorial panel always starts open.
+  const startsCollapsed = isMobile && mode !== "tutorial";
+  const [open, setOpen] = useState(() => (startsCollapsed ? false : Settings.overview.opened));
   const [x, setX] = useState(Settings.overview.x);
   const [y, setY] = useState(Settings.overview.y);
-  const classes = useStyles();
-  const router = use.Router();
+  const { classes } = useStyles();
 
   const CurrentIcon = open ? KeyboardArrowUpIcon : KeyboardArrowDownIcon;
   const LeftIcon = mode === "tutorial" ? SchoolIcon : EqualizerIcon;
@@ -80,11 +89,35 @@ export function Overview({ children, mode }: IProps): React.ReactElement {
   };
 
   useEffect(() => {
+    // Don't let mobile's forced-collapsed default or its (likely unintended) drag position
+    // clobber the desktop-persisted preference.
+    if (isMobile) return;
     Settings.overview = { x, y, opened: open };
-  }, [open, x, y]);
+  }, [open, x, y, isMobile]);
+
+  const fakeDrag = useMemo(
+    () =>
+      debounce((): void => {
+        const node = draggableRef.current;
+        if (!node) return;
+
+        // No official way to trigger an onChange to recompute the bounds
+        // See: https://github.com/react-grid-layout/react-draggable/issues/363#issuecomment-947751127
+        triggerMouseEvent(node, "mouseover");
+        triggerMouseEvent(node, "mousedown");
+        triggerMouseEvent(document, "mousemove");
+        triggerMouseEvent(node, "mouseup");
+        // According to a comment in the above GitHub issue, apparently mousemove is important,
+        // but click probably isn't. This click causes a runtime error in Safari (NotAllowedError),
+        // but not Chromium. If further errors occur, a more thorough fix, possibly using
+        // navigator.userActivation.isActive, might be necessary.
+        // triggerMouseEvent(node, "click");
+      }, 100),
+    [],
+  );
 
   // Trigger fakeDrag once to make sure loaded data is not outside bounds
-  useEffect(() => fakeDrag(), []);
+  useEffect(() => fakeDrag(), [fakeDrag]);
 
   // And trigger fakeDrag when the window is resized
   useEffect(() => {
@@ -92,28 +125,14 @@ export function Overview({ children, mode }: IProps): React.ReactElement {
     return () => {
       window.removeEventListener("resize", fakeDrag);
     };
-  }, []);
-
-  const fakeDrag = debounce((): void => {
-    const node = draggableRef?.current;
-    if (!node) return;
-
-    // No official way to trigger an onChange to recompute the bounds
-    // See: https://github.com/react-grid-layout/react-draggable/issues/363#issuecomment-947751127
-    triggerMouseEvent(node, "mouseover");
-    triggerMouseEvent(node, "mousedown");
-    triggerMouseEvent(document, "mousemove");
-    triggerMouseEvent(node, "mouseup");
-    triggerMouseEvent(node, "click");
-  }, 100);
+  }, [fakeDrag]);
 
   const triggerMouseEvent = (node: HTMLDivElement | Document, eventType: string): void => {
-    const clickEvent = document.createEvent("MouseEvents");
-    clickEvent.initEvent(eventType, true, true);
+    const clickEvent = new MouseEvent(eventType, { bubbles: true, cancelable: true });
     node.dispatchEvent(clickEvent);
   };
 
-  if (router.page() === Page.BitVerse || router.page() === Page.Loading || router.page() === Page.Recovery)
+  if (Router.page() === Page.BitVerse || Router.page() === Page.Loading || Router.page() === Page.Recovery)
     return <></>;
   return (
     <Draggable handle=".drag" bounds="body" onStop={handleStop} defaultPosition={{ x, y }}>
@@ -130,12 +149,19 @@ export function Overview({ children, mode }: IProps): React.ReactElement {
               size="small"
               className={classes.visibilityToggle}
             >
-              {<CurrentIcon className={classes.icon} color="secondary" onClick={() => setOpen((old) => !old)} />}
+              {
+                <CurrentIcon
+                  className={classes.icon}
+                  color="secondary"
+                  onClick={() => setOpen((old) => !old)}
+                  onTouchEnd={() => setOpen((old) => !old)}
+                />
+              }
             </Button>
           </Box>
         </Box>
         <Collapse in={open} className={classes.collapse}>
-          {children}
+          {children(open)}
         </Collapse>
       </Paper>
     </Draggable>

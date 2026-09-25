@@ -1,106 +1,141 @@
-import { INetscriptHelper } from "./INetscriptHelper";
-import { IPlayer } from "../PersonObjects/IPlayer";
-import { WorkerScript } from "../Netscript/WorkerScript";
-import { netscriptDelay } from "../NetscriptEvaluator";
-import { getRamCost } from "../Netscript/RamCostGenerator";
+import { Player } from "@player";
+import { AugmentationName, FactionName } from "@enums";
 
-import { staneksGift } from "../CotMG/Helper";
+import { canAcceptStaneksGift, staneksGift } from "../CotMG/Helper";
 import { Fragments, FragmentById } from "../CotMG/Fragment";
+import { FragmentTypeEnum } from "../CotMG/FragmentType";
 
-import {
-  Stanek as IStanek,
-  Fragment as IFragment,
-  ActiveFragment as IActiveFragment,
-} from "../ScriptEditor/NetscriptDefinitions";
-import { AugmentationNames } from "../Augmentation/data/AugmentationNames";
+import type { Stanek as IStanek } from "@nsdefs";
+import type { NetscriptContext, InternalAPI } from "../Netscript/APIWrapper";
+import { applyAugmentation } from "../Augmentation/AugmentationHelpers";
+import { joinFaction } from "../Faction/FactionHelpers";
+import { Factions } from "../Faction/Factions";
+import { helpers } from "../Netscript/NetscriptHelpers";
+import { getCoreBonus } from "../Server/ServerHelpers";
 
-export function NetscriptStanek(player: IPlayer, workerScript: WorkerScript, helper: INetscriptHelper): IStanek {
-  function checkStanekAPIAccess(func: string): void {
-    if (!player.hasAugmentation(AugmentationNames.StaneksGift1, true)) {
-      helper.makeRuntimeErrorMsg(func, "Requires Stanek's Gift installed.");
+export function NetscriptStanek(): InternalAPI<IStanek> {
+  function checkStanekAPIAccess(ctx: NetscriptContext): void {
+    if (!Player.hasAugmentation(AugmentationName.StaneksGift1, true)) {
+      throw helpers.errorMessage(ctx, "Stanek's Gift is not installed");
     }
   }
 
   return {
-    width: function (): number {
+    giftWidth: (ctx) => () => {
+      checkStanekAPIAccess(ctx);
       return staneksGift.width();
     },
-    height: function (): number {
+    giftHeight: (ctx) => () => {
+      checkStanekAPIAccess(ctx);
       return staneksGift.height();
     },
-    charge: function (arootX: unknown, arootY: unknown): Promise<void> {
-      const rootX = helper.number("stanek.charge", "rootX", arootX);
-      const rootY = helper.number("stanek.charge", "rootY", arootY);
-
-      helper.updateDynamicRam("charge", getRamCost(player, "stanek", "charge"));
-      checkStanekAPIAccess("charge");
+    chargeFragment: (ctx) => (_rootX, _rootY) => {
+      //Get the fragment object using the given coordinates
+      const rootX = helpers.number(ctx, "rootX", _rootX);
+      const rootY = helpers.number(ctx, "rootY", _rootY);
+      checkStanekAPIAccess(ctx);
       const fragment = staneksGift.findFragment(rootX, rootY);
-      if (!fragment) throw helper.makeRuntimeErrorMsg("stanek.charge", `No fragment with root (${rootX}, ${rootY}).`);
-      const time = staneksGift.inBonus() ? 200 : 1000;
-      return netscriptDelay(time, workerScript).then(function () {
-        const charge = staneksGift.charge(player, fragment, workerScript.scriptRef.threads);
-        workerScript.log("stanek.charge", () => `Charged fragment for ${charge} charge.`);
+      //Check whether the selected fragment can ge charged
+      if (!fragment) throw helpers.errorMessage(ctx, `No fragment with root (${rootX}, ${rootY}).`);
+      if (fragment.fragment().type == FragmentTypeEnum.Booster) {
+        throw helpers.errorMessage(
+          ctx,
+          `The fragment with root (${rootX}, ${rootY}) is a Booster Fragment and thus cannot be charged.`,
+        );
+      }
+      //Charge the fragment
+      const cores = ctx.workerScript.getServer().cpuCores;
+      const coreBonus = getCoreBonus(cores);
+      const inBonus = staneksGift.inBonus();
+      const time = inBonus ? 200 : 1000;
+      if (inBonus) staneksGift.isBonusCharging = true;
+      return helpers.netscriptDelay(ctx, time).then(function () {
+        staneksGift.charge(fragment, ctx.workerScript.scriptRef.threads * coreBonus);
+        helpers.log(ctx, () => `Charged fragment with ${ctx.workerScript.scriptRef.threads} threads.`);
         return Promise.resolve();
       });
     },
-    fragmentDefinitions: function (): IFragment[] {
-      helper.updateDynamicRam("fragmentDefinitions", getRamCost(player, "stanek", "fragmentDefinitions"));
-      checkStanekAPIAccess("fragmentDefinitions");
-      workerScript.log("stanek.fragmentDefinitions", () => `Returned ${Fragments.length} fragments`);
+    fragmentDefinitions: (ctx) => () => {
+      checkStanekAPIAccess(ctx);
+      helpers.log(ctx, () => `Returned ${Fragments.length} fragments`);
       return Fragments.map((f) => f.copy());
     },
-    activeFragments: function (): IActiveFragment[] {
-      helper.updateDynamicRam("activeFragments", getRamCost(player, "stanek", "activeFragments"));
-      checkStanekAPIAccess("activeFragments");
-      workerScript.log("stanek.activeFragments", () => `Returned ${staneksGift.fragments.length} fragments`);
-      return staneksGift.fragments.map((af) => {
-        return { ...af.copy(), ...af.fragment().copy() };
-      });
+    activeFragments: (ctx) => () => {
+      checkStanekAPIAccess(ctx);
+      helpers.log(ctx, () => `Returned ${staneksGift.fragments.length} fragments`);
+      return staneksGift.fragments.map((activeFragment) => {
+        return {
+          ...activeFragment.copy(),
+          ...activeFragment.fragment().copy(),
+          chargedEffect: staneksGift.effect(activeFragment),
+        };
+      }) satisfies ReturnType<IStanek["activeFragments"]>;
     },
-    clear: function (): void {
-      helper.updateDynamicRam("clear", getRamCost(player, "stanek", "clear"));
-      checkStanekAPIAccess("clear");
-      workerScript.log("stanek.clear", () => `Cleared Stanek's Gift.`);
+    clearGift: (ctx) => () => {
+      checkStanekAPIAccess(ctx);
+      helpers.log(ctx, () => `Cleared Stanek's Gift.`);
       staneksGift.clear();
     },
-    canPlace: function (arootX: unknown, arootY: unknown, arotation: unknown, afragmentId: unknown): boolean {
-      const rootX = helper.number("stanek.canPlace", "rootX", arootX);
-      const rootY = helper.number("stanek.canPlace", "rootY", arootY);
-      const rotation = helper.number("stanek.canPlace", "rotation", arotation);
-      const fragmentId = helper.number("stanek.canPlace", "fragmentId", afragmentId);
-      helper.updateDynamicRam("canPlace", getRamCost(player, "stanek", "canPlace"));
-      checkStanekAPIAccess("canPlace");
+    canPlaceFragment: (ctx) => (_rootX, _rootY, _rotation, _fragmentId) => {
+      const rootX = helpers.number(ctx, "rootX", _rootX);
+      const rootY = helpers.number(ctx, "rootY", _rootY);
+      const rotation = helpers.number(ctx, "rotation", _rotation);
+      const fragmentId = helpers.number(ctx, "fragmentId", _fragmentId);
+      checkStanekAPIAccess(ctx);
       const fragment = FragmentById(fragmentId);
-      if (!fragment) throw helper.makeRuntimeErrorMsg("stanek.canPlace", `Invalid fragment id: ${fragmentId}`);
+      if (!fragment) throw helpers.errorMessage(ctx, `Invalid fragment id: ${fragmentId}`);
       const can = staneksGift.canPlace(rootX, rootY, rotation, fragment);
       return can;
     },
-    place: function (arootX: unknown, arootY: unknown, arotation: unknown, afragmentId: unknown): boolean {
-      const rootX = helper.number("stanek.place", "rootX", arootX);
-      const rootY = helper.number("stanek.place", "rootY", arootY);
-      const rotation = helper.number("stanek.place", "rotation", arotation);
-      const fragmentId = helper.number("stanek.place", "fragmentId", afragmentId);
-      helper.updateDynamicRam("place", getRamCost(player, "stanek", "place"));
-      checkStanekAPIAccess("place");
+    placeFragment: (ctx) => (_rootX, _rootY, _rotation, _fragmentId) => {
+      const rootX = helpers.number(ctx, "rootX", _rootX);
+      const rootY = helpers.number(ctx, "rootY", _rootY);
+      const rotation = helpers.number(ctx, "rotation", _rotation);
+      const fragmentId = helpers.number(ctx, "fragmentId", _fragmentId);
+      checkStanekAPIAccess(ctx);
       const fragment = FragmentById(fragmentId);
-      if (!fragment) throw helper.makeRuntimeErrorMsg("stanek.place", `Invalid fragment id: ${fragmentId}`);
+      if (!fragment) throw helpers.errorMessage(ctx, `Invalid fragment id: ${fragmentId}`);
       return staneksGift.place(rootX, rootY, rotation, fragment);
     },
-    get: function (arootX: unknown, arootY: unknown): IActiveFragment | undefined {
-      const rootX = helper.number("stanek.get", "rootX", arootX);
-      const rootY = helper.number("stanek.get", "rootY", arootY);
-      helper.updateDynamicRam("get", getRamCost(player, "stanek", "get"));
-      checkStanekAPIAccess("get");
-      const fragment = staneksGift.findFragment(rootX, rootY);
-      if (fragment !== undefined) return fragment.copy();
+    getFragment: (ctx) => (_rootX, _rootY) => {
+      const rootX = helpers.number(ctx, "rootX", _rootX);
+      const rootY = helpers.number(ctx, "rootY", _rootY);
+      checkStanekAPIAccess(ctx);
+      const activeFragment = staneksGift.findFragment(rootX, rootY);
+      if (activeFragment !== undefined) {
+        return {
+          ...activeFragment.copy(),
+          ...activeFragment.fragment().copy(),
+          chargedEffect: staneksGift.effect(activeFragment),
+        } satisfies ReturnType<IStanek["getFragment"]>;
+      }
       return undefined;
     },
-    remove: function (arootX: unknown, arootY: unknown): boolean {
-      const rootX = helper.number("stanek.remove", "rootX", arootX);
-      const rootY = helper.number("stanek.remove", "rootY", arootY);
-      helper.updateDynamicRam("remove", getRamCost(player, "stanek", "remove"));
-      checkStanekAPIAccess("remove");
+    removeFragment: (ctx) => (_rootX, _rootY) => {
+      const rootX = helpers.number(ctx, "rootX", _rootX);
+      const rootY = helpers.number(ctx, "rootY", _rootY);
+      checkStanekAPIAccess(ctx);
       return staneksGift.delete(rootX, rootY);
+    },
+    acceptGift: (ctx) => () => {
+      const cotmgFaction = Factions[FactionName.ChurchOfTheMachineGod];
+      // Check if the player is eligible to join the church
+      const checkResult = canAcceptStaneksGift();
+      if (checkResult.success) {
+        // Join the CotMG factionn
+        joinFaction(cotmgFaction);
+        // Install the first Stanek aug
+        applyAugmentation({ name: AugmentationName.StaneksGift1, level: 1 });
+        helpers.log(
+          ctx,
+          () =>
+            `You joined '${FactionName.ChurchOfTheMachineGod}' and have '${AugmentationName.StaneksGift1}' installed.`,
+        );
+      } else {
+        helpers.log(ctx, () => checkResult.message);
+      }
+      // Return true if the player is in CotMG and has the first Stanek aug installed
+      return cotmgFaction.isMember && Player.hasAugmentation(AugmentationName.StaneksGift1, true);
     },
   };
 }

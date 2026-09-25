@@ -1,11 +1,12 @@
 import { Sleeve } from "../Sleeve";
-import { numeralWrapper } from "../../../ui/numeralFormat";
+import { formatExp, formatPercent } from "../../../ui/formatNumber";
 import { convertTimeMsToTimeElapsedString } from "../../../utils/StringHelperFunctions";
 import { CONSTANTS } from "../../../Constants";
 import { Typography } from "@mui/material";
 import { StatsTable } from "../../../ui/React/StatsTable";
 import { Modal } from "../../../ui/React/Modal";
 import React from "react";
+import { canAccessBitNodeFeature } from "../../../BitNode/BitNodeUtils";
 
 interface IProps {
   open: boolean;
@@ -18,68 +19,49 @@ export function MoreStatsModal(props: IProps): React.ReactElement {
     <Modal open={props.open} onClose={props.onClose}>
       <StatsTable
         rows={[
-          [
-            <>Hacking:&nbsp;</>,
-            props.sleeve.hacking,
-            <>&nbsp;({numeralWrapper.formatExp(props.sleeve.hacking_exp)} exp)</>,
-          ],
-          [
-            <>Strength:&nbsp;</>,
-            props.sleeve.strength,
-            <>&nbsp;({numeralWrapper.formatExp(props.sleeve.strength_exp)} exp)</>,
-          ],
-          [
-            <>Defense:&nbsp;</>,
-            props.sleeve.defense,
-            <>&nbsp;({numeralWrapper.formatExp(props.sleeve.defense_exp)} exp)</>,
-          ],
+          [<>Hacking:&nbsp;</>, props.sleeve.skills.hacking, <>&nbsp;({formatExp(props.sleeve.exp.hacking)} exp)</>],
+          [<>Strength:&nbsp;</>, props.sleeve.skills.strength, <>&nbsp;({formatExp(props.sleeve.exp.strength)} exp)</>],
+          [<>Defense:&nbsp;</>, props.sleeve.skills.defense, <>&nbsp;({formatExp(props.sleeve.exp.defense)} exp)</>],
           [
             <>Dexterity:&nbsp;</>,
-            props.sleeve.dexterity,
-            <>&nbsp;({numeralWrapper.formatExp(props.sleeve.dexterity_exp)} exp)</>,
+            props.sleeve.skills.dexterity,
+            <>&nbsp;({formatExp(props.sleeve.exp.dexterity)} exp)</>,
           ],
+          [<>Agility:&nbsp;</>, props.sleeve.skills.agility, <>&nbsp;({formatExp(props.sleeve.exp.agility)} exp)</>],
+          [<>Charisma:&nbsp;</>, props.sleeve.skills.charisma, <>&nbsp;({formatExp(props.sleeve.exp.charisma)} exp)</>],
           [
-            <>Agility:&nbsp;</>,
-            props.sleeve.agility,
-            <>&nbsp;({numeralWrapper.formatExp(props.sleeve.agility_exp)} exp)</>,
+            ...(canAccessBitNodeFeature(5)
+              ? [
+                  <>Intelligence:&nbsp;</>,
+                  props.sleeve.skills.intelligence,
+                  <>&nbsp;({formatExp(props.sleeve.exp.intelligence)} exp)</>,
+                ]
+              : [<></>]),
           ],
-          [
-            <>Charisma:&nbsp;</>,
-            props.sleeve.charisma,
-            <>&nbsp;({numeralWrapper.formatExp(props.sleeve.charisma_exp)} exp)</>,
-          ],
+          [<></>],
         ]}
         title="Stats:"
       />
       <br />
       <StatsTable
         rows={[
-          [<>Hacking Level multiplier:&nbsp;</>, numeralWrapper.formatPercentage(props.sleeve.hacking_mult)],
-          [<>Hacking Experience multiplier:&nbsp;</>, numeralWrapper.formatPercentage(props.sleeve.hacking_exp_mult)],
-          [<>Strength Level multiplier:&nbsp;</>, numeralWrapper.formatPercentage(props.sleeve.strength_mult)],
-          [<>Strength Experience multiplier:&nbsp;</>, numeralWrapper.formatPercentage(props.sleeve.strength_exp_mult)],
-          [<>Defense Level multiplier:&nbsp;</>, numeralWrapper.formatPercentage(props.sleeve.defense_mult)],
-          [<>Defense Experience multiplier:&nbsp;</>, numeralWrapper.formatPercentage(props.sleeve.defense_exp_mult)],
-          [<>Dexterity Level multiplier:&nbsp;</>, numeralWrapper.formatPercentage(props.sleeve.dexterity_mult)],
-          [
-            <>Dexterity Experience multiplier:&nbsp;</>,
-            numeralWrapper.formatPercentage(props.sleeve.dexterity_exp_mult),
-          ],
-          [<>Agility Level multiplier:&nbsp;</>, numeralWrapper.formatPercentage(props.sleeve.agility_mult)],
-          [<>Agility Experience multiplier:&nbsp;</>, numeralWrapper.formatPercentage(props.sleeve.agility_exp_mult)],
-          [<>Charisma Level multiplier:&nbsp;</>, numeralWrapper.formatPercentage(props.sleeve.charisma_mult)],
-          [<>Charisma Experience multiplier:&nbsp;</>, numeralWrapper.formatPercentage(props.sleeve.charisma_exp_mult)],
-          [
-            <>Faction Reputation Gain multiplier:&nbsp;</>,
-            numeralWrapper.formatPercentage(props.sleeve.faction_rep_mult),
-          ],
-          [
-            <>Company Reputation Gain multiplier:&nbsp;</>,
-            numeralWrapper.formatPercentage(props.sleeve.company_rep_mult),
-          ],
-          [<>Salary multiplier:&nbsp;</>, numeralWrapper.formatPercentage(props.sleeve.work_money_mult)],
-          [<>Crime Money multiplier:&nbsp;</>, numeralWrapper.formatPercentage(props.sleeve.crime_money_mult)],
-          [<>Crime Success multiplier:&nbsp;</>, numeralWrapper.formatPercentage(props.sleeve.crime_success_mult)],
+          [<>Hacking Level multiplier:&nbsp;</>, formatPercent(props.sleeve.mults.hacking)],
+          [<>Hacking Experience multiplier:&nbsp;</>, formatPercent(props.sleeve.mults.hacking_exp)],
+          [<>Strength Level multiplier:&nbsp;</>, formatPercent(props.sleeve.mults.strength)],
+          [<>Strength Experience multiplier:&nbsp;</>, formatPercent(props.sleeve.mults.strength_exp)],
+          [<>Defense Level multiplier:&nbsp;</>, formatPercent(props.sleeve.mults.defense)],
+          [<>Defense Experience multiplier:&nbsp;</>, formatPercent(props.sleeve.mults.defense_exp)],
+          [<>Dexterity Level multiplier:&nbsp;</>, formatPercent(props.sleeve.mults.dexterity)],
+          [<>Dexterity Experience multiplier:&nbsp;</>, formatPercent(props.sleeve.mults.dexterity_exp)],
+          [<>Agility Level multiplier:&nbsp;</>, formatPercent(props.sleeve.mults.agility)],
+          [<>Agility Experience multiplier:&nbsp;</>, formatPercent(props.sleeve.mults.agility_exp)],
+          [<>Charisma Level multiplier:&nbsp;</>, formatPercent(props.sleeve.mults.charisma)],
+          [<>Charisma Experience multiplier:&nbsp;</>, formatPercent(props.sleeve.mults.charisma_exp)],
+          [<>Faction Reputation Gain multiplier:&nbsp;</>, formatPercent(props.sleeve.mults.faction_rep)],
+          [<>Company Reputation Gain multiplier:&nbsp;</>, formatPercent(props.sleeve.mults.company_rep)],
+          [<>Salary multiplier:&nbsp;</>, formatPercent(props.sleeve.mults.work_money)],
+          [<>Crime Money multiplier:&nbsp;</>, formatPercent(props.sleeve.mults.crime_money)],
+          [<>Crime Success multiplier:&nbsp;</>, formatPercent(props.sleeve.mults.crime_success)],
         ]}
         title="Multipliers:"
       />

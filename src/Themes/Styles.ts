@@ -1,6 +1,8 @@
-import { IStyleSettings } from "../ScriptEditor/NetscriptDefinitions";
+import { IStyleSettings } from "@nsdefs";
 
 export const defaultStyles: IStyleSettings = {
   lineHeight: 1.5,
-  fontFamily: "Lucida Console, Lucida Sans Unicode, Fira Mono, Consolas, Courier New, Courier, monospace, Times New Roman"
-}
+  fontSize: 14,
+  tailFontSize: 16,
+  fontFamily: `JetBrainsMono, "Courier New", monospace`,
+};

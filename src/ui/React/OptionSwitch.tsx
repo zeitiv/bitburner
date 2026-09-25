@@ -1,30 +1,46 @@
 import { FormControlLabel, Switch, Tooltip, Typography } from "@mui/material";
 import React, { useEffect, useState } from "react";
 
-interface IProps {
+type OptionSwitchProps = {
   checked: boolean;
+  disabled?: boolean;
   onChange: (newValue: boolean, error?: string) => void;
   text: React.ReactNode;
   tooltip: React.ReactNode;
-}
+  wrapperStyles?: React.CSSProperties;
+};
 
-export function OptionSwitch({ checked, onChange, text, tooltip }: IProps): React.ReactElement {
+export function OptionSwitch({
+  checked,
+  disabled = false,
+  onChange,
+  text,
+  tooltip,
+  wrapperStyles,
+}: OptionSwitchProps): React.ReactElement {
   const [value, setValue] = useState(checked);
 
   function handleSwitchChange(event: React.ChangeEvent<HTMLInputElement>): void {
-    setValue(event.target.checked);
+    const newValue = event.target.checked;
+    setValue(newValue);
+    onChange(newValue);
   }
 
-  useEffect(() => onChange(value), [value]);
+  useEffect(() => {
+    setValue(checked);
+  }, [checked]);
 
   return (
-    <FormControlLabel
-      control={<Switch checked={value} onChange={handleSwitchChange} />}
-      label={
-        <Tooltip title={<Typography>{tooltip}</Typography>}>
-          <Typography>{text}</Typography>
-        </Tooltip>
-      }
-    />
+    <div style={wrapperStyles}>
+      <FormControlLabel
+        disabled={disabled}
+        control={<Switch checked={value} onChange={handleSwitchChange} />}
+        label={
+          <Tooltip title={<Typography component="div">{tooltip}</Typography>}>
+            <Typography component="div">{text}</Typography>
+          </Tooltip>
+        }
+      />
+    </div>
   );
 }

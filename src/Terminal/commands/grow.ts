@@ -1,44 +1,12 @@
-import { ITerminal } from "../ITerminal";
-import { IRouter } from "../../ui/Router";
-import { IPlayer } from "../../PersonObjects/IPlayer";
+import { Terminal } from "../../Terminal";
 import { BaseServer } from "../../Server/BaseServer";
-import { Server } from "../../Server/Server";
 
-export function grow(
-  terminal: ITerminal,
-  router: IRouter,
-  player: IPlayer,
-  server: BaseServer,
-  args: (string | number | boolean)[],
-): void {
-  if (args.length !== 0) {
-    terminal.error("Incorrect usage of grow command. Usage: grow");
-    return;
-  }
+export function grow(args: (string | number | boolean)[], server: BaseServer): void {
+  if (args.length !== 0) return Terminal.error("Incorrect usage of grow command. Usage: grow");
 
-  if (!(server instanceof Server)) {
-    terminal.error(
-      "Cannot grow your own machines! You are currently connected to your home PC or one of your purchased servers",
-    );
-  }
-  const normalServer = server as Server;
-  // Hack the current PC (usually for money)
-  // You can't grow your home pc or servers you purchased
-  if (normalServer.purchasedByPlayer) {
-    terminal.error(
-      "Cannot grow your own machines! You are currently connected to your home PC or one of your purchased servers",
-    );
-    return;
-  }
-  if (!normalServer.hasAdminRights) {
-    terminal.error("You do not have admin rights for this machine! Cannot grow");
-    return;
-  }
-  if (normalServer.requiredHackingSkill > player.hacking) {
-    terminal.error(
-      "Your hacking skill is not high enough to attempt hacking this machine. Try analyzing the machine to determine the required hacking skill",
-    );
-    return;
-  }
-  terminal.startGrow(player);
+  if (server.purchasedByPlayer) return Terminal.error("Cannot grow your own machines!");
+  if (!server.hasAdminRights) return Terminal.error("You do not have admin rights for this machine!");
+  // Grow does not require meeting the hacking level, but undefined requiredHackingSkill indicates the wrong type of server.
+  if (server.requiredHackingSkill === undefined) return Terminal.error("Cannot grow this server.");
+  Terminal.startGrow();
 }

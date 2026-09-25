@@ -6,29 +6,89 @@
 
 Write data to a file.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-write(handle: string, data?: string[] | number | string, mode?: "w" | "a"): Promise<void>;
+write(filename: string, data?: string, mode?: "w" | "a"): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  handle | string | Filename of the text file that will be written to. |
-|  data | string\[\] \| number \| string | Data to write. |
-|  mode | "w" \| "a" | Defines the write mode. Only valid when writing to text files. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
 
-Promise&lt;void&gt;
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+filename
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the file to be written to.
+
+
+</td></tr>
+<tr><td>
+
+data
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Data to write.
+
+
+</td></tr>
+<tr><td>
+
+mode
+
+
+</td><td>
+
+"w" \| "a"
+
+
+</td><td>
+
+_(Optional)_ Defines the write mode.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
+
+void
 
 ## Remarks
 
 RAM cost: 0 GB
 
-This function can be used to write data to a text file (.txt).
+This function can be used to write data to a text file (.txt, .json, .css) or a script (.js, .jsx, .ts, .tsx).
 
-This function will write data to that text file. If the specified text file does not exist, then it will be created. The third argument mode, defines how the data will be written to the text file. If \*mode is set to “w”, then the data is written in “write” mode which means that it will overwrite all existing data on the text file. If mode is set to any other value then the data will be written in “append” mode which means that the data will be added at the end of the text file.
+This function will write data to that file. If the specified file does not exist, then it will be created. The third argument mode defines how the data will be written to the file. If mode is set to “w”, then the data is written in “write” mode which means that it will overwrite all existing data on the file. If mode is set to any other value then the data will be written in “append” mode which means that the data will be added at the end of the file.
 

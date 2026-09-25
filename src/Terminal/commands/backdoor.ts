@@ -1,41 +1,41 @@
-import { ITerminal } from "../ITerminal";
-import { IRouter } from "../../ui/Router";
-import { IPlayer } from "../../PersonObjects/IPlayer";
+import { Terminal } from "../../Terminal";
+import { Player } from "@player";
 import { BaseServer } from "../../Server/BaseServer";
 import { Server } from "../../Server/Server";
-import { HacknetServer } from "../../Hacknet/HacknetServer";
+import { DarknetServer } from "../../Server/DarknetServer";
 
-export function backdoor(
-  terminal: ITerminal,
-  router: IRouter,
-  player: IPlayer,
-  server: BaseServer,
-  args: (string | number | boolean)[],
-): void {
+export function backdoor(args: (string | number | boolean)[], server: BaseServer): void {
   if (args.length !== 0) {
-    terminal.error("Incorrect usage of backdoor command. Usage: backdoor");
+    Terminal.error("Incorrect usage of backdoor command. Usage: backdoor");
     return;
   }
 
-  if (!(server instanceof Server)) {
-    terminal.error("Can only backdoor normal servers");
+  if (!(server instanceof Server) && !(server instanceof DarknetServer)) {
+    Terminal.error("Can only install a backdoor on normal servers");
+    return;
+  }
+  if (server.purchasedByPlayer) {
+    Terminal.error(
+      "Cannot install a backdoor on your own machines! You are currently connected to your home PC or one of your cloud servers.",
+    );
+    return;
+  }
+  if (!server.hasAdminRights) {
+    Terminal.error("You do not have admin rights for this machine!");
+    return;
+  }
+  if (server.requiredHackingSkill && server.requiredHackingSkill > Player.skills.hacking) {
+    Terminal.error(
+      "Your hacking skill is not high enough to install a backdoor on this machine. Try analyzing the machine to determine the required hacking skill.",
+    );
+    return;
   }
 
-  const normalServer = server as Server;
-
-  if (normalServer.purchasedByPlayer) {
-    terminal.error(
-      "Cannot use backdoor on your own machines! You are currently connected to your home PC or one of your purchased servers",
+  if (server.backdoorInstalled) {
+    Terminal.warn(
+      `You have already installed a backdoor on this server. You can check the "Backdoor" status via the "analyze" command.`,
     );
-  } else if (!normalServer.hasAdminRights) {
-    terminal.error("You do not have admin rights for this machine! Cannot backdoor");
-  } else if (normalServer.requiredHackingSkill > player.hacking) {
-    terminal.error(
-      "Your hacking skill is not high enough to use backdoor on this machine. Try analyzing the machine to determine the required hacking skill",
-    );
-  } else if (normalServer instanceof HacknetServer) {
-    terminal.error("Cannot use backdoor on this type of Server");
-  } else {
-    terminal.startBackdoor(player);
   }
+
+  Terminal.startBackdoor();
 }

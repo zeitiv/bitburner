@@ -6,14 +6,14 @@
 
 Terminates the current script immediately.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-exit(): void;
+exit(): never;
 ```
-<b>Returns:</b>
+**Returns:**
 
-void
+never
 
 ## Remarks
 

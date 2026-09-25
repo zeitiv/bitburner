@@ -2,23 +2,23 @@
 
 [Home](./index.md) &gt; [bitburner](./bitburner.md) &gt; [SleeveTask](./bitburner.sleevetask.md)
 
-## SleeveTask interface
+## SleeveTask type
 
 Object representing a sleeve current task.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-export interface SleeveTask 
+export type SleeveTask =
+  | SleeveBladeburnerTask
+  | SleeveClassTask
+  | SleeveCompanyTask
+  | SleeveCrimeTask
+  | SleeveFactionTask
+  | SleeveInfiltrateTask
+  | SleeveRecoveryTask
+  | SleeveSupportTask
+  | SleeveSynchroTask;
 ```
-
-## Properties
-
-|  Property | Type | Description |
-|  --- | --- | --- |
-|  [crime](./bitburner.sleevetask.crime.md) | string | Crime currently attempting, if any |
-|  [factionWorkType](./bitburner.sleevetask.factionworktype.md) | string | Faction work type being performed, if any |
-|  [gymStatType](./bitburner.sleevetask.gymstattype.md) | string | Stat being trained at the gym, if any |
-|  [location](./bitburner.sleevetask.location.md) | string | Location of the task, if any |
-|  [task](./bitburner.sleevetask.task.md) | string | Task type |
+**References:** [SleeveBladeburnerTask](./bitburner.sleevebladeburnertask.md)<!-- -->, [SleeveClassTask](./bitburner.sleeveclasstask.md)<!-- -->, [SleeveCompanyTask](./bitburner.sleevecompanytask.md)<!-- -->, [SleeveCrimeTask](./bitburner.sleevecrimetask.md)<!-- -->, [SleeveFactionTask](./bitburner.sleevefactiontask.md)<!-- -->, [SleeveInfiltrateTask](./bitburner.sleeveinfiltratetask.md)<!-- -->, [SleeveRecoveryTask](./bitburner.sleeverecoverytask.md)<!-- -->, [SleeveSupportTask](./bitburner.sleevesupporttask.md)<!-- -->, [SleeveSynchroTask](./bitburner.sleevesynchrotask.md)
 

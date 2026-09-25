@@ -4,21 +4,51 @@
 
 ## NS.hasRootAccess() method
 
-Check if your have root access on a server.
+Check if you have root access on a server.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-hasRootAccess(host: string): boolean;
+hasRootAccess(host?: string): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  host | string | Host of the target server |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+host
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Hostname/IP of the target server. Optional. Defaults to current server if not provided.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 boolean
 
@@ -30,23 +60,12 @@ RAM cost: 0.05 GB
 
 Returns a boolean indicating whether or not the player has root access to the specified target server.
 
-## Example 1
+## Example
 
 
-```ts
-// NS1:
-if (hasRootAccess("foodnstuff") == false) {
-   nuke("foodnstuff");
-}
-```
-
-## Example 2
-
-
-```ts
-// NS2:
-if (ns.hasRootAccess("foodnstuff") == false) {
-   ns.nuke("foodnstuff");
+```js
+if (!ns.hasRootAccess("foodnstuff")) {
+  ns.nuke("foodnstuff");
 }
 ```
 

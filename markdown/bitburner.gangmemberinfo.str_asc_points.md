@@ -4,7 +4,9 @@
 
 ## GangMemberInfo.str\_asc\_points property
 
-<b>Signature:</b>
+Total Strength Ascension points accumulated
+
+**Signature:**
 
 ```typescript
 str_asc_points: number;

@@ -4,14 +4,14 @@
 
 ## Bladeburner.getStamina() method
 
-Get bladeburner stamina.
+Get Bladeburner stamina.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 getStamina(): [number, number];
 ```
-<b>Returns:</b>
+**Returns:**
 
 \[number, number\]
 
@@ -19,24 +19,14 @@ Array containing current stamina and max stamina.
 
 ## Remarks
 
-RAM cost: 4 GB Returns an array with two elements: \* \[Current stamina, Max stamina\]
+RAM cost: 4 GB
 
-## Example 1
+Returns an array with two elements: \[Current stamina, Max stamina\]
 
-
-```ts
-// NS1:
-function getStaminaPercentage() {
-   var res = bladeburner.getStamina();
-   return res[0] / res[1];
-}
-```
-
-## Example 2
+## Example
 
 
-```ts
-// NS2:
+```js
 function getStaminaPercentage() {
    const [current, max] = ns.bladeburner.getStamina();
    return current / max;

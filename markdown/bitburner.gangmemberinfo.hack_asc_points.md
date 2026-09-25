@@ -4,7 +4,9 @@
 
 ## GangMemberInfo.hack\_asc\_points property
 
-<b>Signature:</b>
+Total Hack Ascension points accumulated
+
+**Signature:**
 
 ```typescript
 hack_asc_points: number;

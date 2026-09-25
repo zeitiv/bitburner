@@ -1,29 +1,24 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 
-import { IPlayer } from "../PersonObjects/IPlayer";
+import Button from "@mui/material/Button";
+import Typography from "@mui/material/Typography";
 import { Money } from "../ui/React/Money";
-import { win, reachedLimit } from "./Game";
+import { BetInput } from "./BetInput";
+import { hasEnoughMoney, reachedLimit, win } from "./Game";
 import { WHRNG } from "./RNG";
 import { trusted } from "./utils";
-import Typography from "@mui/material/Typography";
-import Button from "@mui/material/Button";
-import TextField from "@mui/material/TextField";
 
-type IProps = {
-  p: IPlayer;
-};
-
-const minPlay = 0;
-const maxPlay = 1e7;
+const initialBet = 1000;
+const maxBet = 1e7;
 
 function isRed(n: number): boolean {
   return [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36].includes(n);
 }
 
-type Strategy = {
+interface Strategy {
   match: (n: number) => boolean;
   payout: number;
-};
+}
 
 const redNumbers: number[] = [1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36];
 
@@ -111,9 +106,9 @@ function Single(s: number): Strategy {
   };
 }
 
-export function Roulette(props: IProps): React.ReactElement {
+export function Roulette(): React.ReactElement {
   const [rng] = useState(new WHRNG(new Date().getTime()));
-  const [investment, setInvestment] = useState(1000);
+  const [investment, setInvestment] = useState(initialBet);
   const [canPlay, setCanPlay] = useState(true);
   const [status, setStatus] = useState<string | JSX.Element>("waiting");
   const [n, setN] = useState(0);
@@ -130,20 +125,6 @@ export function Roulette(props: IProps): React.ReactElement {
     }
   }
 
-  function updateInvestment(e: React.ChangeEvent<HTMLInputElement>): void {
-    let investment: number = parseInt(e.currentTarget.value);
-    if (isNaN(investment)) {
-      investment = minPlay;
-    }
-    if (investment > maxPlay) {
-      investment = maxPlay;
-    }
-    if (investment < minPlay) {
-      investment = minPlay;
-    }
-    setInvestment(investment);
-  }
-
   function currentNumber(): string {
     if (n === 0) return "0";
     const color = isRed(n) ? "R" : "B";
@@ -151,7 +132,9 @@ export function Roulette(props: IProps): React.ReactElement {
   }
 
   function play(strategy: Strategy): void {
-    if (reachedLimit(props.p)) return;
+    if (reachedLimit() || !hasEnoughMoney(investment)) {
+      return;
+    }
 
     setCanPlay(false);
     setLock(false);
@@ -164,9 +147,9 @@ export function Roulette(props: IProps): React.ReactElement {
       let playerWin = strategy.match(n);
       // oh yeah, the house straight up cheats. Try finding the seed now!
       if (playerWin && Math.random() > 0.9) {
-        playerWin = false;
-        while (strategy.match(n)) {
-          n = (n + 1) % 36;
+        while (playerWin) {
+          n = Math.floor(rng.random() * 37);
+          playerWin = strategy.match(n);
         }
       }
       if (playerWin) {
@@ -184,21 +167,26 @@ export function Roulette(props: IProps): React.ReactElement {
           </>
         );
       }
-      win(props.p, gain);
+      win(gain);
 
       setCanPlay(true);
       setLock(true);
       setStatus(status);
       setN(n);
-
-      reachedLimit(props.p);
     }, 1600);
   }
 
   return (
     <>
       <Typography variant="h4">{currentNumber()}</Typography>
-      <TextField type="number" onChange={updateInvestment} placeholder={"Amount to play"} disabled={!canPlay} />
+      <BetInput
+        initialBet={initialBet}
+        maxBet={maxBet}
+        gameInProgress={!canPlay}
+        setBet={(bet) => {
+          setInvestment(bet);
+        }}
+      />
       <Typography variant="h4">{status}</Typography>
       <table>
         <tbody>

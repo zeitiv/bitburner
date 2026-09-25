@@ -4,9 +4,9 @@
 
 ## CorporationInfo.issuedShares property
 
-Amount of shares issued
+Amount of shares owned by public traders. Available for CEO buyback.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 issuedShares: number;

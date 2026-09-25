@@ -4,9 +4,9 @@
 
 ## NS.ui property
 
-Namespace for user interface functions. RAM cost: 0 GB
+Namespace for [user interface](./bitburner.userinterface.md) functions.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 readonly ui: UserInterface;

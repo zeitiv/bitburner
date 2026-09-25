@@ -5,22 +5,18 @@ import { ThemeEvents } from "./Theme";
 import { Settings } from "../../Settings/Settings";
 import { getPredefinedThemes, IPredefinedTheme } from "../Themes";
 import { Box, ButtonGroup, Button } from "@mui/material";
-import { IRouter } from "../../ui/Router";
 import { ThemeEditorButton } from "./ThemeEditorButton";
 import { StyleEditorButton } from "./StyleEditorButton";
 import { ThemeEntry } from "./ThemeEntry";
 import { ThemeCollaborate } from "./ThemeCollaborate";
 import { Modal } from "../../ui/React/Modal";
 import { SnackbarEvents } from "../../ui/React/Snackbar";
-
-interface IProps {
-  router: IRouter;
-}
+import { ToastVariant } from "@enums";
 
 // Everything dies when the theme gets reloaded, so we'll keep the current scroll to not jump around.
 let previousScrollY = 0;
 
-export function ThemeBrowser({ router }: IProps): React.ReactElement {
+export function ThemeBrowser(): React.ReactElement {
   const [modalOpen, setModalOpen] = useState(false);
   const [modalImageSrc, setModalImageSrc] = useState<string | undefined>();
   const predefinedThemes = getPredefinedThemes();
@@ -54,7 +50,7 @@ export function ThemeBrowser({ router }: IProps): React.ReactElement {
           UNDO
         </Button>
       </>,
-      "info",
+      ToastVariant.INFO,
       30000,
     );
   }
@@ -80,7 +76,7 @@ export function ThemeBrowser({ router }: IProps): React.ReactElement {
       <Paper sx={{ px: 2, py: 1, my: 1 }}>
         <ThemeCollaborate />
         <ButtonGroup sx={{ mb: 2, display: "block" }}>
-          <ThemeEditorButton router={router} />
+          <ThemeEditorButton />
           <StyleEditorButton />
         </ButtonGroup>
         <Box sx={{ display: "flex", flexWrap: "wrap" }}>{themes}</Box>

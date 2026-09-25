@@ -1,115 +1,144 @@
-import { INetscriptHelper } from "./INetscriptHelper";
-import { WorkerScript } from "../Netscript/WorkerScript";
-import { IPlayer } from "../PersonObjects/IPlayer";
-import { getRamCost } from "../Netscript/RamCostGenerator";
-import { is2DArray } from "../utils/helpers/is2DArray";
-import { CodingContract } from "../CodingContracts";
-import { CodingContract as ICodingContract } from "../ScriptEditor/NetscriptDefinitions";
+import { Player } from "@player";
+import { CodingContract, CodingContractResult } from "../CodingContract/Contract";
+import { CodingContractObject, CodingContract as ICodingContract } from "@nsdefs";
+import { InternalAPI, NetscriptContext } from "../Netscript/APIWrapper";
+import { helpers } from "../Netscript/NetscriptHelpers";
+import { CodingContractName } from "@enums";
+import { generateDummyContract } from "../CodingContract/ContractGenerator";
+import { type BaseServer } from "../Server/BaseServer";
+import { exceptionAlert } from "../utils/helpers/exceptionAlert";
+import { getEnumHelper } from "../utils/EnumHelper";
 
-export function NetscriptCodingContract(
-  player: IPlayer,
-  workerScript: WorkerScript,
-  helper: INetscriptHelper,
-): ICodingContract {
-  const getCodingContract = function (func: any, hostname: any, filename: any): CodingContract {
-    const server = helper.getServer(hostname, func);
-    const contract = server.getContract(filename);
-    if (contract == null) {
-      throw helper.makeRuntimeErrorMsg(
-        `codingcontract.${func}`,
-        `Cannot find contract '${filename}' on server '${hostname}'`,
-      );
+export function NetscriptCodingContract(): InternalAPI<ICodingContract> {
+  const getCodingContract = function (
+    ctx: NetscriptContext,
+    _host: unknown,
+    filename: string,
+  ): [CodingContract, BaseServer] {
+    const [server, host] = helpers.getServer(ctx, _host);
+    const contract = server?.getContract(filename);
+    if (server == null || contract == null) {
+      throw helpers.errorMessage(ctx, `Cannot find contract '${filename}' on server '${host}'`);
     }
 
-    return contract;
+    return [contract, server];
   };
 
-  return {
-    attempt: function (
-      answer: any,
-      filename: any,
-      hostname: any = workerScript.hostname,
-      { returnReward }: any = {},
-    ): boolean | string {
-      helper.updateDynamicRam("attempt", getRamCost(player, "codingcontract", "attempt"));
-      const contract = getCodingContract("attempt", hostname, filename);
+  function attemptContract(
+    ctx: NetscriptContext,
+    server: BaseServer,
+    contract: CodingContract,
+    answer: unknown,
+  ): string {
+    const validationResult = contract.isValid(answer);
+    if (!validationResult.success) {
+      throw helpers.errorMessage(ctx, validationResult.message);
+    }
 
-      // Convert answer to string. If the answer is a 2D array, then we have to
-      // manually add brackets for the inner arrays
-      if (is2DArray(answer)) {
-        const answerComponents = [];
-        for (let i = 0; i < answer.length; ++i) {
-          answerComponents.push(["[", answer[i].toString(), "]"].join(""));
-        }
-
-        answer = answerComponents.join(",");
-      } else {
-        answer = String(answer);
+    const resultOfCheckingSolution = contract.isSolution(answer);
+    switch (resultOfCheckingSolution.result) {
+      case CodingContractResult.Success: {
+        const reward = Player.gainCodingContractReward(
+          contract.reward,
+          contract.getDifficulty(),
+          contract.rewardScaling,
+        );
+        helpers.log(ctx, () => `Successfully completed Coding Contract '${contract.fn}'. Reward: ${reward}`);
+        server.removeContract(contract.fn);
+        return reward;
       }
-
-      const creward = contract.reward;
-      if (creward === null) throw new Error("Somehow solved a contract that didn't have a reward");
-
-      const serv = helper.getServer(hostname, "codingcontract.attempt");
-      if (contract.isSolution(answer)) {
-        const reward = player.gainCodingContractReward(creward, contract.getDifficulty());
-        workerScript.log("codingcontract.attempt", () => `Successfully completed Coding Contract '${filename}'. Reward: ${reward}`);
-        serv.removeContract(filename);
-        return returnReward ? reward : true;
-      } else {
-        ++contract.tries;
-        if (contract.tries >= contract.getMaxNumTries()) {
-          workerScript.log(
-            "codingcontract.attempt",
-            () => `Coding Contract attempt '${filename}' failed. Contract is now self-destructing`,
-          );
-          serv.removeContract(filename);
+      /**
+       * This should never happen. If the answer format is invalid, it should already be handled by the call to
+       * contract.isValid() above.
+       */
+      case CodingContractResult.InvalidFormat: {
+        exceptionAlert(
+          new Error(
+            `contract.isSolution() returns unexpected InvalidFormat result. Type: ${contract.type}. Answer: ${answer}`,
+          ),
+          true,
+        );
+        return "";
+      }
+      case CodingContractResult.Failure: {
+        if (++contract.tries >= contract.getMaxNumTries()) {
+          helpers.log(ctx, () => `Coding Contract attempt '${contract.fn}' failed. Contract is now self-destructing`);
+          const solution = contract.getAnswer();
+          if (solution !== null) {
+            helpers.log(ctx, () => `Coding Contract solution was: ${solution}`);
+          }
+          server.removeContract(contract.fn);
         } else {
-          workerScript.log(
-            "codingcontract.attempt",
+          helpers.log(
+            ctx,
             () =>
-              `Coding Contract attempt '${filename}' failed. ${contract.getMaxNumTries() - contract.tries
-              } attempts remaining.`,
+              `Coding Contract attempt '${contract.fn}' failed. ${
+                contract.getMaxNumTries() - contract.tries
+              } attempt(s) remaining.`,
           );
         }
-
-        return returnReward ? "" : false;
+        return "";
       }
+      default: {
+        const __: never = resultOfCheckingSolution.result;
+      }
+    }
+    return "";
+  }
+
+  return {
+    attempt: (ctx) => (answer, _filename, _host?) => {
+      const filename = helpers.string(ctx, "filename", _filename);
+      const [contract, server] = getCodingContract(ctx, _host, filename);
+      return attemptContract(ctx, server, contract, answer);
     },
-    getContractType: function (filename: any, hostname: any = workerScript.hostname): string {
-      helper.updateDynamicRam("getContractType", getRamCost(player, "codingcontract", "getContractType"));
-      const contract = getCodingContract("getContractType", hostname, filename);
+    getContractType: (ctx) => (_filename, _host?) => {
+      const filename = helpers.string(ctx, "filename", _filename);
+      const [contract] = getCodingContract(ctx, _host, filename);
       return contract.getType();
     },
-    getData: function (filename: any, hostname: any = workerScript.hostname): any {
-      helper.updateDynamicRam("getData", getRamCost(player, "codingcontract", "getData"));
-      const contract = getCodingContract("getData", hostname, filename);
-      const data = contract.getData();
-      if (data.constructor === Array) {
-        // For two dimensional arrays, we have to copy the internal arrays using
-        // slice() as well. As of right now, no contract has arrays that have
-        // more than two dimensions
-        const copy = data.slice();
-        for (let i = 0; i < copy.length; ++i) {
-          if (data[i].constructor === Array) {
-            copy[i] = data[i].slice();
-          }
-        }
-
-        return copy;
-      } else {
-        return data;
-      }
+    getData: (ctx) => (_filename, _host?) => {
+      const filename = helpers.string(ctx, "filename", _filename);
+      const [contract] = getCodingContract(ctx, _host, filename);
+      return structuredClone(contract.getData());
     },
-    getDescription: function (filename: any, hostname: any = workerScript.hostname): string {
-      helper.updateDynamicRam("getDescription", getRamCost(player, "codingcontract", "getDescription"));
-      const contract = getCodingContract("getDescription", hostname, filename);
+    getContract: (ctx) => (_filename, _host?) => {
+      const filename = helpers.string(ctx, "filename", _filename);
+      const [contract, server] = getCodingContract(ctx, _host, filename);
+      // asserting type here is required, since it is not feasible to properly type getData
+      return {
+        type: contract.type,
+        data: structuredClone(contract.getData()),
+        submit: (answer: unknown) => {
+          helpers.checkEnvFlags(ctx);
+          return attemptContract(ctx, server, contract, answer);
+        },
+        description: contract.getDescription(),
+        difficulty: contract.getDifficulty(),
+        numTriesRemaining: () => {
+          helpers.checkEnvFlags(ctx);
+          return contract.getMaxNumTries() - contract.tries;
+        },
+      } as CodingContractObject;
+    },
+    getDescription: (ctx) => (_filename, _host?) => {
+      const filename = helpers.string(ctx, "filename", _filename);
+      const [contract] = getCodingContract(ctx, _host, filename);
       return contract.getDescription();
     },
-    getNumTriesRemaining: function (filename: any, hostname: any = workerScript.hostname): number {
-      helper.updateDynamicRam("getNumTriesRemaining", getRamCost(player, "codingcontract", "getNumTriesRemaining"));
-      const contract = getCodingContract("getNumTriesRemaining", hostname, filename);
+    getNumTriesRemaining: (ctx) => (_filename, _host?) => {
+      const filename = helpers.string(ctx, "filename", _filename);
+      const [contract] = getCodingContract(ctx, _host, filename);
       return contract.getMaxNumTries() - contract.tries;
     },
+    createDummyContract: (ctx) => (_type, _host?) => {
+      const type = getEnumHelper("CodingContractName").nsGetMember(ctx, _type);
+      const [server] = helpers.getServer(ctx, _host);
+      if (server == null) {
+        return null;
+      }
+      return generateDummyContract(type, server);
+    },
+    getContractTypes: () => () => Object.values(CodingContractName),
   };
 }

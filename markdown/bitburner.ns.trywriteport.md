@@ -6,22 +6,67 @@
 
 Attempt to write to a port.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-tryWritePort(port: number, data: string[] | number): Promise<boolean>;
+tryWritePort(portNumber: number, data: any): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  port | number | Port or text file that will be written to. |
-|  data | string\[\] \| number | Data to write. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
 
-Promise&lt;boolean&gt;
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+portNumber
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Port to attempt to write to. Must be a positive integer.
+
+
+</td></tr>
+<tr><td>
+
+data
+
+
+</td><td>
+
+any
+
+
+</td><td>
+
+Data to write, it's cloned with structuredClone().
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
+
+boolean
 
 True if the data is successfully written to the port, and false otherwise.
 
@@ -29,5 +74,5 @@ True if the data is successfully written to the port, and false otherwise.
 
 RAM cost: 0 GB
 
-Attempts to write data to the specified Netscript Port. If the port is full, the data will not be written. Otherwise, the data will be written normally.
+Attempts to write data to the specified Netscript port. If the port is full, the data will not be written. Otherwise, the data will be written normally. Ports are shared across all hosts and contents are reset on game restart.
 

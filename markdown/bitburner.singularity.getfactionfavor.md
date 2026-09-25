@@ -6,19 +6,49 @@
 
 Get faction favor.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getFactionFavor(faction: string): number;
+getFactionFavor(faction: FactionName): number;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  faction | string | Name of faction. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+faction
+
+
+</td><td>
+
+[FactionName](./bitburner.factionname.md)
+
+
+</td><td>
+
+Name of faction.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 

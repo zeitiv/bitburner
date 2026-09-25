@@ -6,20 +6,65 @@
 
 Set a sleeve to commit crime.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-setToCommitCrime(sleeveNumber: number, name: string): boolean;
+setToCommitCrime(sleeveNumber: number, crimeType: CrimeType): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  sleeveNumber | number | Index of the sleeve to start commiting crime. |
-|  name | string | Name of the crime. Must be an exact match. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+sleeveNumber
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Index of the sleeve to start committing crime. Sleeves are numbered starting from 0.
+
+
+</td></tr>
+<tr><td>
+
+crimeType
+
+
+</td><td>
+
+[CrimeType](./bitburner.crimetype.md)
+
+
+</td><td>
+
+Name of the crime.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 boolean
 
@@ -29,7 +74,17 @@ True if this action was set successfully, false otherwise.
 
 RAM cost: 4 GB
 
-Return a boolean indicating whether or not this action was set successfully.
+Return a boolean indicating whether or not this action was set successfully (false if an invalid action is specified).
 
-Returns false if an invalid action is specified.
+## Example
+
+
+```js
+// Assigns the first sleeve to Homicide.
+ns.sleeve.setToCommitCrime(0, "Homicide");
+
+// Assigns the second sleeve to Grand Theft Auto, using enum
+const crimes = ns.enums.CrimeType;
+ns.sleeve.setToCommitCrime(1, crimes.grandTheftAuto);
+```
 

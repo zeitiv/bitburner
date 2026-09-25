@@ -6,27 +6,57 @@
 
 Read data from a port.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-readPort(port: number): any;
+readPort(portNumber: number): any;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  port | number |  |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+portNumber
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Port to read from. Must be a positive integer.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 any
 
-the data read.
+The data read.
 
 ## Remarks
 
 RAM cost: 0 GB
 
-Read data from that port. A port is a serialized queue. This function will remove the first element from that queue and return it. If the queue is empty, then the string “NULL PORT DATA” will be returned.
+Read data from that port. A port is a serialized queue. This function will remove the first element from that queue and return it. If the queue is empty, then the string “NULL PORT DATA” will be returned. Ports are shared across all hosts and contents are reset on game restart.
 

@@ -4,7 +4,9 @@
 
 ## GangMemberInfo.agi\_asc\_points property
 
-<b>Signature:</b>
+Total Agility Ascension points accumulated
+
+**Signature:**
 
 ```typescript
 agi_asc_points: number;

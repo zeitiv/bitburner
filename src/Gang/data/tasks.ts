@@ -1,29 +1,20 @@
 import { ITaskParams } from "../ITaskParams";
-/* tslint:disable:max-line-length */
 
 /**
  * Defines the parameters that can be used to initialize and describe a GangMemberTask
  * (defined in Gang.js)
  */
 interface IGangMemberTaskMetadata {
-  /**
-   * Description of the task
-   */
+  /** Description of the task */
   desc: string;
 
-  /**
-   * Whether or not this task is meant for Combat-type gangs
-   */
+  /** Whether or not this task is meant for Combat-type gangs */
   isCombat: boolean;
 
-  /**
-   * Whether or not this task is for Hacking-type gangs
-   */
+  /** Whether or not this task is for Hacking-type gangs */
   isHacking: boolean;
 
-  /**
-   * Name of the task
-   */
+  /** Name of the task */
   name: string;
 
   /**
@@ -282,7 +273,7 @@ export const gangMemberTasksMetadata: IGangMemberTaskMetadata[] = [
     },
   },
   {
-    desc: "Assign this gang member to threaten and black mail high-profile targets<br><br>Earns money - Slightly increases respect - Slightly increases wanted level",
+    desc: "Assign this gang member to threaten and blackmail high-profile targets<br><br>Earns money - Slightly increases respect - Slightly increases wanted level",
     isCombat: true,
     isHacking: false,
     name: "Threaten & Blackmail",
@@ -388,7 +379,7 @@ export const gangMemberTasksMetadata: IGangMemberTaskMetadata[] = [
     params: { chaWeight: 100, difficulty: 8 },
   },
   {
-    desc: "Assign this gang member to engage in territorial warfare with other gangs. Members assigned to this task will help increase your gang's territory and will defend your territory from being taken.",
+    desc: "Members assigned to this task increase your gang's power. They will also fight for territory if 'Territory Clashes' are enabled.<br /><br />Gang members performing this task can be killed during clashes.",
     isCombat: true,
     isHacking: true,
     name: "Territory Warfare",

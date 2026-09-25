@@ -1,22 +1,25 @@
+import type { Bladeburner } from "../Bladeburner";
+import type { BlackOperation } from "../Actions/BlackOperation";
+import type { Operation } from "../Actions/Operation";
+
 import React, { useState } from "react";
-import { Operation } from "../Operation";
-import { IBladeburner } from "../IBladeburner";
 import { TeamSizeModal } from "./TeamSizeModal";
-import { formatNumber } from "../../utils/StringHelperFunctions";
-import Button from "@mui/material/Button";
-interface IProps {
-  action: Operation;
-  bladeburner: IBladeburner;
+import { formatNumberNoSuffix } from "../../ui/formatNumber";
+import { Button } from "@mui/material";
+
+interface TeamSizeButtonProps {
+  action: Operation | BlackOperation;
+  bladeburner: Bladeburner;
 }
-export function TeamSizeButton(props: IProps): React.ReactElement {
+export function TeamSizeButton({ action, bladeburner }: TeamSizeButtonProps): React.ReactElement {
   const [open, setOpen] = useState(false);
 
   return (
     <>
-      <Button disabled={props.bladeburner.teamSize === 0} onClick={() => setOpen(true)}>
-        Set Team Size (Curr Size: {formatNumber(props.action.teamCount, 0)})
+      <Button style={{ marginLeft: "1rem" }} disabled={bladeburner.teamSize === 0} onClick={() => setOpen(true)}>
+        Set Team Size (Curr Size: {formatNumberNoSuffix(action.teamCount, 0)})
       </Button>
-      <TeamSizeModal open={open} onClose={() => setOpen(false)} action={props.action} bladeburner={props.bladeburner} />
+      <TeamSizeModal open={open} onClose={() => setOpen(false)} action={action} bladeburner={bladeburner} />
     </>
   );
 }

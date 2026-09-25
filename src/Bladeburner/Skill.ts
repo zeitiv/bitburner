@@ -1,162 +1,165 @@
-import { BitNodeMultipliers } from "../BitNode/BitNodeMultipliers";
+import type { BladeburnerMultName, BladeburnerSkillName } from "@enums";
 
-interface ISkillParams {
-  name: string;
+import { currentNodeMults } from "../BitNode/BitNodeMultipliers";
+import { Bladeburner } from "./Bladeburner";
+import { Availability } from "./Types";
+import { PositiveInteger, PositiveNumber, isPositiveInteger } from "../types";
+import { PartialRecord, getRecordEntries } from "../Types/Record";
+
+interface SkillParams {
+  name: BladeburnerSkillName;
   desc: string;
-
   baseCost?: number;
   costInc?: number;
   maxLvl?: number;
-
-  successChanceAll?: number;
-  successChanceStealth?: number;
-  successChanceKill?: number;
-  successChanceContract?: number;
-  successChanceOperation?: number;
-  successChanceEstimate?: number;
-
-  actionTime?: number;
-
-  effHack?: number;
-  effStr?: number;
-  effDef?: number;
-  effDex?: number;
-  effAgi?: number;
-  effCha?: number;
-
-  stamina?: number;
-  money?: number;
-  expGain?: number;
+  mults: PartialRecord<BladeburnerMultName, number>;
 }
 
 export class Skill {
-  name: string;
+  name: BladeburnerSkillName;
   desc: string;
   // Cost is in Skill Points
-  baseCost = 1;
+  baseCost: number;
   // Additive cost increase per level
-  costInc = 1;
-  maxLvl = 0;
+  costInc: number;
+  maxLvl: number;
+  mults: PartialRecord<BladeburnerMultName, number> = {};
 
-  /**
-   * These benefits are additive. So total multiplier will be level (handled externally) times the
-   * effects below
-   */
-  successChanceAll = 0;
-  successChanceStealth = 0;
-  successChanceKill = 0;
-  successChanceContract = 0;
-  successChanceOperation = 0;
-
-  /**
-   * This multiplier affects everything that increases synthoid population/community estimate
-   * e.g. Field analysis, Investigation Op, Undercover Op
-   */
-  successChanceEstimate = 0;
-  actionTime = 0;
-  effHack = 0;
-  effStr = 0;
-  effDef = 0;
-  effDex = 0;
-  effAgi = 0;
-  effCha = 0;
-  stamina = 0;
-  money = 0;
-  expGain = 0;
-
-  constructor(params: ISkillParams = { name: "foo", desc: "foo" }) {
-    if (!params.name) {
-      throw new Error("Failed to initialize Bladeburner Skill. No name was specified in ctor");
-    }
-    if (!params.desc) {
-      throw new Error("Failed to initialize Bladeburner Skills. No desc was specified in ctor");
-    }
+  constructor(params: SkillParams) {
     this.name = params.name;
     this.desc = params.desc;
-    this.baseCost = params.baseCost ? params.baseCost : 1;
-    this.costInc = params.costInc ? params.costInc : 1;
-
-    if (params.maxLvl) {
-      this.maxLvl = params.maxLvl;
-    }
-
-    if (params.successChanceAll) {
-      this.successChanceAll = params.successChanceAll;
-    }
-    if (params.successChanceStealth) {
-      this.successChanceStealth = params.successChanceStealth;
-    }
-    if (params.successChanceKill) {
-      this.successChanceKill = params.successChanceKill;
-    }
-    if (params.successChanceContract) {
-      this.successChanceContract = params.successChanceContract;
-    }
-    if (params.successChanceOperation) {
-      this.successChanceOperation = params.successChanceOperation;
-    }
-
-    if (params.successChanceEstimate) {
-      this.successChanceEstimate = params.successChanceEstimate;
-    }
-
-    if (params.actionTime) {
-      this.actionTime = params.actionTime;
-    }
-    if (params.effHack) {
-      this.effHack = params.effHack;
-    }
-    if (params.effStr) {
-      this.effStr = params.effStr;
-    }
-    if (params.effDef) {
-      this.effDef = params.effDef;
-    }
-    if (params.effDex) {
-      this.effDex = params.effDex;
-    }
-    if (params.effAgi) {
-      this.effAgi = params.effAgi;
-    }
-    if (params.effCha) {
-      this.effCha = params.effCha;
-    }
-
-    if (params.stamina) {
-      this.stamina = params.stamina;
-    }
-    if (params.money) {
-      this.money = params.money;
-    }
-    if (params.expGain) {
-      this.expGain = params.expGain;
-    }
+    this.baseCost = params.baseCost ?? 1;
+    this.costInc = params.costInc ?? 1;
+    this.maxLvl = params.maxLvl ?? Number.MAX_VALUE;
+    for (const [multName, mult] of getRecordEntries(params.mults)) this.mults[multName] = mult;
   }
 
-  calculateCost(currentLevel: number): number {
-    return Math.floor((this.baseCost + currentLevel * this.costInc) * BitNodeMultipliers.BladeburnerSkillCost);
+  calculateCost(currentLevel: number, count = 1 as PositiveInteger): number {
+    const actualCount = currentLevel + count - currentLevel;
+    /**
+     * The cost of the next level: (baseCost + currentLevel * costInc) * mult. The cost needs to be an integer, so we
+     * need to use Math.floor or Math.round.
+     *
+     * In order to calculate the cost of "count" levels, we need to run a loop. "count" can be a big number, so it's
+     * infeasible to calculate the cost in that way. We need to find the closed forms of:
+     *
+     * [1]:
+     * $$Cost = \sum_{i = CurrentLevel}^{CurrentLevel+Count-1}\lfloor ((BaseCost + i \ast CostInc) \ast Mult) \rfloor$$
+     *
+     * Or:
+     *
+     * [2]:
+     * $$Cost = \sum_{i = CurrentLevel}^{CurrentLevel+Count-1} \mathrm{Round}((BaseCost + i \ast CostInc) \ast Mult)$$
+     *
+     * It's really hard to find the closed forms of those two equations, so we switch to these equations:
+     *
+     * [3]:
+     * $$Cost = \lfloor\sum_{i = CurrentLevel}^{CurrentLevel+Count-1} ((BaseCost + i \ast CostInc) \ast Mult) \rfloor$$
+     *
+     * Or
+     *
+     * [4]:
+     * $$Cost = \mathrm{Round}(\sum_{i = CurrentLevel}^{CurrentLevel+Count-1} ((BaseCost + i \ast CostInc) \ast Mult))$$
+     *
+     * This means that we do the flooring/rounding at the end instead of each iterative step.
+     *
+     * [3] and [4] are not equivalent to [1] and [2] respectively, but it's much easier to find the close forms of [3]
+     * and [4] than [1] and [2]. After testing, we conclude that the cost calculated by [4] is a good approximation of
+     * [2], so we choose [4] to calculate the cost. In order to calculate the cost with a big "count", we accept the
+     * slight inaccuracy.
+     *
+     * The closed form of [4]:
+     *
+     * $$Cost = \mathrm{Round}(Count \ast Mult \ast (BaseCost + (CostInc \ast (CurrentLevel + \frac{Count - 1}{2}))))$$
+     *
+     */
+    return Math.round(
+      actualCount *
+        currentNodeMults.BladeburnerSkillCost *
+        (this.baseCost + this.costInc * (currentLevel + (actualCount - 1) / 2)),
+    );
   }
 
-  getMultiplier(name: string): number {
-    if (name === "successChanceAll") return this.successChanceAll;
-    if (name === "successChanceStealth") return this.successChanceStealth;
-    if (name === "successChanceKill") return this.successChanceKill;
-    if (name === "successChanceContract") return this.successChanceContract;
-    if (name === "successChanceOperation") return this.successChanceOperation;
-    if (name === "successChanceEstimate") return this.successChanceEstimate;
+  calculateMaxUpgradeCount(currentLevel: number, cost: PositiveNumber): number {
+    // At extreme levels, floating-point precision loss makes currentLevel + 1 === currentLevel,
+    // causing calculateCost to return 0. No upgrade is possible in this case.
+    if (this.calculateCost(currentLevel, 1 as PositiveInteger) <= 0) return 0;
+    /**
+     * Define:
+     * - x = count
+     * - a = currentNodeMults.BladeburnerSkillCost
+     * - b = this.baseCost
+     * - c = this.costInc
+     * - d = currentLevel
+     * - y = cost
+     *
+     * We have:
+     *
+     * $$ y = \mathrm{Round}(x \ast a \ast (b + c \ast (d + \frac{x - 1}{2})))$$
+     *
+     * To simplify the calculation, let's ignore the Math.round part:
+     *
+     * $$ y = x \ast a \ast (b + c \ast (d + \frac{x - 1}{2}))$$
+     *
+     * Solve for x in terms of y:
+     *
+     * Define:
+     *
+     * $$ m = -b - c \ast d + \frac{c}{2} $$
+     *
+     * $$ Delta = \sqrt{{m ^ 2} + \frac{2 \ast c \ast y}{a}} $$
+     *
+     * Solutions:
+     *
+     * $$ x_1 = \frac{m + Delta}{c} $$
+     *
+     * $$ x_2 = \frac{m - Delta}{c} $$
+     *
+     * $a$, $c$ and $y$ are always greater than 0, so $x_2$ is always less than 0. Therefore, $x_1$ is the only
+     * solution.
+     */
+    const m = -this.baseCost - this.costInc * currentLevel + this.costInc / 2;
+    const delta = Math.sqrt(m * m + (2 * this.costInc * cost) / currentNodeMults.BladeburnerSkillCost);
+    const result = Math.round((m + delta) / this.costInc);
+    /**
+     * Due to floating-point rounding and edge-cases, we cannot ensure that rounding x_1 will give us the correct
+     * integer. In other words, we cannot be sure that x_1 is within 0.5 of the integer value we want. However, we can
+     * be sure that it is within 1 of the value we want, which means that checking the numbers above and below the
+     * rounded value are sufficient to find our correct integer.
+     */
+    const costOfResultPlus1 = this.calculateCost(currentLevel, (result + 1) as PositiveInteger);
+    if (costOfResultPlus1 <= cost) {
+      return result + 1;
+    }
+    const costOfResult = this.calculateCost(currentLevel, result as PositiveInteger);
+    if (costOfResult <= cost) {
+      return result;
+    }
+    return result - 1;
+  }
 
-    if (name === "actionTime") return this.actionTime;
+  canUpgrade(bladeburner: Bladeburner, count = 1): Availability<{ actualCount: number; cost: number }> {
+    const currentLevel = bladeburner.skills[this.name] ?? 0;
+    const actualCount = currentLevel + count - currentLevel;
+    if (actualCount === 0) {
+      return {
+        error: `Cannot upgrade ${this.name}: Due to floating-point inaccuracy and the small value of specified "count", your skill cannot be upgraded.`,
+      };
+    }
+    if (!isPositiveInteger(actualCount)) {
+      return { error: `Invalid upgrade count ${actualCount}` };
+    }
+    if (currentLevel + actualCount > this.maxLvl) {
+      return { error: `Upgraded level ${currentLevel + actualCount} exceeds max` };
+    }
+    const cost = this.calculateCost(currentLevel, actualCount);
+    if (cost > bladeburner.skillPoints) {
+      return { error: `Insufficient skill points for upgrade` };
+    }
+    return { available: true, actualCount, cost };
+  }
 
-    if (name === "effHack") return this.effHack;
-    if (name === "effStr") return this.effStr;
-    if (name === "effDef") return this.effDef;
-    if (name === "effDex") return this.effDex;
-    if (name === "effAgi") return this.effAgi;
-    if (name === "effCha") return this.effCha;
-
-    if (name === "stamina") return this.stamina;
-    if (name === "money") return this.money;
-    if (name === "expGain") return this.expGain;
-    return 0;
+  getMultiplier(name: BladeburnerMultName): number {
+    return this.mults[name] ?? 0;
   }
 }

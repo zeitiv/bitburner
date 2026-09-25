@@ -4,7 +4,9 @@
 
 ## RunningScript.offlineMoneyMade property
 
-<b>Signature:</b>
+Total amount of money made by this script when offline
+
+**Signature:**
 
 ```typescript
 offlineMoneyMade: number;

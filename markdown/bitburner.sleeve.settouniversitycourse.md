@@ -6,21 +6,85 @@
 
 Set a sleeve to take a class at a university.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-setToUniversityCourse(sleeveNumber: number, university: string, className: string): boolean;
+setToUniversityCourse(
+    sleeveNumber: number,
+    universityName: UniversityLocationName,
+    courseName: UniversityClassType,
+  ): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  sleeveNumber | number | Index of the sleeve to start taking class. |
-|  university | string | Name of the university to attend. |
-|  className | string | Name of the class to follow. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+sleeveNumber
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Index of the sleeve to start taking class.
+
+
+</td></tr>
+<tr><td>
+
+universityName
+
+
+</td><td>
+
+[UniversityLocationName](./bitburner.universitylocationname.md)
+
+
+</td><td>
+
+Name of the university to attend.
+
+
+</td></tr>
+<tr><td>
+
+courseName
+
+
+</td><td>
+
+[UniversityClassType](./bitburner.universityclasstype.md)
+
+
+</td><td>
+
+Name of the course to follow.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 boolean
 

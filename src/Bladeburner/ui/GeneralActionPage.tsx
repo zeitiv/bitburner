@@ -1,19 +1,22 @@
-import * as React from "react";
-import { GeneralActionList } from "./GeneralActionList";
-import { IBladeburner } from "../IBladeburner";
-import { IPlayer } from "../../PersonObjects/IPlayer";
-import Typography from "@mui/material/Typography";
+import type { Bladeburner } from "../Bladeburner";
 
-interface IProps {
-  bladeburner: IBladeburner;
-  player: IPlayer;
+import * as React from "react";
+import { Typography } from "@mui/material";
+import { GeneralActionElem } from "./GeneralActionElem";
+import { GeneralActions } from "../data/GeneralActions";
+
+interface GeneralActionPageProps {
+  bladeburner: Bladeburner;
 }
 
-export function GeneralActionPage(props: IProps): React.ReactElement {
+export function GeneralActionPage({ bladeburner }: GeneralActionPageProps): React.ReactElement {
+  const actions = Object.values(GeneralActions);
   return (
     <>
       <Typography>These are generic actions that will assist you in your Bladeburner duties.</Typography>
-      <GeneralActionList bladeburner={props.bladeburner} player={props.player} />
+      {actions.map((action) => (
+        <GeneralActionElem key={action.name} bladeburner={bladeburner} action={action} />
+      ))}
     </>
   );
 }

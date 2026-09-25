@@ -6,29 +6,89 @@
 
 Get general info about a running script.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getRunningScript(filename?: FilenameOrPID, hostname?: string, ...args: (string | number)[]): RunningScript;
+getRunningScript(filename?: FilenameOrPID, host?: string, ...args: ScriptArg[]): RunningScript | null;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  filename | [FilenameOrPID](./bitburner.filenameorpid.md) | Optional. Filename or PID of the script. |
-|  hostname | string | Optional. Name of host server the script is running on. |
-|  args | (string \| number)\[\] | Arguments to identify the script |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
 
-[RunningScript](./bitburner.runningscript.md)
 
-info about a running script
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+filename
+
+
+</td><td>
+
+[FilenameOrPID](./bitburner.filenameorpid.md)
+
+
+</td><td>
+
+_(Optional)_ Optional. Filename or PID of the script.
+
+
+</td></tr>
+<tr><td>
+
+host
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Hostname/IP of target server. Optional, defaults to the server the calling script is running on.
+
+
+</td></tr>
+<tr><td>
+
+args
+
+
+</td><td>
+
+[ScriptArg](./bitburner.scriptarg.md)<!-- -->\[\]
+
+
+</td><td>
+
+Arguments to specify/identify the script. Optional, when looking for scripts run without arguments.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
+
+[RunningScript](./bitburner.runningscript.md) \| null
+
+The info about the running script if found, and null otherwise.
 
 ## Remarks
 
 RAM cost: 0.3 GB
 
-Running with no args returns curent script. If you use a PID as the first parameter, the hostname and args parameters are unnecessary.
+Running with no args returns current script. If you use a PID as the first parameter, the host and args parameters are unnecessary. If host is omitted while filename is used as the first parameter, host defaults to the server the calling script is running on. Remember that a script is semi-uniquely identified by both its name and its arguments. (You can run multiple copies of scripts with the same arguments, but for the purposes of functions like this that check based on filename, the filename plus arguments forms the key.)
 

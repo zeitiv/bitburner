@@ -4,7 +4,7 @@
  */
 import * as React from "react";
 
-import { numeralWrapper } from "../numeralFormat";
+import { formatExp, formatThreads, formatRam } from "../formatNumber";
 
 import Table from "@mui/material/Table";
 import TableCell from "@mui/material/TableCell";
@@ -18,34 +18,34 @@ import IconButton from "@mui/material/IconButton";
 import DeleteIcon from "@mui/icons-material/Delete";
 import ListItemButton from "@mui/material/ListItemButton";
 import ListItemText from "@mui/material/ListItemText";
-import makeStyles from "@mui/styles/makeStyles";
+import { makeStyles } from "tss-react/mui";
 
 import Collapse from "@mui/material/Collapse";
 import ExpandLess from "@mui/icons-material/ExpandLess";
 import ExpandMore from "@mui/icons-material/ExpandMore";
 
-import { killWorkerScript } from "../../Netscript/killWorkerScript";
+import { killWorkerScriptByPid } from "../../Netscript/killWorkerScript";
 import { WorkerScript } from "../../Netscript/WorkerScript";
 
 import { dialogBoxCreate } from "../React/DialogBox";
 import { LogBoxEvents } from "../React/LogBoxManager";
 import { convertTimeMsToTimeElapsedString } from "../../utils/StringHelperFunctions";
-import { arrayToString } from "../../utils/helpers/arrayToString";
+import { arrayToString } from "../../utils/helpers/ArrayHelpers";
 import { Money } from "../React/Money";
 import { MoneyRate } from "../React/MoneyRate";
 
-const useStyles = makeStyles({
+const useStyles = makeStyles()({
   noborder: {
     borderBottom: "none",
   },
 });
 
-type IProps = {
+interface IProps {
   workerScript: WorkerScript;
-};
+}
 
 export function WorkerScriptAccordion(props: IProps): React.ReactElement {
-  const classes = useStyles();
+  const { classes } = useStyles();
   const [open, setOpen] = React.useState(false);
   const workerScript = props.workerScript;
   const scriptRef = workerScript.scriptRef;
@@ -53,11 +53,10 @@ export function WorkerScriptAccordion(props: IProps): React.ReactElement {
   function logClickHandler(): void {
     LogBoxEvents.emit(scriptRef);
   }
-  const killScript = killWorkerScript.bind(null, scriptRef as any, scriptRef.server);
+  const killScript = killWorkerScriptByPid.bind(null, scriptRef.pid);
 
   function killScriptClickHandler(): void {
-    killScript();
-    dialogBoxCreate("Killing script");
+    if (killScript()) dialogBoxCreate("Killing script");
   }
 
   // Calculations for script stats
@@ -67,7 +66,14 @@ export function WorkerScriptAccordion(props: IProps): React.ReactElement {
   return (
     <>
       <ListItemButton onClick={() => setOpen((old) => !old)} component={Paper}>
-        <ListItemText primary={<Typography>└ {props.workerScript.name} {JSON.stringify(props.workerScript.args)}</Typography>} />
+        <ListItemText
+          primary={
+            <Typography sx={{ overflowWrap: "break-word" }}>
+              └ {props.workerScript.name} ({formatRam(scriptRef.ramUsage * scriptRef.threads)}){" "}
+              {JSON.stringify(props.workerScript.args)}
+            </Typography>
+          }
+        />
         {open ? <ExpandLess color="primary" /> : <ExpandMore color="primary" />}
       </ListItemButton>
       <Collapse in={open} timeout={0} unmountOnExit>
@@ -79,12 +85,16 @@ export function WorkerScriptAccordion(props: IProps): React.ReactElement {
                   <Typography>└ Threads:</Typography>
                 </TableCell>
                 <TableCell className={classes.noborder}>
-                  <Typography>{numeralWrapper.formatThreads(props.workerScript.scriptRef.threads)}</Typography>
+                  <Typography>
+                    {formatThreads(scriptRef.threads)} {`(${formatRam(scriptRef.ramUsage)} each)`}
+                  </Typography>
                 </TableCell>
               </TableRow>
               <TableRow>
                 <TableCell className={classes.noborder} colSpan={2}>
-                  <Typography>└ Args: {arrayToString(props.workerScript.args)}</Typography>
+                  <Typography sx={{ overflowWrap: "anywhere" }}>
+                    └ Args: {arrayToString(props.workerScript.args)}
+                  </Typography>
                 </TableCell>
               </TableRow>
               <TableRow>
@@ -116,7 +126,7 @@ export function WorkerScriptAccordion(props: IProps): React.ReactElement {
               <TableRow>
                 <TableCell className={classes.noborder} colSpan={1} />
                 <TableCell className={classes.noborder} align="left">
-                  <Typography>&nbsp;{numeralWrapper.formatExp(scriptRef.onlineExpGained) + " hacking exp"}</Typography>
+                  <Typography>&nbsp;{formatExp(scriptRef.onlineExpGained) + " hacking exp"}</Typography>
                 </TableCell>
               </TableRow>
 
@@ -133,7 +143,7 @@ export function WorkerScriptAccordion(props: IProps): React.ReactElement {
               <TableRow>
                 <TableCell className={classes.noborder} colSpan={1} />
                 <TableCell className={classes.noborder} align="left">
-                  <Typography>&nbsp;{numeralWrapper.formatExp(onlineEps) + " hacking exp / sec"}</Typography>
+                  <Typography>&nbsp;{formatExp(onlineEps) + " hacking exp / sec"}</Typography>
                 </TableCell>
               </TableRow>
 
@@ -150,7 +160,7 @@ export function WorkerScriptAccordion(props: IProps): React.ReactElement {
               <TableRow>
                 <TableCell className={classes.noborder} colSpan={1} />
                 <TableCell className={classes.noborder} align="left">
-                  <Typography>&nbsp;{numeralWrapper.formatExp(scriptRef.offlineExpGained) + " hacking exp"}</Typography>
+                  <Typography>&nbsp;{formatExp(scriptRef.offlineExpGained) + " hacking exp"}</Typography>
                 </TableCell>
               </TableRow>
             </TableBody>

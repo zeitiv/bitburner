@@ -6,19 +6,49 @@
 
 Clear data from a port.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-clearPort(handle: number): void;
+clearPort(portNumber: number): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  handle | number | Port to clear. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+portNumber
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Port to clear data from. Must be a positive integer.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 void
 
@@ -26,5 +56,5 @@ void
 
 RAM cost: 0 GB
 
-Deleta all data from the underlying queue.
+Delete all data from the underlying queue.
 

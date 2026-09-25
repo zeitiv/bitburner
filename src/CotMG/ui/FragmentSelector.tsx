@@ -1,20 +1,20 @@
 import React, { useState } from "react";
-import { Fragments, Fragment, NoneFragment, DeleteFragment } from "../Fragment";
-import { FragmentType, Effect } from "../FragmentType";
-import { IStaneksGift } from "../IStaneksGift";
+import { Fragments, type Fragment } from "../Fragment";
+import { FragmentTypeEnum, Effect } from "../FragmentType";
+import { StaneksGift } from "../StaneksGift";
 import { FragmentPreview } from "./FragmentPreview";
-import { numeralWrapper } from "../../ui/numeralFormat";
+import { formatStaneksGiftPower } from "../../ui/formatNumber";
 
 import Select, { SelectChangeEvent } from "@mui/material/Select";
 import MenuItem from "@mui/material/MenuItem";
 import Typography from "@mui/material/Typography";
 import Box from "@mui/material/Box";
 
-type IOptionProps = {
-  gift: IStaneksGift;
+interface IOptionProps {
+  gift: StaneksGift;
   fragment: Fragment;
   selectFragment: (fragment: Fragment) => void;
-};
+}
 
 function FragmentOption(props: IOptionProps): React.ReactElement {
   const left = props.fragment.limit - props.gift.count(props.fragment);
@@ -28,16 +28,16 @@ function FragmentOption(props: IOptionProps): React.ReactElement {
           colorAt={(x, y) => {
             if (!props.fragment.fullAt(x, y, 0)) return "";
             if (left === 0) return "grey";
-            return props.fragment.type === FragmentType.Booster ? "blue" : "green";
+            return props.fragment.type === FragmentTypeEnum.Booster ? "blue" : "green";
           }}
         />
       </Box>
       <Typography>
-        {props.fragment.type === FragmentType.Booster
+        {props.fragment.type === FragmentTypeEnum.Booster
           ? `${props.fragment.power}x adjacent fragment power`
           : Effect(props.fragment.type)}
         <br />
-        power: {numeralWrapper.formatStaneksGiftPower(props.fragment.power)}
+        power: {formatStaneksGiftPower(props.fragment.power)}
         <br />
         {remaining}
       </Typography>
@@ -45,10 +45,21 @@ function FragmentOption(props: IOptionProps): React.ReactElement {
   );
 }
 
-type IProps = {
-  gift: IStaneksGift;
-  selectFragment: (fragment: Fragment) => void;
-};
+export interface UIFragment {
+  type: "None" | "Delete";
+}
+
+export function isUIFragment(fragment: object): fragment is UIFragment {
+  return "type" in fragment && (fragment.type === "None" || fragment.type === "Delete");
+}
+
+interface IProps {
+  gift: StaneksGift;
+  selectFragment: (fragment: UIFragment | Fragment) => void;
+}
+
+export const NoneFragment: UIFragment = { type: "None" };
+const DeleteFragment: UIFragment = { type: "Delete" };
 
 export function FragmentSelector(props: IProps): React.ReactElement {
   const [value, setValue] = useState<string | number>("None");

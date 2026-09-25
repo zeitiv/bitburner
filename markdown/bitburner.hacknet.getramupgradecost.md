@@ -6,30 +6,75 @@
 
 Calculate the cost of upgrading hacknet node RAM.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getRamUpgradeCost(index: number, n: number): number;
+getRamUpgradeCost(index: number, n?: number): number;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  index | number | Index/Identifier of Hacknet Node. |
-|  n | number | Number of times to upgrade RAM. Must be positive. Rounded to nearest integer. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+index
+
+
+</td><td>
 
 number
 
-Cost of upgrading the specified Hacknet Node's ram.
+
+</td><td>
+
+Index/Identifier of Hacknet Node.
+
+
+</td></tr>
+<tr><td>
+
+n
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Number of times to upgrade RAM. Must be positive. Will be rounded to the nearest integer. Defaults to 1 if not specified.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
+
+number
+
+Cost of upgrading the specified Hacknet Node's RAM.
 
 ## Remarks
 
-RAM cost: 0 GB
+RAM cost: 0.5 GB
 
 Returns the cost of upgrading the RAM of the specified Hacknet Node n times.
 
-If an invalid value for n is provided, then this function returns 0. If the specified Hacknet Node is already at max level, then Infinity is returned.
+If an invalid value for n is provided, then this function returns 0. If the specified Hacknet Node already has max RAM, then Infinity is returned.
 

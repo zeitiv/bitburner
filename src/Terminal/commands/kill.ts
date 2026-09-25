@@ -1,47 +1,51 @@
-import { ITerminal } from "../ITerminal";
-import { IRouter } from "../../ui/Router";
-import { IPlayer } from "../../PersonObjects/IPlayer";
-import { BaseServer } from "../../Server/BaseServer";
-import { killWorkerScript } from "../../Netscript/killWorkerScript";
+import { Terminal } from "../../Terminal";
+import { findRunningScripts } from "../../Script/ScriptHelpers";
+import { killWorkerScriptByPid } from "../../Netscript/killWorkerScript";
+import { hasScriptExtension } from "../../Paths/ScriptFilePath";
 
-export function kill(
-  terminal: ITerminal,
-  router: IRouter,
-  player: IPlayer,
-  server: BaseServer,
-  args: (string | number | boolean)[],
-): void {
+import type { BaseServer } from "../../Server/BaseServer";
+
+export function kill(args: (string | number | boolean)[], server: BaseServer): void {
   try {
-    if (args.length < 1) {
-      terminal.error("Incorrect usage of kill command. Usage: kill [scriptname] [arg1] [arg2]...");
-      return;
-    }
-    if (typeof args[0] === "boolean") {
+    if (args.length < 1 || typeof args[0] === "boolean") {
+      Terminal.error("Incorrect usage of kill command. Usage: kill [pid] or kill [scriptname] [arg1] [arg2]...");
       return;
     }
 
     // Kill by PID
     if (typeof args[0] === "number") {
       const pid = args[0];
-      const res = killWorkerScript(pid);
+      const res = killWorkerScriptByPid(pid);
       if (res) {
-        terminal.print(`Killing script with PID ${pid}`);
+        Terminal.print(`Killing script with PID ${pid}`);
       } else {
-        terminal.error(`Failed to kill script with PID ${pid}. No such script is running`);
+        Terminal.error(`Failed to kill script with PID ${pid}. No such script is running`);
       }
 
       return;
     }
 
-    const scriptName = terminal.getFilepath(args[0]);
-    const runningScript = server.getRunningScript(scriptName, args.slice(1));
-    if (runningScript == null) {
-      terminal.error("No such script is running. Nothing to kill");
+    const path = Terminal.getFilepath(args[0]);
+    if (!path) return Terminal.error(`Invalid filename: ${args[0]}`);
+    if (!hasScriptExtension(path)) return Terminal.error(`Invalid file extension. Kill can only be used on scripts.`);
+    const runningScripts = findRunningScripts(path, args.slice(1), server);
+    if (runningScripts === null) {
+      Terminal.error("No such script is running. Nothing to kill");
       return;
     }
-    killWorkerScript(runningScript, server.hostname, false);
-    terminal.print(`Killing ${scriptName}`);
-  } catch (e) {
-    terminal.error(e + "");
+    let killed = 0;
+    for (const pid of runningScripts.keys()) {
+      killed++;
+      if (killed < 5) {
+        Terminal.print(`Killing ${path} with pid ${pid}`);
+      }
+      killWorkerScriptByPid(pid);
+    }
+    if (killed >= 5) {
+      Terminal.print(`... killed ${killed} instances total`);
+    }
+  } catch (error) {
+    console.error(error);
+    Terminal.error(String(error));
   }
 }

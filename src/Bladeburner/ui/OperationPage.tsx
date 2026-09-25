@@ -1,15 +1,15 @@
-import * as React from "react";
-import { OperationList } from "./OperationList";
-import { IBladeburner } from "../IBladeburner";
-import { IPlayer } from "../../PersonObjects/IPlayer";
-import Typography from "@mui/material/Typography";
+import type { Bladeburner } from "../Bladeburner";
 
-interface IProps {
-  bladeburner: IBladeburner;
-  player: IPlayer;
+import React from "react";
+import { OperationElem } from "./OperationElem";
+import { Typography } from "@mui/material";
+
+interface OperationPageProps {
+  bladeburner: Bladeburner;
 }
 
-export function OperationPage(props: IProps): React.ReactElement {
+export function OperationPage({ bladeburner }: OperationPageProps): React.ReactElement {
+  const operations = Object.values(bladeburner.operations);
   return (
     <>
       <Typography>
@@ -22,14 +22,16 @@ export function OperationPage(props: IProps): React.ReactElement {
         between different Operations.
         <br />
         <br />
-        For operations, you can use a team. You must first recruit team members. Having a larger team will improves your
+        For operations, you can use a team. You must first recruit team members. Having a larger team will improve your
         chances of success.
         <br />
         <br />
         You can unlock higher-level operations by successfully completing them. Higher-level operations are more
         difficult, but grant more rank and experience.
       </Typography>
-      <OperationList bladeburner={props.bladeburner} player={props.player} />
+      {operations.map((operation) => (
+        <OperationElem key={operation.name} bladeburner={bladeburner} action={operation} />
+      ))}
     </>
   );
 }

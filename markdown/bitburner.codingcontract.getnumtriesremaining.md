@@ -4,9 +4,9 @@
 
 ## CodingContract.getNumTriesRemaining() method
 
-Get the number of attempt remaining.
+Get the number of attempts remaining.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 getNumTriesRemaining(filename: string, host?: string): number;
@@ -14,16 +14,61 @@ getNumTriesRemaining(filename: string, host?: string): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  filename | string |  |
-|  host | string | Host of the server containing the contract. Optional. Defaults to current server if not provided. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+filename
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Filename of the contract.
+
+
+</td></tr>
+<tr><td>
+
+host
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Hostname/IP of the server containing the contract. Optional. Defaults to current server if not provided.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 
-How many attempts are remaining for the contract;
+How many attempts are remaining for the contract.
 
 ## Remarks
 

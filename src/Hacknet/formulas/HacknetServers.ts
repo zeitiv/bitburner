@@ -1,4 +1,4 @@
-import { BitNodeMultipliers } from "../../BitNode/BitNodeMultipliers";
+import { currentNodeMults } from "../../BitNode/BitNodeMultipliers";
 import { HacknetServerConstants } from "../data/Constants";
 
 export function calculateHashGainRate(
@@ -13,7 +13,7 @@ export function calculateHashGainRate(
   const coreMultiplier = 1 + (cores - 1) / 5;
   const ramRatio = 1 - ramUsed / maxRam;
 
-  return baseGain * ramMultiplier * coreMultiplier * ramRatio * mult * BitNodeMultipliers.HacknetNodeMoney;
+  return baseGain * ramMultiplier * coreMultiplier * ramRatio * mult * currentNodeMults.HacknetNodeMoney;
 }
 
 export function calculateLevelUpgradeCost(startingLevel: number, extraLevels = 1, costMult = 1): number {
@@ -22,7 +22,7 @@ export function calculateLevelUpgradeCost(startingLevel: number, extraLevels = 1
     return 0;
   }
 
-  if (startingLevel >= HacknetServerConstants.MaxLevel) {
+  if (startingLevel + sanitizedLevels > HacknetServerConstants.MaxLevel) {
     return Infinity;
   }
 
@@ -43,7 +43,7 @@ export function calculateRamUpgradeCost(startingRam: number, extraLevels = 1, co
     return 0;
   }
 
-  if (startingRam >= HacknetServerConstants.MaxRam) {
+  if (startingRam * Math.pow(2, sanitizedLevels) > HacknetServerConstants.MaxRam) {
     return Infinity;
   }
 
@@ -70,7 +70,7 @@ export function calculateCoreUpgradeCost(startingCores: number, extraLevels = 1,
     return 0;
   }
 
-  if (startingCores >= HacknetServerConstants.MaxCores) {
+  if (startingCores + sanitizedLevels > HacknetServerConstants.MaxCores) {
     return Infinity;
   }
 
@@ -93,7 +93,7 @@ export function calculateCacheUpgradeCost(startingCache: number, extraLevels = 1
     return 0;
   }
 
-  if (startingCache >= HacknetServerConstants.MaxCache) {
+  if (startingCache + sanitizedLevels > HacknetServerConstants.MaxCache) {
     return Infinity;
   }
 

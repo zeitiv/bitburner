@@ -4,14 +4,14 @@
 
 ## WarehouseAPI.makeProduct() method
 
-Create a new product
+Create a new product.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 makeProduct(
     divisionName: string,
-    cityName: string,
+    city: CityName,
     productName: string,
     designInvest: number,
     marketingInvest: number,
@@ -20,15 +20,109 @@ makeProduct(
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  divisionName | string | Name of the division |
-|  cityName | string | Name of the city |
-|  productName | string | Name of the product |
-|  designInvest | number | Amount to invest for the design of the product. |
-|  marketingInvest | number | Amount to invest for the marketing of the product. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+divisionName
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the division
+
+
+</td></tr>
+<tr><td>
+
+city
+
+
+</td><td>
+
+[CityName](./bitburner.cityname.md)
+
+
+</td><td>
+
+Name of the city
+
+
+</td></tr>
+<tr><td>
+
+productName
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the product
+
+
+</td></tr>
+<tr><td>
+
+designInvest
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Amount to invest for the design of the product.
+
+
+</td></tr>
+<tr><td>
+
+marketingInvest
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Amount to invest for the marketing of the product.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 void
+
+## Remarks
+
+RAM cost: 20 GB
 

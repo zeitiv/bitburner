@@ -4,22 +4,71 @@
 
 ## Corporation.expandIndustry() method
 
-Expand to a new industry
+Expand to a new industry.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-expandIndustry(industryType: string, divisionName: string): void;
+expandIndustry(industryType: CorpIndustryName, divisionName: string): void;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  industryType | string | Name of the industry |
-|  divisionName | string | Name of the division |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+industryType
+
+
+</td><td>
+
+[CorpIndustryName](./bitburner.corpindustryname.md)
+
+
+</td><td>
+
+Name of the industry
+
+
+</td></tr>
+<tr><td>
+
+divisionName
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of the division
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 void
+
+## Remarks
+
+RAM cost: 20 GB
 

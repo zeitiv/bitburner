@@ -2,85 +2,93 @@
  * Stops an actively-running script (represented by a WorkerScript object)
  * and removes it from the global pool of active scripts.
  */
+import { ScriptDeath } from "./ScriptDeath";
 import { WorkerScript } from "./WorkerScript";
 import { workerScripts } from "./WorkerScripts";
-import { WorkerScriptStartStopEventEmitter } from "./WorkerScriptStartStopEventEmitter";
 
-import { RunningScript } from "../Script/RunningScript";
-import { GetServer } from "../Server/AllServers";
-
-import { compareArrays } from "../utils/helpers/compareArrays";
-import { dialogBoxCreate } from "../ui/React/DialogBox";
+import { GetAllServers, GetServer } from "../Server/AllServers";
 import { AddRecentScript } from "./RecentScripts";
-import { Player } from "../Player";
+import { ITutorial } from "../InteractiveTutorial";
+import { AlertEvents } from "../ui/React/AlertManager";
+import { handleUnknownError } from "../utils/ErrorHandler";
+import { roundToTwo } from "../utils/helpers/roundToTwo";
+import { BaseServer } from "../Server/BaseServer";
 
-export function killWorkerScript(runningScriptObj: RunningScript, hostname: string, rerenderUi?: boolean): boolean;
-export function killWorkerScript(workerScript: WorkerScript): boolean;
-export function killWorkerScript(pid: number): boolean;
-export function killWorkerScript(
-  script: RunningScript | WorkerScript | number,
-  hostname?: string,
-  rerenderUi?: boolean,
-): boolean {
-  if (rerenderUi == null || typeof rerenderUi !== "boolean") {
-    rerenderUi = true;
-  }
-
-  if (script instanceof WorkerScript) {
-    stopAndCleanUpWorkerScript(script);
-
-    return true;
-  } else if (script instanceof RunningScript && typeof hostname === "string") {
-    // Try to kill by PID
-    const res = killWorkerScriptByPid(script.pid, rerenderUi);
-    if (res) {
-      return res;
-    }
-
-    // If for some reason that doesn't work, we'll try the old way
-    for (const ws of workerScripts.values()) {
-      if (ws.name == script.filename && ws.hostname == hostname && compareArrays(ws.args, script.args)) {
-        stopAndCleanUpWorkerScript(ws, rerenderUi);
-
-        return true;
-      }
-    }
-
-    return false;
-  } else if (typeof script === "number") {
-    return killWorkerScriptByPid(script, rerenderUi);
-  } else {
-    console.error(`killWorkerScript() called with invalid argument:`);
-    console.error(script);
+export function killWorkerScript(ws: WorkerScript): boolean {
+  if (ITutorial.isRunning) {
+    AlertEvents.emit("Processes cannot be killed during the tutorial.");
     return false;
   }
+  stopAndCleanUpWorkerScript(ws);
+
+  return true;
 }
 
-function killWorkerScriptByPid(pid: number, rerenderUi = true): boolean {
+export function killWorkerScriptByPid(pid: number, killer?: WorkerScript): boolean {
   const ws = workerScripts.get(pid);
   if (ws instanceof WorkerScript) {
-    stopAndCleanUpWorkerScript(ws, rerenderUi);
-
+    ws.log("", () => (killer ? `Script killed by script ${killer.name} with PID ${killer.pid}` : "Script killed."));
+    stopAndCleanUpWorkerScript(ws);
     return true;
   }
 
   return false;
 }
 
-function stopAndCleanUpWorkerScript(workerScript: WorkerScript, rerenderUi = true): void {
-  if (typeof workerScript.atExit === "function") {
-    try {
-      workerScript.atExit();
-    } catch (e: any) {
-      dialogBoxCreate(
-        `Error trying to call atExit for script ${workerScript.name} on ${workerScript.hostname} ${workerScript.scriptRef.args} ${e}`,
-      );
-    }
-    workerScript.atExit = undefined;
+export const killAllScripts = () => {
+  for (const server of GetAllServers(true)) {
+    killServerScripts(server, "Script killed.");
   }
-  workerScript.env.stopFlag = true;
-  killNetscriptDelay(workerScript);
-  removeWorkerScript(workerScript, rerenderUi);
+};
+
+export const killServerScripts = (server: BaseServer, message: string) => {
+  const scripts = server.runningScriptMap.values();
+  for (const byPid of scripts) {
+    for (const runningScript of byPid.values()) {
+      killWorkerScriptWithMessage(runningScript.pid, message);
+    }
+  }
+};
+
+function killWorkerScriptWithMessage(pid: number, message: string): boolean {
+  const ws = workerScripts.get(pid);
+  if (ws) {
+    ws.log("", () => message);
+    stopAndCleanUpWorkerScript(ws);
+    return true;
+  }
+  return false;
+}
+
+function stopAndCleanUpWorkerScript(ws: WorkerScript): void {
+  // Only clean up once.
+  // Important: Only this function can set stopFlag!
+  if (ws.env.stopFlag) return;
+
+  //Clean up any ongoing netscriptDelay
+  if (ws.delay) clearTimeout(ws.delay);
+  ws.delayReject?.(new ScriptDeath(ws));
+  ws.env.runningFn = "";
+  const atExit = ws.atExit;
+  //Calling ns.exit inside ns.atExit can lead to recursion
+  //so the map must be cleared before looping
+  ws.atExit = new Map();
+
+  for (const [id, callback] of atExit) {
+    try {
+      callback();
+    } catch (e: unknown) {
+      handleUnknownError(e, ws, `Error running atExit function with id ${id}.\n\n`);
+    }
+  }
+
+  if (ws.env.stopFlag) {
+    // If atExit() kills the script, we'll already be stopped, don't stop again.
+    return;
+  }
+
+  ws.env.stopFlag = true;
+  removeWorkerScript(ws);
 }
 
 /**
@@ -90,9 +98,8 @@ function stopAndCleanUpWorkerScript(workerScript: WorkerScript, rerenderUi = tru
  * @param {WorkerScript} - Identifier for WorkerScript. Either the object itself, or
  *                                  its index in the global workerScripts array
  */
-function removeWorkerScript(workerScript: WorkerScript, rerenderUi = true): void {
+function removeWorkerScript(workerScript: WorkerScript): void {
   const ip = workerScript.hostname;
-  const name = workerScript.name;
 
   // Get the server on which the script runs
   const server = GetServer(ip);
@@ -102,45 +109,22 @@ function removeWorkerScript(workerScript: WorkerScript, rerenderUi = true): void
   }
 
   // Delete the RunningScript object from that server
-  for (let i = 0; i < server.runningScripts.length; ++i) {
-    const runningScript = server.runningScripts[i];
-    if (runningScript.filename === name && compareArrays(runningScript.args, workerScript.args)) {
-      server.runningScripts.splice(i, 1);
-      break;
+  const rs = workerScript.scriptRef;
+  const byPid = server.runningScriptMap.get(rs.scriptKey);
+  if (!byPid) {
+    console.error(`Couldn't find runningScriptMap for key ${rs.scriptKey}`);
+  } else {
+    byPid.delete(workerScript.pid);
+    if (byPid.size === 0) {
+      server.runningScriptMap.delete(rs.scriptKey);
     }
   }
 
-  // Recalculate ram used on that server
+  // Update ram used. Reround to prevent accumulation of error.
+  server.updateRamUsed(roundToTwo(server.ramUsed - rs.ramUsage * rs.threads));
 
-  server.updateRamUsed(0, Player);
-  for (const rs of server.runningScripts) server.updateRamUsed(server.ramUsed + rs.ramUsage * rs.threads, Player);
-
-  // Delete script from global pool (workerScripts)
   workerScripts.delete(workerScript.pid);
-  // const res = workerScripts.delete(workerScript.pid);
-  // if (!res) {
-  //   console.warn(`removeWorkerScript() called with WorkerScript that wasn't in the global map:`);
-  //   console.warn(workerScript);
-  // }
-  AddRecentScript(workerScript);
-
-  if (rerenderUi) {
-    WorkerScriptStartStopEventEmitter.emit();
-  }
-}
-
-/**
- * Helper function that interrupts a script's delay if it is in the middle of a
- * timed, blocked operation (like hack(), sleep(), etc.). This allows scripts to
- * be killed immediately even if they're in the middle of one of those long operations
- */
-function killNetscriptDelay(workerScript: WorkerScript): void {
-  if (workerScript instanceof WorkerScript) {
-    if (workerScript.delay) {
-      clearTimeout(workerScript.delay);
-      if (workerScript.delayReject) {
-        workerScript.delayReject(workerScript);
-      }
-    }
+  if (rs.temporary === false) {
+    AddRecentScript(workerScript);
   }
 }

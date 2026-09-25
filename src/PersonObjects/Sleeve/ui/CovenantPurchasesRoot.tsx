@@ -2,20 +2,21 @@
  * Root React component for the popup that lets player purchase Duplicate
  * Sleeves and Sleeve-related upgrades from The Covenant
  */
-import React, { useState } from "react";
+import React from "react";
 
 import { CovenantSleeveMemoryUpgrade } from "./CovenantSleeveMemoryUpgrade";
 
-import { Sleeve } from "../Sleeve";
-import { BaseCostPerSleeve, MaxSleevesFromCovenant } from "../SleeveCovenantPurchases";
+import { MaxSleevesFromCovenant, canPurchaseSleeve, getSleeveCost, purchaseSleeve } from "../SleeveCovenantPurchases";
 
 import { Money } from "../../../ui/React/Money";
 import { Modal } from "../../../ui/React/Modal";
-import { use } from "../../../ui/Context";
+import { Player } from "@player";
 
 import { dialogBoxCreate } from "../../../ui/React/DialogBox";
 import Typography from "@mui/material/Typography";
 import Button from "@mui/material/Button";
+import { FactionName } from "@enums";
+import { useRerender } from "../../../ui/React/hooks";
 
 interface IProps {
   open: boolean;
@@ -23,69 +24,41 @@ interface IProps {
 }
 
 export function CovenantPurchasesRoot(props: IProps): React.ReactElement {
-  const player = use.Player();
-  const [update, setUpdate] = useState(0);
-
-  /**
-   * Get the cost to purchase a new Duplicate Sleeve
-   */
-  function purchaseCost(): number {
-    return Math.pow(10, player.sleevesFromCovenant) * BaseCostPerSleeve;
-  }
-
-  /**
-   * Force a rerender by just changing an arbitrary state value
-   */
-  function rerender(): void {
-    setUpdate(update + 1);
-  }
-
-  // Purchasing a new Duplicate Sleeve
-  let purchaseDisabled = false;
-  if (!player.canAfford(purchaseCost())) {
-    purchaseDisabled = true;
-  }
-  if (player.sleevesFromCovenant >= MaxSleevesFromCovenant) {
-    purchaseDisabled = true;
-  }
+  const rerender = useRerender();
 
   function purchaseOnClick(): void {
-    if (player.sleevesFromCovenant >= MaxSleevesFromCovenant) return;
-
-    if (player.canAfford(purchaseCost())) {
-      player.loseMoney(purchaseCost(), "sleeves");
-      player.sleevesFromCovenant += 1;
-      player.sleeves.push(new Sleeve(player));
-      rerender();
-    } else {
-      dialogBoxCreate(`You cannot afford to purchase a Duplicate Sleeve`);
+    const result = purchaseSleeve();
+    if (!result.success) {
+      dialogBoxCreate(result.message);
+      return;
     }
+    rerender();
   }
 
   // Purchasing Upgrades for Sleeves
   const upgradePanels = [];
-  for (let i = 0; i < player.sleeves.length; ++i) {
-    const sleeve = player.sleeves[i];
-    upgradePanels.push(<CovenantSleeveMemoryUpgrade index={i} p={player} rerender={rerender} sleeve={sleeve} />);
+  for (let i = 0; i < Player.sleeves.length; ++i) {
+    const sleeve = Player.sleeves[i];
+    upgradePanels.push(<CovenantSleeveMemoryUpgrade key={i} index={i} rerender={rerender} sleeve={sleeve} />);
   }
 
   return (
     <Modal open={props.open} onClose={props.onClose}>
       <>
-        {player.sleevesFromCovenant < MaxSleevesFromCovenant && (
+        {Player.sleevesFromCovenant < MaxSleevesFromCovenant && (
           <>
             <Typography>
-              Purchase an additional Sleeves. These Duplicate Sleeves are permanent (they persist through BitNodes). You
-              can purchase a total of {MaxSleevesFromCovenant} from The Covenant.
+              Purchase an additional Sleeve. These Duplicate Sleeves are permanent (they persist through BitNodes). You
+              can purchase a total of {MaxSleevesFromCovenant} from {FactionName.TheCovenant}.
             </Typography>
-            <Button disabled={purchaseDisabled} onClick={purchaseOnClick}>
+            <Button disabled={!canPurchaseSleeve().success} onClick={purchaseOnClick}>
               Purchase -&nbsp;
-              <Money money={purchaseCost()} player={player} />
+              <Money money={getSleeveCost(Player.sleevesFromCovenant)} forPurchase={true} />
             </Button>
+            <br />
+            <br />
           </>
         )}
-        <br />
-        <br />
         <Typography>You can also purchase upgrades for your Sleeves. These upgrades are also permanent.</Typography>
         {upgradePanels}
       </>

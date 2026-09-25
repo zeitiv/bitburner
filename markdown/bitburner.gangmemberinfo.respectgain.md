@@ -4,7 +4,9 @@
 
 ## GangMemberInfo.respectGain property
 
-<b>Signature:</b>
+Per Cycle Rate this member is currently gaining Respect
+
+**Signature:**
 
 ```typescript
 respectGain: number;

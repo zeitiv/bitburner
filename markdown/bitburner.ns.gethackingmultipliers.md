@@ -6,12 +6,12 @@
 
 Get hacking related multipliers.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 getHackingMultipliers(): HackingMultipliers;
 ```
-<b>Returns:</b>
+**Returns:**
 
 [HackingMultipliers](./bitburner.hackingmultipliers.md)
 
@@ -19,29 +19,16 @@ Object containing the Player’s hacking related multipliers.
 
 ## Remarks
 
-RAM cost: 4 GB
+RAM cost: 0.25 GB
 
 Returns an object containing the Player’s hacking related multipliers. These multipliers are returned in fractional forms, not percentages (e.g. 1.5 instead of 150%).
 
-## Example 1
+## Example
 
 
-```ts
-// NS1:
-// Example of how this can be used:
-var mults = getHackingMultipliers();
-print(mults.chance);
-print(mults.growth);
-```
-
-## Example 2
-
-
-```ts
-// NS2:
-// Example of how this can be used:
-const {chance, growth} = ns.getHackingMultipliers();
-print(chance);
-print(growth);
+```js
+const mults = ns.getHackingMultipliers();
+ns.tprint(`chance: ${mults.chance}`);
+ns.tprint(`growth: ${mults.growth}`);
 ```
 

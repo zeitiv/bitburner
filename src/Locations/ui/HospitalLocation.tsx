@@ -6,64 +6,37 @@
 import * as React from "react";
 import Button from "@mui/material/Button";
 
-import { IPlayer } from "../../PersonObjects/IPlayer";
+import { Player } from "@player";
 import { getHospitalizationCost } from "../../Hospital/Hospital";
 
 import { Money } from "../../ui/React/Money";
 
 import { dialogBoxCreate } from "../../ui/React/DialogBox";
+import { useCycleRerender } from "../../ui/React/hooks";
 
-type IProps = {
-  p: IPlayer;
-};
+export function HospitalLocation(): React.ReactElement {
+  /** Stores button styling that sets them all to block display */
+  const btnStyle = { display: "block" };
+  const rerender = useCycleRerender();
 
-type IState = {
-  currHp: number;
-};
-
-export class HospitalLocation extends React.Component<IProps, IState> {
-  /**
-   * Stores button styling that sets them all to block display
-   */
-  btnStyle: any;
-
-  constructor(props: IProps) {
-    super(props);
-
-    this.btnStyle = { display: "block" };
-
-    this.getCost = this.getCost.bind(this);
-    this.getHealed = this.getHealed.bind(this);
-
-    this.state = {
-      currHp: this.props.p.hp,
-    };
-  }
-
-  getCost(): number {
-    return getHospitalizationCost(this.props.p);
-  }
-
-  getHealed(e: React.MouseEvent<HTMLElement>): void {
+  function getHealed(e: React.MouseEvent<HTMLElement>): void {
     if (!e.isTrusted) {
       return;
     }
 
-    if (this.props.p.hp < 0) {
-      this.props.p.hp = 0;
+    if (Player.hp.current < 0) {
+      Player.hp.current = 0;
     }
-    if (this.props.p.hp >= this.props.p.max_hp) {
+    if (Player.hp.current >= Player.hp.max) {
       return;
     }
 
-    const cost = this.getCost();
-    this.props.p.loseMoney(cost, "hospitalization");
-    this.props.p.hp = this.props.p.max_hp;
+    const cost = getHospitalizationCost();
+    Player.loseMoney(cost, "hospitalization");
+    Player.hp.current = Player.hp.max;
 
     // This just forces a re-render to update the cost
-    this.setState({
-      currHp: this.props.p.hp,
-    });
+    rerender();
 
     dialogBoxCreate(
       <>
@@ -72,13 +45,9 @@ export class HospitalLocation extends React.Component<IProps, IState> {
     );
   }
 
-  render(): React.ReactNode {
-    const cost = this.getCost();
-
-    return (
-      <Button onClick={this.getHealed} style={this.btnStyle}>
-        Get treatment for wounds - <Money money={cost} player={this.props.p} />
-      </Button>
-    );
-  }
+  return (
+    <Button onClick={getHealed} style={btnStyle}>
+      Get treatment for wounds - <Money money={getHospitalizationCost()} forPurchase={true} />
+    </Button>
+  );
 }

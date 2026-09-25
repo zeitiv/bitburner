@@ -1,65 +1,47 @@
-/**
- * Root React Component for displaying a faction's "Purchase Augmentations" page
- */
-import React, { useState } from "react";
-
-import { PurchaseableAugmentation } from "./PurchaseableAugmentation";
+import React, { useState, useMemo } from "react";
+import { Box, Button, Typography, Paper, Container, TextField } from "@mui/material";
+import SearchIcon from "@mui/icons-material/Search";
 
 import { Augmentations } from "../../Augmentation/Augmentations";
-import { AugmentationNames } from "../../Augmentation/data/AugmentationNames";
-import { Faction } from "../../Faction/Faction";
+import { getAugCost, getGenericAugmentationPriceMultiplier } from "../../Augmentation/AugmentationHelpers";
+import { AugmentationName, FactionName } from "@enums";
+import { PurchasableAugmentations } from "../../Augmentation/ui/PurchasableAugmentations";
 import { PurchaseAugmentationsOrderSetting } from "../../Settings/SettingEnums";
 import { Settings } from "../../Settings/Settings";
-import { hasAugmentationPrereqs } from "../FactionHelpers";
-
-import { use } from "../../ui/Context";
-import { Reputation } from "../../ui/React/Reputation";
-import { Favor } from "../../ui/React/Favor";
-import { numeralWrapper } from "../../ui/numeralFormat";
-
-import Box from "@mui/material/Box";
-import Button from "@mui/material/Button";
-import Typography from "@mui/material/Typography";
-import Tooltip from "@mui/material/Tooltip";
-import TableBody from "@mui/material/TableBody";
-import Table from "@mui/material/Table";
+import { Player } from "@player";
+import { formatBigNumber } from "../../ui/formatNumber";
+import { Router } from "../../ui/GameRoot";
+import { Faction } from "../Faction";
+import { getFactionAugmentationsFiltered, hasAugmentationPrereqs, purchaseAugmentation } from "../FactionHelpers";
 import { CONSTANTS } from "../../Constants";
+import { useRerender } from "../../ui/React/hooks";
+import { ReputationInfo } from "../../ui/React/ReputationInfo";
+import { FavorInfo } from "../../ui/React/FavorInfo";
 
-type IProps = {
-  faction: Faction;
-  routeToMainPage: () => void;
-};
+/** Root React Component for displaying a faction's "Purchase Augmentations" page */
+export function AugmentationsPage({ faction }: { faction: Faction }): React.ReactElement {
+  const rerender = useRerender(400);
+  const [filterText, setFilterText] = useState("");
 
-export function AugmentationsPage(props: IProps): React.ReactElement {
-  const player = use.Player();
-  // Flag for whether the player has a gang with this faction
-  const isPlayersGang = player.inGang() && player.getGangName() === props.faction.name;
+  const matches = (s1: string, s2: string) => s1.toLowerCase().includes(s2.toLowerCase());
+  const factionAugs = useMemo(() => getFactionAugmentationsFiltered(faction), [faction]);
+  const filteredFactionAugs = useMemo(
+    () =>
+      factionAugs.filter(
+        (aug: AugmentationName) =>
+          !filterText ||
+          matches(Augmentations[aug].name, filterText) ||
+          matches(Augmentations[aug].info, filterText) ||
+          matches(Augmentations[aug].stats, filterText),
+      ),
+    [filterText, factionAugs],
+  );
 
-  const setRerender = useState(false)[1];
-
-  function rerender(): void {
-    setRerender((old) => !old);
+  function getAugs(): AugmentationName[] {
+    return filteredFactionAugs;
   }
 
-  function getAugs(): string[] {
-    if (isPlayersGang) {
-      const augs: string[] = [];
-      for (const augName of Object.keys(Augmentations)) {
-        if (augName === AugmentationNames.NeuroFluxGovernor) continue;
-        if (augName === AugmentationNames.TheRedPill && player.bitNodeN !== 2) continue;
-        const aug = Augmentations[augName];
-        if (!aug.isSpecial) {
-          augs.push(augName);
-        }
-      }
-
-      return augs;
-    } else {
-      return props.faction.augmentations.slice();
-    }
-  }
-
-  function getAugsSorted(): string[] {
+  function getAugsSorted(): AugmentationName[] {
     switch (Settings.PurchaseAugmentationsOrder) {
       case PurchaseAugmentationsOrderSetting.Cost: {
         return getAugsSortedByCost();
@@ -75,7 +57,7 @@ export function AugmentationsPage(props: IProps): React.ReactElement {
     }
   }
 
-  function getAugsSortedByCost(): string[] {
+  function getAugsSortedByCost(): AugmentationName[] {
     const augs = getAugs();
     augs.sort((augName1, augName2) => {
       const aug1 = Augmentations[augName1],
@@ -84,20 +66,21 @@ export function AugmentationsPage(props: IProps): React.ReactElement {
         throw new Error("Invalid Augmentation Names");
       }
 
-      return aug1.baseCost - aug2.baseCost;
+      return getAugCost(aug1).moneyCost - getAugCost(aug2).moneyCost;
     });
 
     return augs;
   }
 
-  function getAugsSortedByPurchasable(): string[] {
+  function getAugsSortedByPurchasable(): AugmentationName[] {
     const augs = getAugs();
-    function canBuy(augName: string): boolean {
+    function canBuy(augName: AugmentationName): boolean {
       const aug = Augmentations[augName];
-      const repCost = aug.baseRepRequirement * props.faction.getInfo().augmentationRepRequirementMult;
-      const hasReq = props.faction.playerReputation >= repCost;
+      const augCosts = getAugCost(aug);
+      const repCost = augCosts.repCost;
+      const hasReq = faction.playerReputation >= repCost;
       const hasRep = hasAugmentationPrereqs(aug);
-      const hasCost = aug.baseCost !== 0 && player.money > aug.baseCost * props.faction.getInfo().augmentationPriceMult;
+      const hasCost = augCosts.moneyCost !== 0 && Player.money >= augCosts.moneyCost;
       return hasCost && hasReq && hasRep;
     }
     const buy = augs.filter(canBuy).sort((augName1, augName2) => {
@@ -107,7 +90,7 @@ export function AugmentationsPage(props: IProps): React.ReactElement {
         throw new Error("Invalid Augmentation Names");
       }
 
-      return aug1.baseCost - aug2.baseCost;
+      return getAugCost(aug1).moneyCost - getAugCost(aug2).moneyCost;
     });
     const cantBuy = augs
       .filter((aug) => !canBuy(aug))
@@ -117,13 +100,13 @@ export function AugmentationsPage(props: IProps): React.ReactElement {
         if (aug1 == null || aug2 == null) {
           throw new Error("Invalid Augmentation Names");
         }
-        return aug1.baseRepRequirement - aug2.baseRepRequirement;
+        return getAugCost(aug1).repCost - getAugCost(aug2).repCost;
       });
 
     return buy.concat(cantBuy);
   }
 
-  function getAugsSortedByReputation(): string[] {
+  function getAugsSortedByReputation(): AugmentationName[] {
     const augs = getAugs();
     augs.sort((augName1, augName2) => {
       const aug1 = Augmentations[augName1],
@@ -131,13 +114,13 @@ export function AugmentationsPage(props: IProps): React.ReactElement {
       if (aug1 == null || aug2 == null) {
         throw new Error("Invalid Augmentation Names");
       }
-      return aug1.baseRepRequirement - aug2.baseRepRequirement;
+      return getAugCost(aug1).repCost - getAugCost(aug2).repCost;
     });
 
     return augs;
   }
 
-  function getAugsSortedByDefault(): string[] {
+  function getAugsSortedByDefault(): AugmentationName[] {
     return getAugs();
   }
 
@@ -146,82 +129,134 @@ export function AugmentationsPage(props: IProps): React.ReactElement {
     rerender();
   }
 
+  function handleFilterChange(event: React.ChangeEvent<HTMLInputElement>): void {
+    setFilterText(event.target.value);
+  }
+
   const augs = getAugsSorted();
   const purchasable = augs.filter(
     (aug: string) =>
-      aug === AugmentationNames.NeuroFluxGovernor ||
-      (!player.augmentations.some((a) => a.name === aug) && !player.queuedAugmentations.some((a) => a.name === aug)),
+      aug === AugmentationName.NeuroFluxGovernor ||
+      (!Player.augmentations.some((a) => a.name === aug) && !Player.queuedAugmentations.some((a) => a.name === aug)),
   );
+  const owned = augs.filter((aug) => !purchasable.includes(aug));
 
-  const purchaseableAugmentation = (aug: string, owned = false): React.ReactNode => {
-    return (
-      <PurchaseableAugmentation
-        augName={aug}
-        faction={props.faction}
-        key={aug}
-        p={player}
-        rerender={rerender}
-        owned={owned}
-      />
+  let multiplierDescription;
+  let multiplierComponent;
+  if (faction.name !== FactionName.ShadowsOfAnarchy) {
+    multiplierDescription = (
+      <Typography>
+        The price of every Augmentation increases for every queued Augmentation and it is reset when you install them.
+      </Typography>
     );
-  };
-
-  const augListElems = purchasable.map((aug) => purchaseableAugmentation(aug));
-
-  let ownedElem = <></>;
-  const owned = augs.filter((aug: string) => !purchasable.includes(aug));
-  if (owned.length !== 0) {
-    ownedElem = (
-      <>
+    multiplierComponent = (
+      <Typography>
+        <b>Price multiplier:</b> x {formatBigNumber(getGenericAugmentationPriceMultiplier())}
+      </Typography>
+    );
+  } else {
+    multiplierDescription = (
+      <Typography>
+        This price multiplier increases for each {FactionName.ShadowsOfAnarchy} augmentation already purchased. The
+        multiplier is NOT reset when installing augmentations.
+      </Typography>
+    );
+    multiplierComponent = (
+      <Typography>
+        <b>Price multiplier:</b> x{" "}
+        {formatBigNumber(
+          Math.pow(
+            CONSTANTS.SoACostMult,
+            augs.filter((augmentationName) => Player.hasAugmentation(augmentationName)).length,
+          ),
+        )}
         <br />
-        <Typography variant="h4">Purchased Augmentations</Typography>
-        <Typography>This faction also offers these augmentations but you already own them.</Typography>
-        {owned.map((aug) => purchaseableAugmentation(aug, true))}
-      </>
+        <b>Reputation multiplier:</b> x{" "}
+        {formatBigNumber(
+          Math.pow(
+            CONSTANTS.SoARepMult,
+            augs.filter((augmentationName) => Player.hasAugmentation(augmentationName)).length,
+          ),
+        )}
+      </Typography>
     );
   }
-  const mult = Math.pow(
-    CONSTANTS.MultipleAugMultiplier * [1, 0.96, 0.94, 0.93][player.sourceFileLvl(11)],
-    player.queuedAugmentations.length,
-  );
+
   return (
     <>
-      <Button onClick={props.routeToMainPage}>Back</Button>
-      <Typography variant="h4">Faction Augmentations</Typography>
-      <Typography>
-        These are all of the Augmentations that are available to purchase from {props.faction.name}. Augmentations are
-        powerful upgrades that will enhance your abilities.
-        <br />
-        Reputation: <Reputation reputation={props.faction.playerReputation} /> Favor:{" "}
-        <Favor favor={Math.floor(props.faction.favor)} />
-      </Typography>
-      <Box display="flex">
-        <Tooltip
-          title={
-            <Typography>
-              The price of every Augmentation increases for every queued Augmentation and it is reset when you install
-              them.
-            </Typography>
+      <Container disableGutters maxWidth="lg" sx={{ mx: 0 }}>
+        <Button onClick={() => Router.back()}>Back</Button>
+        <Typography variant="h4">Faction Augmentations - {faction.name}</Typography>
+        <Paper sx={{ p: 1, mb: 1 }}>
+          <Typography>
+            These are all of the Augmentations that are available to purchase from <b>{faction.name}</b>. Augmentations
+            are powerful upgrades that will enhance your abilities.
+          </Typography>
+          <br />
+          {multiplierDescription}
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: `repeat(${faction.name === FactionName.ShadowsOfAnarchy ? "2" : "3"}, 1fr)`,
+              justifyItems: "center",
+              my: 1,
+            }}
+          >
+            {multiplierComponent}
+            <Box>
+              <ReputationInfo favor={faction.favor} playerReputation={faction.playerReputation} boldLabel={true} />
+              <FavorInfo favor={faction.favor} boldLabel={true} />
+            </Box>
+          </Box>
+          <Box sx={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)" }}>
+            <Button onClick={() => switchSortOrder(PurchaseAugmentationsOrderSetting.Cost)}>Sort by Cost</Button>
+            <Button onClick={() => switchSortOrder(PurchaseAugmentationsOrderSetting.Reputation)}>
+              Sort by Reputation
+            </Button>
+            <Button onClick={() => switchSortOrder(PurchaseAugmentationsOrderSetting.Default)}>
+              Sort by Default Order
+            </Button>
+            <Button onClick={() => switchSortOrder(PurchaseAugmentationsOrderSetting.Purchasable)}>
+              Sort by Purchasable
+            </Button>
+          </Box>
+          <TextField
+            value={filterText}
+            onChange={handleFilterChange}
+            autoFocus
+            placeholder="Filter augmentations"
+            InputProps={{
+              startAdornment: <SearchIcon />,
+              spellCheck: false,
+            }}
+            sx={{ pt: 1 }}
+          />
+        </Paper>
+      </Container>
+
+      <PurchasableAugmentations
+        augNames={purchasable}
+        ownedAugNames={owned}
+        canPurchase={(aug) => {
+          const costs = getAugCost(aug);
+          return (
+            hasAugmentationPrereqs(aug) &&
+            faction.playerReputation >= costs.repCost &&
+            (costs.moneyCost === 0 || Player.money >= costs.moneyCost)
+          );
+        }}
+        purchaseAugmentation={(aug, showModal) => {
+          if (!Settings.SuppressBuyAugmentationConfirmation) {
+            showModal(true);
+          } else {
+            purchaseAugmentation(faction, aug);
+            rerender();
           }
-        >
-          <Typography>Price multiplier: x {numeralWrapper.formatMultiplier(mult)}</Typography>
-        </Tooltip>
-      </Box>
-      <Button onClick={() => switchSortOrder(PurchaseAugmentationsOrderSetting.Cost)}>Sort by Cost</Button>
-      <Button onClick={() => switchSortOrder(PurchaseAugmentationsOrderSetting.Reputation)}>Sort by Reputation</Button>
-      <Button onClick={() => switchSortOrder(PurchaseAugmentationsOrderSetting.Default)}>Sort by Default Order</Button>
-      <Button onClick={() => switchSortOrder(PurchaseAugmentationsOrderSetting.Purchasable)}>
-        Sort by Purchasable
-      </Button>
-      <br />
-
-      <Table size="small" padding="none">
-        <TableBody>{augListElems}</TableBody>
-      </Table>
-
-      <Table size="small" padding="none">
-        <TableBody>{ownedElem}</TableBody>
-      </Table>
+        }}
+        rerender={rerender}
+        rep={faction.playerReputation}
+        faction={faction}
+      />
     </>
   );
 }

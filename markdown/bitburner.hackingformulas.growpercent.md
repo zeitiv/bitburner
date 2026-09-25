@@ -4,24 +4,105 @@
 
 ## HackingFormulas.growPercent() method
 
-Calculate the percent a server would grow.
+Calculate the growth multiplier constant for a given server and threads.
 
-<b>Signature:</b>
+The actual amount of money grown depends both linearly \*and\* exponentially on threads; this is only giving the exponential part that is used for the multiplier. See [grow](./bitburner.ns.grow.md) for more details.
+
+As a result of the above, this multiplier does \*not\* depend on the amount of money on the server. Changing server.moneyAvailable and server.moneyMax will have no effect.
+
+For the most common use-cases, you probably want either [formulas.hacking.growThreads](./bitburner.hackingformulas.growthreads.md) or [formulas.hacking.growAmount](./bitburner.hackingformulas.growamount.md) instead.
+
+**Signature:**
 
 ```typescript
-growPercent(server: Server, threads: number, player: Player, cores?: number): number;
+growPercent(server: Server, threads: number, player: Person, cores?: number): number;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  server | [Server](./bitburner.server.md) | Server info from [getServer](./bitburner.ns.getserver.md) |
-|  threads | number | Amount of thread. |
-|  player | [Player](./bitburner.player.md) | Player info from [getPlayer](./bitburner.ns.getplayer.md) |
-|  cores | number | Number of cores on the computer that will execute grow. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+server
+
+
+</td><td>
+
+[Server](./bitburner.server.md)
+
+
+</td><td>
+
+Server info, typically from [getServer](./bitburner.ns.getserver.md)
+
+
+</td></tr>
+<tr><td>
+
+threads
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Amount of threads. Can be fractional.
+
+
+</td></tr>
+<tr><td>
+
+player
+
+
+</td><td>
+
+[Person](./bitburner.person.md)
+
+
+</td><td>
+
+Player info, typically from [getPlayer](./bitburner.ns.getplayer.md)
+
+
+</td></tr>
+<tr><td>
+
+cores
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ Number of cores on the computer that will execute grow.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 

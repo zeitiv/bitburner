@@ -1,7 +1,7 @@
 /**
  * React component for the tickers configuration section of the Stock Market UI.
  * This config lets you change the way stock tickers are displayed (watchlist,
- * all/portoflio mode, etc)
+ * all/portfolio mode, etc)
  */
 import * as React from "react";
 import Typography from "@mui/material/Typography";
@@ -9,16 +9,17 @@ import Tooltip from "@mui/material/Tooltip";
 import Button from "@mui/material/Button";
 import TextField from "@mui/material/TextField";
 
+// numeric enum
 export enum TickerDisplayMode {
   AllStocks,
   Portfolio,
 }
 
-type IProps = {
+interface IProps {
   changeDisplayMode: () => void;
   changeWatchlistFilter: (e: React.ChangeEvent<HTMLInputElement>) => void;
   tickerDisplayMode: TickerDisplayMode;
-};
+}
 
 function DisplayModeButton(props: IProps): React.ReactElement {
   let txt = "";

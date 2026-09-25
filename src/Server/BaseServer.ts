@@ -1,39 +1,52 @@
-/**
- * Abstract Base Class for any Server object
- */
-import { CodingContract } from "../CodingContracts";
+import type { Server as IServer } from "@nsdefs";
+import type { CompletedProgramName, LiteratureName, MessageFilename } from "@enums";
+import type { IPAddress, ServerName } from "../Types/strings";
+import type { FilePath } from "../Paths/FilePath";
+
+import { CodingContract } from "../CodingContract/Contract";
 import { RunningScript } from "../Script/RunningScript";
 import { Script } from "../Script/Script";
-import { isValidFilePath } from "../Terminal/DirectoryHelpers";
 import { TextFile } from "../TextFile";
 import { IReturnStatus } from "../types";
 
-import { isScriptFilename } from "../Script/isScriptFilename";
+import { ScriptFilePath, resolveScriptFilePath, hasScriptExtension } from "../Paths/ScriptFilePath";
+import { Directory, resolveDirectory } from "../Paths/Directory";
+import { TextFilePath, resolveTextFilePath, hasTextExtension } from "../Paths/TextFilePath";
+import { Generic_toJSON, Generic_fromJSON, IReviverValue } from "../utils/JSONReviver";
+import { matchScriptPathExact } from "../utils/helpers/scriptKey";
 
 import { createRandomIp } from "../utils/IPAddress";
-import { compareArrays } from "../utils/helpers/compareArrays";
-import { IPlayer } from "../PersonObjects/IPlayer";
+import { JSONMap } from "../Types/Jsonable";
+import { ContentFile, ContentFilePath } from "../Paths/ContentFile";
+import { ProgramFilePath, hasProgramExtension } from "../Paths/ProgramFilePath";
+import { getKeyList } from "../utils/helpers/getKeyList";
+import lodash from "lodash";
+import { Settings } from "../Settings/Settings";
 
-interface IConstructorParams {
+import type { ScriptKey } from "../utils/helpers/scriptKey";
+import { assertObject } from "../utils/TypeAssertion";
+import { clampNumber } from "../utils/helpers/clampNumber";
+import { roundToTwo } from "../utils/helpers/roundToTwo";
+
+export interface BaseServerConstructorParams {
   adminRights?: boolean;
   hostname: string;
-  ip?: string;
+  ip?: IPAddress;
   isConnectedTo?: boolean;
   maxRam?: number;
   organizationName?: string;
 }
 
 interface writeResult {
-  success: boolean;
   overwritten: boolean;
 }
 
-export class BaseServer {
+/** Abstract Base Class for any Server object */
+export abstract class BaseServer implements IServer {
   // Coding Contract files on this server
   contracts: CodingContract[] = [];
 
-  // How many CPU cores this server has. Maximum of 8.
-  // Currently, this only affects hacking missions
+  // How many CPU cores this server has.
   cpuCores = 1;
 
   // Flag indicating whether the FTP port is open
@@ -43,40 +56,45 @@ export class BaseServer {
   hasAdminRights = false;
 
   // Hostname. Must be unique
-  hostname = "";
+  hostname: ServerName = "home";
 
   // Flag indicating whether HTTP Port is open
   httpPortOpen = false;
 
   // IP Address. Must be unique
-  ip = "";
+  ip = "1.1.1.1" as IPAddress;
 
-  // Flag indicating whether player is curently connected to this server
+  // Flag indicating whether player is currently connected to this server
   isConnectedTo = false;
 
   // RAM (GB) available on this server
   maxRam = 0;
 
   // Message files AND Literature files on this Server
-  messages: string[] = [];
+  messages: (MessageFilename | LiteratureName)[] = [];
 
   // Name of company/faction/etc. that this server belongs to.
-  // Optional, not applicable to all Servers
+  // Optional, not applicable to all Servers (e.g., pserver, hacknet server, and dnet server)
   organizationName = "";
 
   // Programs on this servers. Contains only the names of the programs
-  programs: string[] = [];
+  // CompletedProgramNames are all typechecked as valid paths in Program constructor
+  programs: (ProgramFilePath | CompletedProgramName)[] = [];
 
   // RAM (GB) used. i.e. unavailable RAM
   ramUsed = 0;
 
-  // RunningScript files on this server
-  runningScripts: RunningScript[] = [];
+  // RunningScript files on this server. Keyed first by name/args, then by PID.
+  runningScriptMap = new Map<ScriptKey, Map<number, RunningScript>>();
+
+  // RunningScript files loaded from the savegame. Only stored here temporarily,
+  // this field is undef while the game is running.
+  savedScripts: RunningScript[] | undefined = undefined;
 
   // Script files on this Server
-  scripts: Script[] = [];
+  scripts = new JSONMap<ScriptFilePath, Script>();
 
-  // Contains the IP Addresses of all servers that are immediately
+  // Contains the hostnames of all servers that are immediately
   // reachable from this one
   serversOnNetwork: string[] = [];
 
@@ -90,12 +108,25 @@ export class BaseServer {
   sshPortOpen = false;
 
   // Text files on this server
-  textFiles: TextFile[] = [];
+  textFiles = new JSONMap<TextFilePath, TextFile>();
 
-  // Flag indicating wehther this is a purchased server
+  // Flag indicating whether this is a server owned by the player (e.g., home, cloud servers, hacknet servers)
   purchasedByPlayer = false;
 
-  constructor(params: IConstructorParams = { hostname: "", ip: createRandomIp() }) {
+  // Optional, listed just so they can be accessed on a BaseServer. These will be undefined for HacknetServers.
+  backdoorInstalled?: boolean;
+  baseDifficulty?: number;
+  hackDifficulty?: number;
+  minDifficulty?: number;
+  moneyAvailable?: number;
+  moneyMax?: number;
+  numOpenPortsRequired?: number;
+  openPortCount?: number;
+  requiredHackingSkill?: number;
+  serverGrowth?: number;
+  isHacknetServer?: boolean;
+
+  constructor(params: BaseServerConstructorParams = { hostname: "", ip: createRandomIp() }) {
     this.ip = params.ip ? params.ip : createRandomIp();
 
     this.hostname = params.hostname;
@@ -119,43 +150,16 @@ export class BaseServer {
     return null;
   }
 
-  /**
-   * Find an actively running script on this server
-   * @param scriptName - Filename of script to search for
-   * @param scriptArgs - Arguments that script is being run with
-   * @returns RunningScript for the specified active script
-   *          Returns null if no such script can be found
-   */
-  getRunningScript(scriptName: string, scriptArgs: any[]): RunningScript | null {
-    for (const rs of this.runningScripts) {
-      if (rs.filename === scriptName && compareArrays(rs.args, scriptArgs)) {
-        return rs;
-      }
-    }
-
-    return null;
+  /** Get a TextFile or Script depending on the input path type. */
+  getContentFile(path: ContentFilePath): ContentFile | null {
+    return (hasTextExtension(path) ? this.textFiles.get(path) : this.scripts.get(path)) ?? null;
   }
 
-  /**
-   * Given the name of the script, returns the corresponding
-   * Script object on the server (if it exists)
-   */
-  getScript(scriptName: string): Script | null {
-    for (let i = 0; i < this.scripts.length; i++) {
-      if (this.scripts[i].filename === scriptName) {
-        return this.scripts[i];
-      }
-    }
-
-    return null;
-  }
-
-  /**
-   * Returns boolean indicating whether the given script is running on this server
-   */
-  isRunning(fn: string): boolean {
-    for (const runningScriptObj of this.runningScripts) {
-      if (runningScriptObj.filename === fn) {
+  /** Returns boolean indicating whether the given script is running on this server */
+  isRunning(path: ScriptFilePath): boolean {
+    const pattern = matchScriptPathExact(lodash.escapeRegExp(path));
+    for (const k of this.runningScriptMap.keys()) {
+      if (pattern.test(k)) {
         return true;
       }
     }
@@ -163,70 +167,51 @@ export class BaseServer {
     return false;
   }
 
-  removeContract(contract: CodingContract): void {
-    if (contract instanceof CodingContract) {
-      this.contracts = this.contracts.filter((c) => {
-        return c.fn !== contract.fn;
-      });
-    } else {
-      this.contracts = this.contracts.filter((c) => {
-        return c.fn !== contract;
-      });
-    }
+  removeContract(contract: CodingContract | string): void {
+    const index = this.contracts.findIndex((c) => c.fn === (typeof contract === "string" ? contract : contract.fn));
+    if (index > -1) this.contracts.splice(index, 1);
   }
 
   /**
    * Remove a file from the server
-   * @param fn {string} Name of file to be deleted
+   * @param path Name of file to be deleted
    * @returns {IReturnStatus} Return status object indicating whether or not file was deleted
    */
-  removeFile(fn: string): IReturnStatus {
-    if (fn.endsWith(".exe") || fn.match(/^.+\.exe-\d+(?:\.\d*)?%-INC$/) != null) {
-      for (let i = 0; i < this.programs.length; ++i) {
-        if (this.programs[i] === fn) {
-          this.programs.splice(i, 1);
-          return { res: true };
-        }
-      }
-    } else if (isScriptFilename(fn)) {
-      for (let i = 0; i < this.scripts.length; ++i) {
-        if (this.scripts[i].filename === fn) {
-          if (this.isRunning(fn)) {
-            return {
-              res: false,
-              msg: "Cannot delete a script that is currently running!",
-            };
-          }
-
-          this.scripts.splice(i, 1);
-          return { res: true };
-        }
-      }
-    } else if (fn.endsWith(".lit")) {
-      for (let i = 0; i < this.messages.length; ++i) {
-        const f = this.messages[i];
-        if (typeof f === "string" && f === fn) {
-          this.messages.splice(i, 1);
-          return { res: true };
-        }
-      }
-    } else if (fn.endsWith(".txt")) {
-      for (let i = 0; i < this.textFiles.length; ++i) {
-        if (this.textFiles[i].fn === fn) {
-          this.textFiles.splice(i, 1);
-          return { res: true };
-        }
-      }
-    } else if (fn.endsWith(".cct")) {
-      for (let i = 0; i < this.contracts.length; ++i) {
-        if (this.contracts[i].fn === fn) {
-          this.contracts.splice(i, 1);
-          return { res: true };
-        }
-      }
+  removeFile(path: FilePath): IReturnStatus {
+    if (hasTextExtension(path)) {
+      const textFile = this.textFiles.get(path);
+      if (!textFile) return { res: false, msg: `Text file ${path} not found.` };
+      this.textFiles.delete(path);
+      return { res: true };
+    }
+    if (hasScriptExtension(path)) {
+      const script = this.scripts.get(path);
+      if (!script) return { res: false, msg: `Script ${path} not found.` };
+      if (this.isRunning(path)) return { res: false, msg: "Cannot delete a script that is currently running!" };
+      script.invalidateModule();
+      this.scripts.delete(path);
+      return { res: true };
+    }
+    if (hasProgramExtension(path)) {
+      const programIndex = this.programs.findIndex((program) => program === path);
+      if (programIndex === -1) return { res: false, msg: `Program ${path} does not exist` };
+      this.programs.splice(programIndex, 1);
+      return { res: true };
+    }
+    if (path.endsWith(".lit")) {
+      const litIndex = this.messages.findIndex((lit) => lit === path);
+      if (litIndex === -1) return { res: false, msg: `Literature file ${path} does not exist` };
+      this.messages.splice(litIndex, 1);
+      return { res: true };
+    }
+    if (path.endsWith(".cct")) {
+      const contractIndex = this.contracts.findIndex((contracts) => contracts.fn === path);
+      if (contractIndex === -1) return { res: false, msg: `Contract file ${path} does not exist` };
+      this.contracts.splice(contractIndex, 1);
+      return { res: true };
     }
 
-    return { res: false, msg: "No such file exists" };
+    return { res: false, msg: `Unhandled file extension on file path ${path}` };
   }
 
   /**
@@ -236,70 +221,165 @@ export class BaseServer {
    * be run.
    */
   runScript(script: RunningScript): void {
-    this.runningScripts.push(script);
+    let byPid = this.runningScriptMap.get(script.scriptKey);
+    if (!byPid) {
+      byPid = new Map();
+      this.runningScriptMap.set(script.scriptKey, byPid);
+    }
+    byPid.set(script.pid, script);
   }
 
   setMaxRam(ram: number): void {
     this.maxRam = ram;
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  updateRamUsed(ram: number, player: IPlayer): void {
-    this.ramUsed = ram;
+  updateRamUsed(ram: number): void {
+    this.ramUsed = roundToTwo(clampNumber(ram, 0, this.maxRam));
+  }
+
+  pushProgram(program: ProgramFilePath | CompletedProgramName): void {
+    if (this.programs.includes(program)) return;
+
+    // Remove partially created program if there is one
+    const existingPartialExeIndex = this.programs.findIndex((p) => p.startsWith(program));
+    // findIndex returns -1 if there is no match, we only want to splice on a match
+    if (existingPartialExeIndex > -1) this.programs.splice(existingPartialExeIndex, 1);
+
+    this.programs.push(program);
   }
 
   /**
    * Write to a script file
-   * Overwrites existing files. Creates new files if the script does not eixst
+   * Overwrites existing files. Creates new files if the script does not exist.
    */
-  writeToScriptFile(player: IPlayer, fn: string, code: string): writeResult {
-    const ret = { success: false, overwritten: false };
-    if (!isValidFilePath(fn) || !isScriptFilename(fn)) {
-      return ret;
-    }
-
+  writeToScriptFile(filename: ScriptFilePath, code: string): writeResult {
     // Check if the script already exists, and overwrite it if it does
-    for (let i = 0; i < this.scripts.length; ++i) {
-      if (fn === this.scripts[i].filename) {
-        const script = this.scripts[i];
-        script.code = code;
-        script.updateRamUsage(player, this.scripts);
-        script.markUpdated();
-        ret.overwritten = true;
-        ret.success = true;
-        return ret;
-      }
+    const script = this.scripts.get(filename);
+    if (script) {
+      // content setter handles module invalidation
+      script.content = code;
+      return { overwritten: true };
     }
 
     // Otherwise, create a new script
-    const newScript = new Script(player, fn, code, this.hostname, this.scripts);
-    this.scripts.push(newScript);
-    ret.success = true;
-    return ret;
+    const newScript = new Script(filename, code, this.hostname);
+    this.scripts.set(filename, newScript);
+    return { overwritten: false };
   }
 
   // Write to a text file
   // Overwrites existing files. Creates new files if the text file does not exist
-  writeToTextFile(fn: string, txt: string): writeResult {
-    const ret = { success: false, overwritten: false };
-    if (!isValidFilePath(fn) || !fn.endsWith("txt")) {
-      return ret;
-    }
-
+  writeToTextFile(textPath: TextFilePath, txt: string): writeResult {
     // Check if the text file already exists, and overwrite if it does
-    for (let i = 0; i < this.textFiles.length; ++i) {
-      if (this.textFiles[i].fn === fn) {
-        ret.overwritten = true;
-        this.textFiles[i].text = txt;
-        ret.success = true;
-        return ret;
-      }
+    const existingFile = this.textFiles.get(textPath);
+    // overWrite if already exists
+    if (existingFile) {
+      existingFile.content = txt;
+      return { overwritten: true };
     }
 
     // Otherwise create a new text file
-    const newFile = new TextFile(fn, txt);
-    this.textFiles.push(newFile);
-    ret.success = true;
-    return ret;
+    const newFile = new TextFile(textPath, txt);
+    this.textFiles.set(textPath, newFile);
+    return { overwritten: false };
+  }
+
+  /** Write to a Script or TextFile */
+  writeToContentFile(path: ContentFilePath, content: string): writeResult {
+    if (hasTextExtension(path)) return this.writeToTextFile(path, content);
+    return this.writeToScriptFile(path, content);
+  }
+
+  // Serialize the current object to a JSON save state
+  // Called by subclasses, not stringify.
+  toJSONBase(ctorName: string, keys: readonly (keyof this)[]): IReviverValue {
+    // RunningScripts are stored as a simple array, both for backward compatibility,
+    // compactness, and ease of filtering them here.
+    const result = Generic_toJSON(ctorName, this, keys);
+    assertObject(result.data);
+    if (Settings.ExcludeRunningScriptsFromSave) {
+      result.data.runningScripts = [];
+      return result;
+    }
+
+    const rsArray: RunningScript[] = [];
+    for (const byPid of this.runningScriptMap.values()) {
+      for (const rs of byPid.values()) {
+        if (!rs.temporary) {
+          rsArray.push(rs);
+        }
+      }
+    }
+    result.data.runningScripts = rsArray;
+    return result;
+  }
+
+  // Initializes a Server Object from a JSON save state
+  // Called by subclasses, not Reviver.
+  static fromJSONBase<T extends BaseServer>(value: IReviverValue, ctor: new () => T, keys: readonly (keyof T)[]): T {
+    assertObject(value.data);
+    const server = Generic_fromJSON(ctor, value.data, keys);
+    if (value.data.runningScripts != null && Array.isArray(value.data.runningScripts)) {
+      server.savedScripts = value.data.runningScripts;
+    }
+    // Remove duplicate .lit and .msg files.
+    const messageSet = new Set(server.messages);
+    if (messageSet.size !== server.messages.length) {
+      console.warn("Found duplicate messages in ", server.messages);
+      server.messages = [...messageSet];
+    }
+    // If textFiles is not an array, we've already done the 2.3 migration to textFiles and scripts as maps + path changes.
+    if (!Array.isArray(server.textFiles)) return server;
+
+    // Migrate to using maps for scripts and textfiles. This is done here, directly at load, instead of the
+    // usual upgrade logic, for two reasons:
+    // 1) Our utility functions depend on it, so the upgrade logic itself needs the data to be in maps, even the logic
+    //    written earlier than 2.3!
+    // 2) If the upgrade logic throws, and then you soft-reset at the recovery screen (or maybe don't even see the
+    //    recovery screen), you can end up with a "migrated" save that still has arrays.
+    const newDirectory = resolveDirectory("v2.3FileChanges/") as Directory;
+    let invalidScriptCount = 0;
+    // There was a brief dev window where Server.scripts was already a map but the filepath changes weren't in yet.
+    // Thus, we can't skip this logic just because it's already a map.
+    const oldScripts = Array.isArray(server.scripts) ? (server.scripts as Script[]) : [...server.scripts.values()];
+    server.scripts = new JSONMap();
+    // In case somehow there are previously valid filenames that can't be sanitized, they will go in a new directory with a note.
+    for (const script of oldScripts) {
+      // We're about to do type validation on the filename anyway.
+      if (script.filename.endsWith(".ns")) script.filename = (script.filename + ".js") as ScriptFilePath;
+      let newFilePath = resolveScriptFilePath(script.filename);
+      if (!newFilePath) {
+        newFilePath = `${newDirectory}script${++invalidScriptCount}.js` as ScriptFilePath;
+        script.content = `// Original path: ${script.filename}. Path was no longer valid\n` + script.content;
+      }
+      script.filename = newFilePath;
+      server.scripts.set(newFilePath, script);
+    }
+    let invalidTextCount = 0;
+
+    const oldTextFiles = server.textFiles as (TextFile & { fn?: string })[];
+    server.textFiles = new JSONMap();
+    for (const textFile of oldTextFiles) {
+      const oldName = textFile.fn ?? textFile.filename;
+      delete textFile.fn;
+
+      let newFilePath = resolveTextFilePath(oldName);
+      if (!newFilePath) {
+        newFilePath = `${newDirectory}text${++invalidTextCount}.txt` as TextFilePath;
+        textFile.content = `// Original path: ${textFile.filename}. Path was no longer valid\n` + textFile.content;
+      }
+      textFile.filename = newFilePath;
+      server.textFiles.set(newFilePath, textFile);
+    }
+    if (invalidScriptCount || invalidTextCount) {
+      // If we had to migrate names, don't run scripts for this server.
+      server.savedScripts = [];
+    }
+    return server;
+  }
+
+  // Customize a prune list for a subclass.
+  static getIncludedKeys<T extends BaseServer>(ctor: new () => T): readonly (keyof T)[] {
+    return getKeyList(ctor, { removedKeys: ["runningScriptMap", "savedScripts", "ramUsed", "isHacknetServer"] });
   }
 }

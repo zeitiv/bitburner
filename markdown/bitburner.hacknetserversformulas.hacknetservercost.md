@@ -6,7 +6,7 @@
 
 Calculate the cost of a hacknet server.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 hacknetServerCost(n: number, mult?: number): number;
@@ -14,12 +14,57 @@ hacknetServerCost(n: number, mult?: number): number;
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  n | number | number of the hacknet server |
-|  mult | number | player cost reduction (defaults to 1) |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+n
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+number of the hacknet server
+
+
+</td></tr>
+<tr><td>
+
+mult
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+_(Optional)_ player cost reduction (defaults to 1)
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 number
 

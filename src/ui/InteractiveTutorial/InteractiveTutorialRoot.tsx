@@ -1,11 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect } from "react";
 
 import Paper from "@mui/material/Paper";
 import Typography from "@mui/material/Typography";
-import IconButton from "@mui/material/IconButton";
 import Button from "@mui/material/Button";
-import ArrowForwardIos from "@mui/icons-material/ArrowForwardIos";
-import ArrowBackIos from "@mui/icons-material/ArrowBackIos";
 import { ITutorialEvents } from "./ITutorialEvents";
 import { CopyableText } from "../React/CopyableText";
 
@@ -17,8 +14,7 @@ import AccountTreeIcon from "@mui/icons-material/AccountTree";
 import StorageIcon from "@mui/icons-material/Storage";
 import LocationCityIcon from "@mui/icons-material/LocationCity";
 import { Theme } from "@mui/material/styles";
-import makeStyles from "@mui/styles/makeStyles";
-import createStyles from "@mui/styles/createStyles";
+import { makeStyles } from "tss-react/mui";
 
 import {
   iTutorialPrevStep,
@@ -27,28 +23,33 @@ import {
   iTutorialSteps,
   iTutorialEnd,
 } from "../../InteractiveTutorial";
+import { useRerender } from "../React/hooks";
+import { Settings } from "../../Settings/Settings";
+import { DocumentationLink } from "../React/DocumentationLink";
+import { defaultNsApiPage } from "../React/Documentation";
 
 interface IContent {
   content: React.ReactElement;
   canNext: boolean;
 }
 
-const useStyles = makeStyles((theme: Theme) =>
-  createStyles({
-    textfield: {
-      borderBottom: "1px solid " + theme.palette.primary.main,
-    },
-    code: {
-      whiteSpace: "pre",
-      backgroundColor: theme.palette.background.paper,
-    },
-  }),
-);
+const useStyles = makeStyles()((theme: Theme) => ({
+  textfield: {
+    borderBottom: "1px solid " + theme.palette.primary.main,
+  },
+  code: {
+    whiteSpace: "pre",
+    backgroundColor: theme.palette.background.paper,
+  },
+}));
 
 export function InteractiveTutorialRoot(): React.ReactElement {
-  const classes = useStyles();
+  const { classes } = useStyles();
+  const rerender = useRerender();
 
-  const contents: { [number: string]: IContent | undefined } = {
+  const tutorialScriptName = `n00dles.js`;
+
+  const contents: Record<string, IContent | undefined> = {
     [iTutorialSteps.Start as number]: {
       content: (
         <>
@@ -58,6 +59,9 @@ export function InteractiveTutorialRoot(): React.ReactElement {
             <br />
             <br />
             This tutorial will show you the basics of the game. You may skip the tutorial at any time.
+            <br />
+            <br />
+            You can replay this tutorial by going to the Options tab and pressing "Reset tutorial".
             <br />
             <br />
             You can also collapse this panel to temporarily hide this tutorial.
@@ -125,7 +129,7 @@ export function InteractiveTutorialRoot(): React.ReactElement {
       content: (
         <>
           <Typography>Let's try it out. Start by entering</Typography>
-          <Typography classes={{ root: classes.textfield }}>{"[home ~/]> help"}</Typography>
+          <Typography classes={{ root: classes.textfield }}>{"[home /]> help"}</Typography>
           <Typography>(Don't forget to press Enter after typing the command)</Typography>
         </>
       ),
@@ -134,7 +138,7 @@ export function InteractiveTutorialRoot(): React.ReactElement {
     [iTutorialSteps.TerminalLs as number]: {
       content: (
         <>
-          <Typography classes={{ root: classes.textfield }}>{"[home ~/]> help"}</Typography>
+          <Typography classes={{ root: classes.textfield }}>{"[home /]> help"}</Typography>
           <Typography>
             displays a list of all available Terminal commands, how to use them, and a description of what they do.{" "}
             <br />
@@ -142,7 +146,10 @@ export function InteractiveTutorialRoot(): React.ReactElement {
             Let's try another command. Enter
           </Typography>
 
-          <Typography classes={{ root: classes.textfield }}>{"[home ~/]> ls"}</Typography>
+          <Typography classes={{ root: classes.textfield }}>{"[home /]> ls"}</Typography>
+          <Typography>
+            <br />( "ls" is short for "list" )
+          </Typography>
         </>
       ),
       canNext: false,
@@ -150,16 +157,16 @@ export function InteractiveTutorialRoot(): React.ReactElement {
     [iTutorialSteps.TerminalScan as number]: {
       content: (
         <>
-          <Typography classes={{ root: classes.textfield }}>{"[home ~/]> ls"}</Typography>
+          <Typography classes={{ root: classes.textfield }}>{"[home /]> ls"}</Typography>
           <Typography>
             {" "}
-            is a basic command that shows files on the computer. Right now, it shows that you have a program called{" "}
+            is a basic command that lists the files on the computer. Right now, it shows that you have a program called{" "}
             NUKE.exe on your computer. We'll get to what this does later. <br />
             <br />
             Using your home computer's terminal, you can connect to other machines throughout the world. Let's do that
             now by first entering
           </Typography>
-          <Typography classes={{ root: classes.textfield }}>{"[home ~/]> scan"}</Typography>
+          <Typography classes={{ root: classes.textfield }}>{"[home /]> scan"}</Typography>
         </>
       ),
       canNext: false,
@@ -167,7 +174,7 @@ export function InteractiveTutorialRoot(): React.ReactElement {
     [iTutorialSteps.TerminalScanAnalyze1 as number]: {
       content: (
         <>
-          <Typography classes={{ root: classes.textfield }}>{"[home ~/]> scan"}</Typography>
+          <Typography classes={{ root: classes.textfield }}>{"[home /]> scan"}</Typography>
           <Typography>
             shows all available network connections. In other words, it displays a list of all servers that can be
             connected to from your current machine. A server is identified by its hostname. <br />
@@ -175,7 +182,7 @@ export function InteractiveTutorialRoot(): React.ReactElement {
             That's great and all, but there's so many servers. Which one should you go to?{" "}
           </Typography>
 
-          <Typography classes={{ root: classes.textfield }}>{"[home ~/]> scan-analyze"}</Typography>
+          <Typography classes={{ root: classes.textfield }}>{"[home /]> scan-analyze"}</Typography>
           <Typography>gives some more detailed information about servers on the network. Try it now!</Typography>
         </>
       ),
@@ -184,7 +191,7 @@ export function InteractiveTutorialRoot(): React.ReactElement {
     [iTutorialSteps.TerminalScanAnalyze2 as number]: {
       content: (
         <>
-          <Typography classes={{ root: classes.textfield }}>{"[home ~/]> scan-analyze"}</Typography>
+          <Typography classes={{ root: classes.textfield }}>{"[home /]> scan-analyze"}</Typography>
           <Typography>
             shows more detailed information about each server that you can connect to (servers that are a distance of
             one node away). <br />
@@ -192,7 +199,7 @@ export function InteractiveTutorialRoot(): React.ReactElement {
             following command:{" "}
           </Typography>
 
-          <Typography classes={{ root: classes.textfield }}>{"[home ~/]> scan-analyze 2"}</Typography>
+          <Typography classes={{ root: classes.textfield }}>{"[home /]> scan-analyze 2"}</Typography>
         </>
       ),
       canNext: false,
@@ -205,17 +212,17 @@ export function InteractiveTutorialRoot(): React.ReactElement {
             navigate to those servers through the network. You can only connect to a server that is one node away. To
             connect to a machine, use
           </Typography>
-          <Typography classes={{ root: classes.textfield }}>{"[home ~/]> connect hostname"}</Typography>
+          <Typography classes={{ root: classes.textfield }}>{"[home /]> connect hostname"}</Typography>
 
           <Typography>From the results of </Typography>
-          <Typography classes={{ root: classes.textfield }}>{"[home ~/]> scan-analyze 2"}</Typography>
+          <Typography classes={{ root: classes.textfield }}>{"[home /]> scan-analyze 2"}</Typography>
 
           <Typography>
             {" "}
-            we can see that the n00dles server is only one node away. Let's connect so it now using:
+            we can see that the n00dles server is only one node away. Let's connect to it now using:
           </Typography>
 
-          <Typography classes={{ root: classes.textfield }}>{"[home ~/]> connect n00dles"}</Typography>
+          <Typography classes={{ root: classes.textfield }}>{"[home /]> connect n00dles"}</Typography>
         </>
       ),
       canNext: false,
@@ -232,7 +239,7 @@ export function InteractiveTutorialRoot(): React.ReactElement {
             <br />
             Before you try to hack a server, you should run diagnostics using{" "}
           </Typography>
-          <Typography classes={{ root: classes.textfield }}>{"[n00dles ~/]> analyze"}</Typography>
+          <Typography classes={{ root: classes.textfield }}>{"[n00dles /]> analyze"}</Typography>
         </>
       ),
       canNext: false,
@@ -241,7 +248,7 @@ export function InteractiveTutorialRoot(): React.ReactElement {
       content: (
         <>
           <Typography>When </Typography>
-          <Typography classes={{ root: classes.textfield }}>{"[n00dles ~/]> analyze"}</Typography>
+          <Typography classes={{ root: classes.textfield }}>{"[n00dles /]> analyze"}</Typography>
 
           <Typography>
             finishes running it will show useful information about hacking the server. <br />
@@ -250,25 +257,25 @@ export function InteractiveTutorialRoot(): React.ReactElement {
             on your home computer is a virus that will grant you root access to a machine if there are enough open
             ports.
           </Typography>
-          <Typography classes={{ root: classes.textfield }}>{"[n00dles ~/]> analyze"}</Typography>
+          <Typography classes={{ root: classes.textfield }}>{"[n00dles /]> analyze"}</Typography>
 
           <Typography>
             {" "}
             shows that there do not need to be any open ports on this machine for the NUKE virus to work, so go ahead
             and run the virus using{" "}
           </Typography>
-          <Typography classes={{ root: classes.textfield }}>{"[n00dles ~/]> run NUKE.exe"}</Typography>
+          <Typography classes={{ root: classes.textfield }}>{"[n00dles /]> run NUKE.exe"}</Typography>
 
           <Typography></Typography>
         </>
       ),
-      canNext: true,
+      canNext: false,
     },
     [iTutorialSteps.TerminalManualHack as number]: {
       content: (
         <>
           <Typography>You now have root access! You can hack the server using </Typography>
-          <Typography classes={{ root: classes.textfield }}>{"[n00dles ~/]> hack"}</Typography>
+          <Typography classes={{ root: classes.textfield }}>{"[n00dles /]> hack"}</Typography>
 
           <Typography> Try doing that now.</Typography>
         </>
@@ -277,7 +284,7 @@ export function InteractiveTutorialRoot(): React.ReactElement {
     },
     [iTutorialSteps.TerminalHackingMechanics as number]: {
       content: (
-        <Typography>
+        <Typography component="div">
           You are now attempting to hack the server. Performing a hack takes time and only has a certain percentage
           chance of success. This time and success chance is determined by a variety of factors, including your hacking
           skill and the server's security level.
@@ -289,9 +296,9 @@ export function InteractiveTutorialRoot(): React.ReactElement {
           <br />
           The amount of money on a server is not limitless. So, if you constantly hack a server and deplete its money,
           then you will encounter diminishing returns in your hacking. You will need to use{" "}
-          <Typography classes={{ root: classes.textfield }}>{"[n00dles ~/]> grow"}</Typography>
+          <Typography classes={{ root: classes.textfield }}>{"[n00dles /]> grow"}</Typography>
           which tricks the company into adding money to their server and{" "}
-          <Typography classes={{ root: classes.textfield }}>{"[n00dles ~/]> weaken"}</Typography>
+          <Typography classes={{ root: classes.textfield }}>{"[n00dles /]> weaken"}</Typography>
           which increases the speed of hack and grow.
         </Typography>
       ),
@@ -301,12 +308,12 @@ export function InteractiveTutorialRoot(): React.ReactElement {
       content: (
         <>
           <Typography>From any server you can get back home using</Typography>
-          <Typography classes={{ root: classes.textfield }}>{"[n00dles ~/]> home"}</Typography>
+          <Typography classes={{ root: classes.textfield }}>{"[n00dles /]> home"}</Typography>
 
           <Typography>Let's head home before creating our first script!</Typography>
         </>
       ),
-      canNext: true,
+      canNext: false,
     },
     [iTutorialSteps.TerminalCreateScript as number]: {
       content: (
@@ -318,39 +325,50 @@ export function InteractiveTutorialRoot(): React.ReactElement {
             <br />
             To create a new script or edit an existing one, you can use{" "}
           </Typography>
-          <Typography classes={{ root: classes.textfield }}>{"[home ~/]> nano"}</Typography>
-
-          <Typography>Scripts must end with the .script extension. Let's make a script now by entering </Typography>
-          <Typography classes={{ root: classes.textfield }}>{"[home ~/]> nano n00dles.script"}</Typography>
+          <Typography classes={{ root: classes.textfield }}>{"[home /]> nano"}</Typography>
 
           <Typography>
-            after the hack command finishes running (Sidenote: Pressing ctrl + c will end a command like hack early)
+            Scripts must end with a script extension (.js, .jsx, .ts, .tsx). Let's make a script now by entering
           </Typography>
+          <Typography classes={{ root: classes.textfield }}>{`[home /]> nano ${tutorialScriptName}`}</Typography>
         </>
       ),
       canNext: false,
     },
-    [iTutorialSteps.TerminalTypeScript as number]: {
+    [iTutorialSteps.TerminalEditScript as number]: {
       content: (
         <>
           <Typography>
-            This is the script editor. You can use it to program your scripts. Scripts are written in a simplified
-            version of javascript. Copy and paste the following code into the script editor: <br />
+            This is the script editor. You can use it to program your scripts. Click this text to copy it and paste it
+            into the text editor:
           </Typography>
-
-          <Typography classes={{ root: classes.code }}>
-            <CopyableText
-              value={`while(true) {
-  hack('n00dles');
+          <br />
+          <Typography component="div" classes={{ root: classes.code }}>
+            {
+              <CopyableText
+                value={`/** @param {NS} ns */
+export async function main(ns) {
+  while (true) {
+    await ns.hack("n00dles");
+  }
 }`}
-            />
+              />
+            }
           </Typography>
+          <br />
           <Typography>
             For anyone with basic programming experience, this code should be straightforward. This script will
             continuously hack the n00dles server.
             <br />
             <br />
-            To save and close the script editor, press the button in the bottom left, or press ctrl + s then ctrl + b.
+            Use the search tool at the bottom to find and have a quick glance at documentation of any NS APIs.
+            <br />
+            <br />
+            To access <DocumentationLink page={defaultNsApiPage}>NS API documentation</DocumentationLink>, press the
+            link at the bottom.
+            <br />
+            <br />
+            To save and close the script editor, press the button at the bottom.
           </Typography>
         </>
       ),
@@ -367,7 +385,7 @@ export function InteractiveTutorialRoot(): React.ReactElement {
             <br />
             To check how much RAM is available on this machine, enter
           </Typography>
-          <Typography classes={{ root: classes.textfield }}>{"[home ~/]> free"}</Typography>
+          <Typography classes={{ root: classes.textfield }}>{"[home /]> free"}</Typography>
         </>
       ),
       canNext: false,
@@ -378,7 +396,7 @@ export function InteractiveTutorialRoot(): React.ReactElement {
           <Typography>
             We have 8GB of free RAM on this machine, which is enough to run our script. Let's run our script using
           </Typography>
-          <Typography classes={{ root: classes.textfield }}>{"[home ~/]> run n00dles.script"}</Typography>
+          <Typography classes={{ root: classes.textfield }}>{`[home /]> run ${tutorialScriptName}`}</Typography>
         </>
       ),
       canNext: false,
@@ -388,7 +406,7 @@ export function InteractiveTutorialRoot(): React.ReactElement {
         <>
           <Typography>
             Your script is now running! It will continuously run in the background and will automatically stop if the
-            code ever completes (the n00dles.script will never complete because it runs an infinite loop). <br />
+            code ever completes (the {tutorialScriptName} will never complete because it runs an infinite loop). <br />
             <br />
             These scripts can passively earn you income and hacking experience. Your scripts will also earn money and
             experience while you are offline, although at a slightly slower rate. <br />
@@ -408,7 +426,16 @@ export function InteractiveTutorialRoot(): React.ReactElement {
         <>
           <Typography>
             This page displays information about all of your scripts that are running across every server. You can use
-            this to gauge how well your scripts are doing. Let's go back to
+            this to gauge how well your scripts are doing.
+            <br />
+            <br />
+            Click on Home to see the scripts running on it.
+            <br />
+            <br />
+            Then click on n00dles.js to see the scripts information.
+            <br />
+            <br />
+            Let's go back to
           </Typography>
           <ListItem>
             <LastPageIcon color={"error"} />
@@ -425,7 +452,7 @@ export function InteractiveTutorialRoot(): React.ReactElement {
             One last thing about scripts, each active script contains logs that detail what it's doing. We can check
             these logs using the tail command. Do that now for the script we just ran by typing{" "}
           </Typography>
-          <Typography classes={{ root: classes.textfield }}>{"[home ~/]> tail n00dles.script"}</Typography>
+          <Typography classes={{ root: classes.textfield }}>{`[home /]> tail ${tutorialScriptName}`}</Typography>
         </>
       ),
       canNext: false,
@@ -441,18 +468,10 @@ export function InteractiveTutorialRoot(): React.ReactElement {
           </Typography>
           <ListItem>
             <HelpIcon color={"primary"} />
-            <Typography color={"primary"}>Tutorial</Typography>
+            <Typography color={"primary"}>Documentation</Typography>
           </ListItem>
           <Typography>
             in the main navigation menu to look at the documentation.
-            <br />
-            <br />
-            If you know even a little bit of programming it is highly recommended you use NS2 instead. You will enjoy
-            the game much more. NS1 files end with .script and are a subset of javascript. NS2 files end with .js and
-            are full speed native javascript.
-            <br />
-            <br />
-            You can learn more about the difference between them later in the documentation.
             <br />
             <br />
             For now, let's move on to something else!
@@ -475,7 +494,7 @@ export function InteractiveTutorialRoot(): React.ReactElement {
           <Typography>through the main navigation menu now.</Typography>
         </>
       ),
-      canNext: true,
+      canNext: false,
     },
     [iTutorialSteps.HacknetNodesIntroduction as number]: {
       content: (
@@ -501,7 +520,7 @@ export function InteractiveTutorialRoot(): React.ReactElement {
           </ListItem>
         </>
       ),
-      canNext: true,
+      canNext: false,
     },
     [iTutorialSteps.WorldDescription as number]: {
       content: (
@@ -515,18 +534,49 @@ export function InteractiveTutorialRoot(): React.ReactElement {
           </Typography>
           <ListItem>
             <HelpIcon color={"error"} />
-            <Typography color={"error"}>Tutorial</Typography>
+            <Typography color={"error"}>Documentation</Typography>
           </ListItem>
         </>
       ),
-      canNext: true,
+      canNext: false,
     },
-    [iTutorialSteps.TutorialPageInfo as number]: {
+    [iTutorialSteps.DocumentationPageInfo as number]: {
       content: (
-        <Typography>
-          This page contains a lot of different documentation about the game's content and mechanics. I know it's a lot,
-          but I highly suggest you read (or at least skim) through this before you start playing . That's the end of the
-          tutorial. Hope you enjoy the game!
+        <Typography component="div">
+          This page contains a lot of different documentation about the game's contents and mechanics. I know it's a
+          lot, but I highly suggest you read (or at least skim) through this before you start playing. Some pages are
+          inaccessible at the start and will be unlocked later.
+          <br />
+          <br />
+          If you click a link in these pages while holding Ctrl key (Control key on Mac keyboard), it will be opened in
+          a new tab. If you play the Steam version, that link will be opened in your default browser.
+          <br />
+          <br />
+          You should at least check these pages:
+          <ul>
+            <li>
+              The <DocumentationLink page="help/getting_started.md">Beginner's guide</DocumentationLink> contains the
+              guide for new players, navigating you through most of the early game.
+            </li>
+            <li>
+              The <DocumentationLink page={defaultNsApiPage}>NS API documentation</DocumentationLink> contains reference
+              materials for all NS APIs.
+            </li>
+            <li>
+              The <DocumentationLink page="help/faq.md">FAQ</DocumentationLink> contains questions often asked by
+              beginners of the game.
+            </li>
+          </ul>
+          <Typography fontWeight="fontWeightBold">
+            This documentation page is the best place to get up-to-date information, especially when you get stuck. If
+            you have a question and cannot find the answer here, please ask us on Discord.
+          </Typography>
+          <br />
+          <Typography color={Settings.theme.warning}>
+            The documentation at readthedocs is outdated and unmaintained. Do not use them!
+          </Typography>
+          <br />
+          That's the end of the tutorial. Hope you enjoy the game!
         </Typography>
       ),
       canNext: true,
@@ -537,37 +587,38 @@ export function InteractiveTutorialRoot(): React.ReactElement {
     },
   };
 
-  const setRerender = useState(false)[1];
-  function rerender(): void {
-    setRerender((old) => !old);
-  }
-
   useEffect(() => {
     return ITutorialEvents.subscribe(rerender);
-  }, []);
+  }, [rerender]);
+
   const step = ITutorial.currStep;
   const content = contents[step];
   if (content === undefined) throw new Error("error in the tutorial");
   return (
-    <Paper square sx={{ maxWidth: "70vw", p: 2 }}>
-      {content.content}
-      {step !== iTutorialSteps.TutorialPageInfo && (
-        <>
-          <IconButton onClick={iTutorialPrevStep} aria-label="previous">
-            <ArrowBackIos />
-          </IconButton>
-          {content.canNext && (
-            <IconButton onClick={iTutorialNextStep} aria-label="next">
-              <ArrowForwardIos />
-            </IconButton>
-          )}
-        </>
-      )}
-      <br />
-      <br />
-      <Button onClick={iTutorialEnd}>
-        {step !== iTutorialSteps.TutorialPageInfo ? "SKIP TUTORIAL" : "FINISH TUTORIAL"}
-      </Button>
-    </Paper>
+    <>
+      <Paper square sx={{ maxWidth: "70vw", p: 2 }}>
+        {content.content}
+        <br />
+        {step !== iTutorialSteps.DocumentationPageInfo && (
+          <>
+            {step !== iTutorialSteps.Start && (
+              <Button onClick={iTutorialPrevStep} aria-label="previous" style={{ marginRight: "1em" }}>
+                Previous
+              </Button>
+            )}
+            {(content.canNext || ITutorial.stepIsDone[step]) && (
+              <Button onClick={iTutorialNextStep} aria-label="next">
+                Next
+              </Button>
+            )}
+          </>
+        )}
+        <br />
+        <br />
+        <Button onClick={iTutorialEnd}>
+          {step !== iTutorialSteps.DocumentationPageInfo ? "Exit Tutorial" : "Finish Tutorial"}
+        </Button>
+      </Paper>
+    </>
   );
 }

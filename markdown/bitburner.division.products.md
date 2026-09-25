@@ -4,9 +4,9 @@
 
 ## Division.products property
 
-Products developed by this division
+Names of Products developed by this division
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 products: string[];

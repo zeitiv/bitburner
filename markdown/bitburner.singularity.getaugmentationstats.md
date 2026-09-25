@@ -6,21 +6,51 @@
 
 Get the stats of an augmentation.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getAugmentationStats(name: string): AugmentationStats;
+getAugmentationStats(name: string): Multipliers;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  name | string | Name of Augmentation. CASE-SENSITIVE. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
 
-[AugmentationStats](./bitburner.augmentationstats.md)
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+name
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Name of Augmentation. CASE-SENSITIVE.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
+
+[Multipliers](./bitburner.multipliers.md)
 
 Augmentation stats.
 

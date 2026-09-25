@@ -1,6 +1,9 @@
-import { Player } from "../Player";
-import { Script } from "../Script/Script";
+import { AugmentationName } from "@enums";
+import { PlayerOwnedAugmentation } from "../Augmentation/PlayerOwnedAugmentation";
+import { Player } from "@player";
 import { GetAllServers } from "../Server/AllServers";
+import { resolveTextFilePath } from "../Paths/TextFilePath";
+import { resolveScriptFilePath, type ScriptFilePath } from "../Paths/ScriptFilePath";
 
 const detect: [string, string][] = [
   ["getHackTime", "returns milliseconds"],
@@ -20,7 +23,7 @@ const detect: [string, string][] = [
   ["basic.weakenTime", "renamed 'hacking.weakenTime'"],
   ["write", "needs to be awaited"],
   ["scp", "needs to be awaited"],
-  ["sleep", "Can no longer be called simultenaously."],
+  ["sleep", "Can no longer be called simultaneously."],
   ["hacking_skill", "renamed 'hacking'"],
   ["tryWrite", "renamed 'tryWritePort'"],
 ];
@@ -68,25 +71,41 @@ function convert(code: string): string {
     }
     out.push(line);
   }
-  return out.join("\n");
+  code = out.join("\n");
+  return code;
+}
+
+export function AwardNFG(n = 1): void {
+  const nf = Player.augmentations.find((a) => a.name === AugmentationName.NeuroFluxGovernor);
+  if (nf) {
+    nf.level += n;
+  } else {
+    const nf = new PlayerOwnedAugmentation(AugmentationName.NeuroFluxGovernor);
+    nf.level = n;
+    Player.augmentations.push(nf);
+  }
+}
+
+export interface IFileLine {
+  file: string;
+  line: number;
+  content: string;
 }
 
 export function v1APIBreak(): void {
-  interface IFileLine {
-    file: string;
-    line: number;
-  }
   let txt = "";
   for (const server of GetAllServers()) {
     for (const change of detect) {
       const s: IFileLine[] = [];
-      for (const script of server.scripts) {
+
+      for (const script of server.scripts.values()) {
         const lines = script.code.split("\n");
         for (let i = 0; i < lines.length; i++) {
           if (lines[i].includes(change[0])) {
             s.push({
               file: script.filename,
               line: i + 1,
+              content: "",
             });
           }
         }
@@ -94,25 +113,42 @@ export function v1APIBreak(): void {
 
       if (s.length === 0) continue;
 
-      txt += `// Detected change ${change[0]}, reason: ${change[1]}` + "\n";
+      txt += `// Detected change ${change[0]}, reason: ${change[1]}\n`;
       for (const fl of s) {
-        txt += `${fl.file}:${fl.line}` + "\n";
+        txt += `${fl.file}:${fl.line}\n`;
       }
     }
   }
   if (txt !== "") {
     const home = Player.getHomeComputer();
-    home.writeToTextFile("v1_DETECTED_CHANGES.txt", txt);
+    const textPath = resolveTextFilePath("v1_DETECTED_CHANGES.txt");
+    if (!textPath) return console.error("Filepath unexpectedly failed to parse");
+    home.writeToTextFile(textPath, txt);
   }
 
+  const backupFiles = new Map<ScriptFilePath, string>();
   for (const server of GetAllServers()) {
-    const backups: Script[] = [];
-    for (const script of server.scripts) {
-      if (!hasChanges(script.code)) continue;
-      const prefix = script.filename.includes("/") ? "/BACKUP_" : "BACKUP_";
-      backups.push(new Script(Player, prefix + script.filename, script.code, script.server));
+    backupFiles.clear();
+    for (const script of server.scripts.values()) {
+      if (!hasChanges(script.code)) {
+        continue;
+      }
+      // Sanitize first before combining
+      const oldFilename = resolveScriptFilePath(script.filename);
+      if (!oldFilename) {
+        console.error(`Cannot resolve path for ${script.filename}`);
+        continue;
+      }
+      const filename = resolveScriptFilePath("BACKUP_" + oldFilename);
+      if (!filename) {
+        console.error(`Cannot resolve backup path for ${script.filename}`);
+        continue;
+      }
+      backupFiles.set(filename, script.code);
       script.code = convert(script.code);
     }
-    server.scripts = server.scripts.concat(backups);
+    for (const [filename, code] of backupFiles.entries()) {
+      server.writeToScriptFile(filename, code);
+    }
   }
 }

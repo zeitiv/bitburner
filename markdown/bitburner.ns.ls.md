@@ -6,20 +6,65 @@
 
 List files on a server.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-ls(host: string, grep?: string): string[];
+ls(host: string, substring?: string): string[];
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  host | string | Host of the target server. |
-|  grep | string | A substring to search for in the filename. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+host
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+Hostname/IP of the target server.
+
+
+</td></tr>
+<tr><td>
+
+substring
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ A substring to search for in the filename.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 string\[\]
 

@@ -1,93 +1,52 @@
-import React, { useState } from "react";
-import { ActionTypes } from "../data/ActionTypes";
-import { createProgressBarText } from "../../utils/helpers/createProgressBarText";
-import { formatNumber, convertTimeMsToTimeElapsedString } from "../../utils/StringHelperFunctions";
+import type { Bladeburner } from "../Bladeburner";
+import type { Operation } from "../Actions/Operation";
+
+import React from "react";
+import { Paper, Typography } from "@mui/material";
+
+import { Player } from "@player";
+import { convertTimeMsToTimeElapsedString } from "../../utils/StringHelperFunctions";
 import { SuccessChance } from "./SuccessChance";
 import { ActionLevel } from "./ActionLevel";
 import { Autolevel } from "./Autolevel";
-import { StartButton } from "./StartButton";
-import { TeamSizeButton } from "./TeamSizeButton";
-import { IBladeburner } from "../IBladeburner";
-import { Operation } from "../Operation";
-import { Operations } from "../data/Operations";
-import { IPlayer } from "../../PersonObjects/IPlayer";
-import { CopyableText } from "../../ui/React/CopyableText";
+import { formatBigNumber } from "../../ui/formatNumber";
+import { useRerender } from "../../ui/React/hooks";
+import { BladeburnerActionType } from "@enums";
+import { ActionHeader } from "./ActionHeader";
 
-import Typography from "@mui/material/Typography";
-import Paper from "@mui/material/Paper";
-
-interface IProps {
-  bladeburner: IBladeburner;
-  player: IPlayer;
+interface OperationElemProps {
+  bladeburner: Bladeburner;
   action: Operation;
 }
 
-export function OperationElem(props: IProps): React.ReactElement {
-  const setRerender = useState(false)[1];
-  function rerender(): void {
-    setRerender((old) => !old);
-  }
+export function OperationElem({ bladeburner, action }: OperationElemProps): React.ReactElement {
+  const rerender = useRerender();
   const isActive =
-    props.bladeburner.action.type === ActionTypes["Operation"] && props.action.name === props.bladeburner.action.name;
-  const computedActionTimeCurrent = Math.min(
-    props.bladeburner.actionTimeCurrent + props.bladeburner.actionTimeOverflow,
-    props.bladeburner.actionTimeToComplete,
-  );
-  const actionTime = props.action.getActionTime(props.bladeburner);
-
-  const actionData = Operations[props.action.name];
-  if (actionData === undefined) {
-    throw new Error(`Cannot find data for ${props.action.name}`);
-  }
+    bladeburner.action?.type === BladeburnerActionType.Operation && action.name === bladeburner.action?.name;
+  const actionTime = action.getActionTime(bladeburner, Player);
 
   return (
     <Paper sx={{ my: 1, p: 1 }}>
-      {isActive ? (
-        <>
-          <Typography>
-            <CopyableText value={props.action.name} /> (IN PROGRESS - {formatNumber(computedActionTimeCurrent, 0)} /{" "}
-            {formatNumber(props.bladeburner.actionTimeToComplete, 0)})
-          </Typography>
-          <Typography>
-            {createProgressBarText({
-              progress: computedActionTimeCurrent / props.bladeburner.actionTimeToComplete,
-            })}
-          </Typography>
-        </>
-      ) : (
-        <>
-          <CopyableText value={props.action.name} />
-          <StartButton
-            bladeburner={props.bladeburner}
-            type={ActionTypes.Operation}
-            name={props.action.name}
-            rerender={rerender}
-          />
-          <TeamSizeButton action={props.action} bladeburner={props.bladeburner} />
-        </>
-      )}
+      <ActionHeader bladeburner={bladeburner} action={action} rerender={rerender}></ActionHeader>
       <br />
+      <ActionLevel action={action} bladeburner={bladeburner} isActive={isActive} rerender={rerender} />
       <br />
-
-      <ActionLevel action={props.action} bladeburner={props.bladeburner} isActive={isActive} rerender={rerender} />
-      <br />
-      <br />
-      <Typography>
-        {actionData.desc}
+      <Typography whiteSpace={"pre-wrap"}>
+        {action.desc}
         <br />
         <br />
-        <SuccessChance action={props.action} bladeburner={props.bladeburner} />
+        <SuccessChance action={action} bladeburner={bladeburner} />
         <br />
         Time Required: {convertTimeMsToTimeElapsedString(actionTime * 1000)}
         <br />
-        Operations remaining: {Math.floor(props.action.count)}
+        Operations remaining: {formatBigNumber(Math.floor(action.count))}
         <br />
-        Successes: {props.action.successes}
+        Successes: {formatBigNumber(action.successes)}
         <br />
-        Failures: {props.action.failures}
+        Failures: {formatBigNumber(action.failures)}
       </Typography>
       <br />
-      <Autolevel rerender={rerender} action={props.action} />
+      <Autolevel rerender={rerender} action={action} />
     </Paper>
   );
 }

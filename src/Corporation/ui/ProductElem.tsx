@@ -1,26 +1,21 @@
 import React, { useState } from "react";
-
-import { CorporationConstants } from "../data/Constants";
+import { Box, Button, Paper, Tooltip, Typography } from "@mui/material";
+import { CityName, CorpUnlockName } from "@enums";
+import * as corpConstants from "../data/Constants";
 import { Product } from "../Product";
-import { DiscontinueProductModal } from "./DiscontinueProductModal";
-import { LimitProductProductionModal } from "./LimitProductProductionModal";
-import { SellProductModal } from "./SellProductModal";
-import { ProductMarketTaModal } from "./ProductMarketTaModal";
+import { DiscontinueProductModal } from "./modals/DiscontinueProductModal";
+import { LimitProductProductionModal } from "./modals/LimitProductProductionModal";
+import { SellProductModal } from "./modals/SellProductModal";
+import { CancelProductModal } from "./modals/CancelProductModal";
 
-import { numeralWrapper } from "../../ui/numeralFormat";
+import { formatBigNumber, formatPercent } from "../../ui/formatNumber";
 
-import { isString } from "../../utils/helpers/isString";
 import { Money } from "../../ui/React/Money";
 import { useCorporation, useDivision } from "./Context";
-
-import Typography from "@mui/material/Typography";
-import Tooltip from "@mui/material/Tooltip";
-import Paper from "@mui/material/Paper";
-import Button from "@mui/material/Button";
-import Box from "@mui/material/Box";
+import { StatsTable } from "../../ui/React/StatsTable";
 
 interface IProductProps {
-  city: string;
+  city: CityName;
   product: Product;
   rerender: () => void;
 }
@@ -32,33 +27,29 @@ export function ProductElem(props: IProductProps): React.ReactElement {
   const [sellOpen, setSellOpen] = useState(false);
   const [limitOpen, setLimitOpen] = useState(false);
   const [discontinueOpen, setDiscontinueOpen] = useState(false);
-  const [marketTaOpen, setMarketTaOpen] = useState(false);
+  const [cancelOpen, setCancelOpen] = useState(false);
   const city = props.city;
   const product = props.product;
-
-  // Numeraljs formatters
-  const nf = "0.000";
-  const nfB = "0.000a"; // For numbers that might be big
-
+  const cityData = product.cityData[city];
   const hasUpgradeDashboard = division.hasResearch("uPgrade: Dashboard");
 
   // Total product gain = production - sale
-  const totalGain = product.data[city][1] - product.data[city][2];
+  const totalGain = cityData.productionAmount - cityData.actualSellAmount;
 
   // Sell button
   let sellButtonText: JSX.Element;
-  if (product.sllman[city][0]) {
-    if (isString(product.sllman[city][1])) {
+  const desiredSellAmount = cityData.desiredSellAmount;
+  if (desiredSellAmount !== null) {
+    if (typeof desiredSellAmount === "string") {
       sellButtonText = (
         <>
-          Sell ({numeralWrapper.format(product.data[city][2], nfB)}/{product.sllman[city][1]})
+          Sell ({formatBigNumber(cityData.actualSellAmount)}/{desiredSellAmount})
         </>
       );
     } else {
       sellButtonText = (
         <>
-          Sell ({numeralWrapper.format(product.data[city][2], nfB)}/
-          {numeralWrapper.format(product.sllman[city][1], nfB)})
+          Sell ({formatBigNumber(cityData.actualSellAmount)}/{formatBigNumber(desiredSellAmount)})
         </>
       );
     }
@@ -66,67 +57,48 @@ export function ProductElem(props: IProductProps): React.ReactElement {
     sellButtonText = <>Sell (0.000/0.000)</>;
   }
 
-  if (product.marketTa2) {
-    sellButtonText = (
-      <>
-        {sellButtonText} @ <Money money={product.marketTa2Price[city]} />
-      </>
-    );
-  } else if (product.marketTa1) {
-    const markupLimit = product.rat / product.mku;
-    sellButtonText = (
-      <>
-        {sellButtonText} @ <Money money={product.pCost + markupLimit} />
-      </>
-    );
-  } else if (product.sCost) {
-    if (isString(product.sCost)) {
-      const sCost = (product.sCost as string).replace(/MP/g, product.pCost + product.rat / product.mku + "");
-      sellButtonText = (
-        <>
-          {sellButtonText} @ <Money money={eval(sCost)} />
-        </>
-      );
-    } else {
-      sellButtonText = (
-        <>
-          {sellButtonText} @ <Money money={product.sCost} />
-        </>
-      );
-    }
-  }
-
+  sellButtonText = (
+    <>
+      {sellButtonText} @ <Money money={product.uiMarketPrice[city]} />
+    </>
+  );
   // Limit Production button
-  let limitProductionButtonText = "Limit Production";
-  if (product.prdman[city][0]) {
-    limitProductionButtonText += " (" + numeralWrapper.format(product.prdman[city][1], nf) + ")";
-  }
+  const productionLimit = cityData.productionLimit;
+  const limitProductionButtonText =
+    "Limit Production" + (productionLimit !== null ? " (" + formatBigNumber(productionLimit) + ")" : "");
 
   return (
     <Paper>
-      {!product.fin ? (
+      {!product.finished ? (
         <>
           <Typography>
-            Designing {product.name} (req. Operations/Engineers in {product.createCity})...
+            Designing {product.name} (req. Operations/Engineers in {product.creationCity})...
           </Typography>
           <br />
-          <Typography>{numeralWrapper.format(product.prog, "0.00")}% complete</Typography>
+          <Typography>{formatPercent(product.developmentProgress / 100, 2)} complete</Typography>
+          <Button onClick={() => setCancelOpen(true)}>Cancel</Button>
+          <CancelProductModal
+            product={product}
+            rerender={props.rerender}
+            open={cancelOpen}
+            onClose={() => setCancelOpen(false)}
+          />
         </>
       ) : (
         <>
           <Box display="flex">
             <Tooltip
               title={
-                <Typography>
-                  Prod: {numeralWrapper.format(product.data[city][1], nfB)}/s
-                  <br />
-                  Sell: {numeralWrapper.format(product.data[city][2], nfB)} /s
-                </Typography>
+                <StatsTable
+                  rows={[
+                    ["Prod:", formatBigNumber(cityData.productionAmount)],
+                    ["Sell:", formatBigNumber(-cityData.actualSellAmount || 0)],
+                  ]}
+                />
               }
             >
               <Typography>
-                {product.name}: {numeralWrapper.format(product.data[city][0], nfB)} (
-                {numeralWrapper.format(totalGain, nfB)}
+                {product.name}: {formatBigNumber(cityData.stored)} ({formatBigNumber(totalGain)}
                 /s)
               </Typography>
             </Tooltip>
@@ -135,27 +107,36 @@ export function ProductElem(props: IProductProps): React.ReactElement {
             <Tooltip
               title={
                 <Typography>
-                  Quality: {numeralWrapper.format(product.qlt, nf)} <br />
-                  Performance: {numeralWrapper.format(product.per, nf)} <br />
-                  Durability: {numeralWrapper.format(product.dur, nf)} <br />
-                  Reliability: {numeralWrapper.format(product.rel, nf)} <br />
-                  Aesthetics: {numeralWrapper.format(product.aes, nf)} <br />
-                  Features: {numeralWrapper.format(product.fea, nf)}
-                  {corp.unlockUpgrades[2] === 1 && <br />}
-                  {corp.unlockUpgrades[2] === 1 && "Demand: " + numeralWrapper.format(product.dmd, nf)}
-                  {corp.unlockUpgrades[3] === 1 && <br />}
-                  {corp.unlockUpgrades[3] === 1 && "Competition: " + numeralWrapper.format(product.cmp, nf)}
+                  Effective rating is calculated from product rating and the quality of materials used <br />
+                  Rating: {formatBigNumber(product.rating)} <br /> <br />
+                  Quality: {formatBigNumber(product.stats.quality)} <br />
+                  Performance: {formatBigNumber(product.stats.performance)} <br />
+                  Durability: {formatBigNumber(product.stats.durability)} <br />
+                  Reliability: {formatBigNumber(product.stats.reliability)} <br />
+                  Aesthetics: {formatBigNumber(product.stats.aesthetics)} <br />
+                  Features: {formatBigNumber(product.stats.features)}
+                  {corp.unlocks.has(CorpUnlockName.MarketResearchDemand) && (
+                    <>
+                      <br />
+                      {"Demand: " + formatBigNumber(product.demand)}
+                    </>
+                  )}
+                  {corp.unlocks.has(CorpUnlockName.MarketDataCompetition) && (
+                    <>
+                      <br />
+                      {"Competition: " + formatBigNumber(product.competition)}
+                    </>
+                  )}
                 </Typography>
               }
             >
-              <Typography>Rating: {numeralWrapper.format(product.rat, nf)}</Typography>
+              <Typography>Effective rating: {formatBigNumber(cityData.effectiveRating)}</Typography>
             </Tooltip>
           </Box>
           <Box display="flex">
             <Tooltip title={<Typography>An estimate of the material cost it takes to create this Product.</Typography>}>
               <Typography>
-                Est. Production Cost:{" "}
-                {numeralWrapper.formatMoney(product.pCost / CorporationConstants.ProductProductionCostRatio)}
+                Est. Production Cost: <Money money={cityData.productionCost / corpConstants.baseProductProfitMult} />
               </Typography>
             </Tooltip>
           </Box>
@@ -168,16 +149,31 @@ export function ProductElem(props: IProductProps): React.ReactElement {
                 </Typography>
               }
             >
-              <Typography>Est. Market Price: {numeralWrapper.formatMoney(product.pCost)}</Typography>
+              <Typography>
+                Est. Market Price: <Money money={cityData.productionCost} />
+              </Typography>
             </Tooltip>
           </Box>
+          <Button onClick={() => setDiscontinueOpen(true)}>Discontinue</Button>
+          <DiscontinueProductModal
+            product={product}
+            rerender={props.rerender}
+            open={discontinueOpen}
+            onClose={() => setDiscontinueOpen(false)}
+          />
         </>
       )}
 
-      {(hasUpgradeDashboard || product.fin) && (
+      {(hasUpgradeDashboard || product.finished) && (
         <>
           <Button onClick={() => setSellOpen(true)}>{sellButtonText}</Button>
-          <SellProductModal product={product} city={city} open={sellOpen} onClose={() => setSellOpen(false)} />
+          <SellProductModal
+            product={product}
+            div={division}
+            city={city}
+            open={sellOpen}
+            onClose={() => setSellOpen(false)}
+          />
           <br />
           <Button onClick={() => setLimitOpen(true)}>{limitProductionButtonText}</Button>
           <LimitProductProductionModal
@@ -186,20 +182,6 @@ export function ProductElem(props: IProductProps): React.ReactElement {
             open={limitOpen}
             onClose={() => setLimitOpen(false)}
           />
-          <Button onClick={() => setDiscontinueOpen(true)}>Discontinue</Button>
-
-          <DiscontinueProductModal
-            product={product}
-            rerender={props.rerender}
-            open={discontinueOpen}
-            onClose={() => setDiscontinueOpen(false)}
-          />
-          {division.hasResearch("Market-TA.I") && (
-            <>
-              <Button onClick={() => setMarketTaOpen(true)}>Market-TA</Button>
-              <ProductMarketTaModal product={product} open={marketTaOpen} onClose={() => setMarketTaOpen(false)} />
-            </>
-          )}
         </>
       )}
     </Paper>

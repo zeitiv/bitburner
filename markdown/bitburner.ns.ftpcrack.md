@@ -6,21 +6,53 @@
 
 Runs FTPCrack.exe on a server.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-ftpcrack(host: string): void;
+ftpcrack(host?: string): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  host | string | Hostname of the target server. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
 
-void
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+host
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Hostname/IP of the target server. Optional. Defaults to current server if not provided.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
+
+boolean
+
+True if the player runs the program successfully, and false otherwise.
 
 ## Remarks
 
@@ -28,19 +60,10 @@ RAM cost: 0.05 GB
 
 Runs the FTPCrack.exe program on the target server. FTPCrack.exe must exist on your home computer.
 
-## Example 1
+## Example
 
 
-```ts
-// NS1:
-ftpcrack("foodnstuff");
-```
-
-## Example 2
-
-
-```ts
-// NS2:
+```js
 ns.ftpcrack("foodnstuff");
 ```
 

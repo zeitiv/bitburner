@@ -6,27 +6,57 @@
 
 Get task of a sleeve.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-getTask(sleeveNumber: number): SleeveTask;
+getTask(sleeveNumber: number): SleeveTask | null;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  sleeveNumber | number | Index of the sleeve to retrieve task from. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
 
-[SleeveTask](./bitburner.sleevetask.md)
 
-Object containing information the current task that the sleeve is performing.
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+sleeveNumber
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Index of the sleeve to retrieve task from.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
+
+[SleeveTask](./bitburner.sleevetask.md) \| null
+
+Object containing information for the current task that the sleeve is performing.
 
 ## Remarks
 
 RAM cost: 4 GB
 
-Return the current task that the sleeve is performing. type is set to “Idle” if the sleeve isn’t doing anything.
+Return the current task that the sleeve is performing, or null if the sleeve is idle. All tasks have a "type" property, and other available properties depend on the type of task.
 

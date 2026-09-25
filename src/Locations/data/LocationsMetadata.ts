@@ -2,10 +2,8 @@
  * Metadata for constructing Location objects for all Locations
  * in the game
  */
-import { CityName } from "./CityNames";
-import { LocationName } from "./LocationNames";
+import { CityName, LocationName, LocationType } from "@enums";
 import { IConstructorParams } from "../Location";
-import { LocationType } from "../LocationTypeEnum";
 
 export const LocationsMetadata: IConstructorParams[] = [
   {
@@ -186,7 +184,7 @@ export const LocationsMetadata: IConstructorParams[] = [
       startingSecurityLevel: 7.18,
     },
     name: LocationName.NewTokyoDefComm,
-    types: [LocationType.Company],
+    types: [LocationType.Company, LocationType.Special],
   },
   {
     city: CityName.NewTokyo,
@@ -216,6 +214,11 @@ export const LocationsMetadata: IConstructorParams[] = [
     types: [LocationType.Company, LocationType.Special],
   },
   {
+    city: CityName.NewTokyo,
+    name: LocationName.NewTokyoArcade,
+    types: [LocationType.Special],
+  },
+  {
     city: CityName.Sector12,
     infiltrationData: {
       maxClearanceLevel: 10,
@@ -238,7 +241,7 @@ export const LocationsMetadata: IConstructorParams[] = [
   {
     city: CityName.Sector12,
     name: LocationName.Sector12CIA,
-    types: [LocationType.Company],
+    types: [LocationType.Company, LocationType.Special],
   },
   {
     city: CityName.Sector12,
@@ -448,6 +451,11 @@ export const LocationsMetadata: IConstructorParams[] = [
   {
     city: CityName.Ishima,
     name: LocationName.IshimaGlitch,
+    types: [LocationType.Special],
+  },
+  {
+    city: CityName.Chongqing,
+    name: LocationName.ChongqingShadowedWalkway,
     types: [LocationType.Special],
   },
 ];

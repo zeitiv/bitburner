@@ -4,7 +4,9 @@
 
 ## GangMemberInfo.str\_exp property
 
-<b>Signature:</b>
+Current strength experience
+
+**Signature:**
 
 ```typescript
 str_exp: number;

@@ -4,22 +4,67 @@
 
 ## Sleeve.travel() method
 
-Make a sleeve travel to another city.
+Make a sleeve travel to another city. The cost for using this function is the same as for a player.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-travel(sleeveNumber: number, cityName: string): boolean;
+travel(sleeveNumber: number, city: CityName): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  sleeveNumber | number | Index of the sleeve to travel. |
-|  cityName | string | Name of the destination city. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+sleeveNumber
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Index of the sleeve to travel.
+
+
+</td></tr>
+<tr><td>
+
+city
+
+
+</td><td>
+
+[CityName](./bitburner.cityname.md)
+
+
+</td><td>
+
+Name of the destination city.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 boolean
 

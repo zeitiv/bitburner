@@ -3,37 +3,41 @@ import Button from "@mui/material/Button";
 import Tooltip from "@mui/material/Tooltip";
 import Typography from "@mui/material/Typography";
 
-import { CONSTANTS } from "../../Constants";
-import { IPlayer } from "../../PersonObjects/IPlayer";
+import { Player } from "@player";
 import { purchaseRamForHomeComputer } from "../../Server/ServerPurchases";
 
 import { Money } from "../../ui/React/Money";
-import { numeralWrapper } from "../../ui/numeralFormat";
+import { formatRam } from "../../ui/formatNumber";
 
-import { MathJaxWrapper } from "../../MathJaxWrapper";
+import { currentNodeMults } from "../../BitNode/BitNodeMultipliers";
+import { ServerConstants } from "../../Server/data/Constants";
+import MathNotation from "../../Documentation/data/MathNotation.json";
+import { MathNotationOutput } from "../../Documentation/ui/MathNotationOutput";
 
-type IProps = {
-  p: IPlayer;
+interface IProps {
   rerender: () => void;
-};
+}
 
 export function RamButton(props: IProps): React.ReactElement {
-  const homeComputer = props.p.getHomeComputer();
-  if (homeComputer.maxRam >= CONSTANTS.HomeComputerMaxRam) {
-    return <Button>Upgrade 'home' RAM - MAX</Button>;
-  }
+  const homeComputer = Player.getHomeComputer();
+  const reachMaxRam =
+    (Player.bitNodeOptions.restrictHomePCUpgrade && homeComputer.maxRam >= 128) ||
+    homeComputer.maxRam >= ServerConstants.HomeComputerMaxRam;
 
-  const cost = props.p.getUpgradeHomeRamCost();
+  const cost = Player.getUpgradeHomeRamCost();
 
   function buy(): void {
-    purchaseRamForHomeComputer(props.p);
+    purchaseRamForHomeComputer();
     props.rerender();
   }
 
   return (
     <Tooltip
       title={
-        <MathJaxWrapper>{`\\(\\large{cost = 3.2 \\cdot 10^3 \\cdot 1.58^{log_2{(ram)}}}\\)`}</MathJaxWrapper>
+        <>
+          <Typography>HomeRamCostMult = {currentNodeMults.HomeComputerRamCost}</Typography>
+          <MathNotationOutput notation={MathNotation.HomeRAMCost} />
+        </>
       }
     >
       <span>
@@ -42,10 +46,16 @@ export function RamButton(props: IProps): React.ReactElement {
           <i>"More RAM means more scripts on 'home'"</i>
         </Typography>
         <br />
-        <Button disabled={!props.p.canAfford(cost)} onClick={buy}>
-          Upgrade 'home' RAM ({numeralWrapper.formatRAM(homeComputer.maxRam)} -&gt;&nbsp;
-          {numeralWrapper.formatRAM(homeComputer.maxRam * 2)}) -&nbsp;
-          <Money money={cost} player={props.p} />
+        <Button disabled={!Player.canAfford(cost) || reachMaxRam} onClick={buy}>
+          Upgrade 'home' RAM&nbsp;
+          {reachMaxRam ? (
+            "- Max"
+          ) : (
+            <>
+              ({formatRam(homeComputer.maxRam)} -&gt; {formatRam(homeComputer.maxRam * 2)}) -&nbsp;
+              <Money money={cost} forPurchase={true} />
+            </>
+          )}
         </Button>
       </span>
     </Tooltip>

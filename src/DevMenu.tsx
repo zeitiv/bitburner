@@ -1,68 +1,81 @@
-import { IPlayer } from "./PersonObjects/IPlayer";
-import { Bladeburner } from "./Bladeburner/Bladeburner";
-import { IEngine } from "./IEngine";
-import { IRouter } from "./ui/Router";
-import { AugmentationNames } from "./Augmentation/data/AugmentationNames";
+import React, { useEffect, useRef } from "react";
 
-import React, { useEffect } from "react";
-
-import { General } from "./DevMenu/ui/General";
-import { Stats } from "./DevMenu/ui/Stats";
-import { Factions } from "./DevMenu/ui/Factions";
-import { Augmentations } from "./DevMenu/ui/Augmentations";
-import { SourceFiles } from "./DevMenu/ui/SourceFiles";
-import { Programs } from "./DevMenu/ui/Programs";
-import { Servers } from "./DevMenu/ui/Servers";
-import { Companies } from "./DevMenu/ui/Companies";
-import { Bladeburner as BladeburnerElem } from "./DevMenu/ui/Bladeburner";
-import { Gang } from "./DevMenu/ui/Gang";
-import { Corporation } from "./DevMenu/ui/Corporation";
-import { CodingContracts } from "./DevMenu/ui/CodingContracts";
-import { StockMarket } from "./DevMenu/ui/StockMarket";
-import { Sleeves } from "./DevMenu/ui/Sleeves";
-import { Stanek } from "./DevMenu/ui/Stanek";
-import { TimeSkip } from "./DevMenu/ui/TimeSkip";
-import { Achievements } from "./DevMenu/ui/Achievements";
 import Typography from "@mui/material/Typography";
+
+import { Player } from "@player";
+import { AugmentationName } from "@enums";
+
+import { GeneralDev } from "./DevMenu/ui/GeneralDev";
+import { TimeSkipDev } from "./DevMenu/ui/TimeSkipDev";
+
+import { StatsDev } from "./DevMenu/ui/StatsDev";
+import { FactionsDev } from "./DevMenu/ui/FactionsDev";
+import { AugmentationsDev } from "./DevMenu/ui/AugmentationsDev";
+import { SourceFilesDev } from "./DevMenu/ui/SourceFilesDev";
+import { ProgramsDev } from "./DevMenu/ui/ProgramsDev";
+import { ServersDev } from "./DevMenu/ui/ServersDev";
+import { CompaniesDev } from "./DevMenu/ui/CompaniesDev";
+import { BladeburnerDev } from "./DevMenu/ui/BladeburnerDev";
+import { GangDev } from "./DevMenu/ui/GangDev";
+import { CorporationDev } from "./DevMenu/ui/CorporationDev";
+import { CodingContractsDev } from "./DevMenu/ui/CodingContractsDev";
+import { StockMarketDev } from "./DevMenu/ui/StockMarketDev";
+import { SleevesDev } from "./DevMenu/ui/SleevesDev";
+import { StanekDev } from "./DevMenu/ui/StanekDev";
+import { AchievementsDev } from "./DevMenu/ui/AchievementsDev";
+import { EntropyDev } from "./DevMenu/ui/EntropyDev";
+
 import { Exploit } from "./Exploits/Exploit";
+import { useRerender } from "./ui/React/hooks";
+import { DarknetDev } from "./DevMenu/ui/DarknetDev";
+import { AutoExpandContext, getAutoExpandData, setAutoExpandData } from "./ui/AutoExpand/AutoExpandContext";
+import { canAccessStockMarket } from "./StockMarket/StockMarket";
 
-interface IProps {
-  player: IPlayer;
-  engine: IEngine;
-  router: IRouter;
-}
+export function DevMenuRoot(): React.ReactElement {
+  const autoExpandContextValue = useRef({
+    data: getAutoExpandData(),
+    set: (key: string, expanded: boolean) => {
+      autoExpandContextValue.current.data[key] = expanded;
+      setAutoExpandData(autoExpandContextValue.current.data);
+    },
+  });
 
-export function DevMenuRoot(props: IProps): React.ReactElement {
   useEffect(() => {
-    props.player.giveExploit(Exploit.YoureNotMeantToAccessThis);
+    Player.giveExploit(Exploit.YoureNotMeantToAccessThis);
   }, []);
+
+  // Pass rerender to certain subpages in case certain tabs are now valid/invalid due to changes made on those pages
+  // Rerender periodically in case game state changes (e.g. player starts gang or buys wse account through a script)
+  const rerender = useRerender(400);
   return (
-    <>
+    <AutoExpandContext.Provider value={autoExpandContextValue.current}>
       <Typography>Development Menu - Only meant to be used for testing/debugging</Typography>
-      <General player={props.player} router={props.router} />
-      <Stats player={props.player} />
-      <Factions player={props.player} />
-      <Augmentations player={props.player} />
-      <SourceFiles player={props.player} />
-      <Programs player={props.player} />
-      <Servers />
-      <Companies />
+      <GeneralDev parentRerender={rerender} />
+      <StatsDev />
+      <FactionsDev />
+      <AugmentationsDev />
+      <SourceFilesDev parentRerender={rerender} />
+      <ProgramsDev />
+      <ServersDev />
+      <CompaniesDev />
 
-      {props.player.bladeburner instanceof Bladeburner && <BladeburnerElem player={props.player} />}
+      {Player.bladeburner && <BladeburnerDev bladeburner={Player.bladeburner} />}
 
-      {props.player.inGang() && <Gang player={props.player} />}
+      {Player.gang && <GangDev />}
 
-      {props.player.hasCorporation() && <Corporation player={props.player} />}
+      {Player.corporation && <CorporationDev />}
 
-      <CodingContracts />
+      <CodingContractsDev />
 
-      {props.player.hasWseAccount && <StockMarket />}
+      {canAccessStockMarket() && <StockMarketDev />}
 
-      {props.player.sleeves.length > 0 && <Sleeves player={props.player} />}
-      {props.player.augmentations.some((aug) => aug.name === AugmentationNames.StaneksGift1) && <Stanek />}
+      {Player.sleeves.length > 0 && <SleevesDev />}
+      {Player.augmentations.some((aug) => aug.name === AugmentationName.StaneksGift1) && <StanekDev />}
 
-      <TimeSkip player={props.player} engine={props.engine} />
-      <Achievements player={props.player} engine={props.engine} />
-    </>
+      <TimeSkipDev />
+      <AchievementsDev />
+      <EntropyDev />
+      <DarknetDev />
+    </AutoExpandContext.Provider>
   );
 }

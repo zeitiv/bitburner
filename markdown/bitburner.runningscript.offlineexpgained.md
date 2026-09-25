@@ -4,7 +4,9 @@
 
 ## RunningScript.offlineExpGained property
 
-<b>Signature:</b>
+Total amount of hacking experience earned from this script when offline
+
+**Signature:**
 
 ```typescript
 offlineExpGained: number;

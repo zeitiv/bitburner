@@ -6,7 +6,7 @@
 
 Material in a warehouse
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 interface Material 
@@ -14,11 +14,292 @@ interface Material
 
 ## Properties
 
-|  Property | Type | Description |
-|  --- | --- | --- |
-|  [name](./bitburner.material.name.md) | string | Name of the material |
-|  [prod](./bitburner.material.prod.md) | number | Amount of material produced |
-|  [qlt](./bitburner.material.qlt.md) | number | Quality of the material |
-|  [qty](./bitburner.material.qty.md) | number | Amount of material |
-|  [sell](./bitburner.material.sell.md) | number | Amount of material sold |
+<table><thead><tr><th>
+
+Property
+
+
+</th><th>
+
+Modifiers
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+[actualSellAmount](./bitburner.material.actualsellamount.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Amount of material sold last cycle
+
+
+</td></tr>
+<tr><td>
+
+[buyAmount](./bitburner.material.buyamount.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Amount of material purchased from the market last cycle
+
+
+</td></tr>
+<tr><td>
+
+[competition](./bitburner.material.competition.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number \| undefined
+
+
+</td><td>
+
+Competition for the material, only present if "Market Research - Competition" unlocked
+
+
+</td></tr>
+<tr><td>
+
+[demand](./bitburner.material.demand.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number \| undefined
+
+
+</td><td>
+
+Demand for the material, only present if "Market Research - Demand" unlocked
+
+
+</td></tr>
+<tr><td>
+
+[desiredSellAmount](./bitburner.material.desiredsellamount.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string \| number
+
+
+</td><td>
+
+Sell amount, can be "PROD/2"
+
+
+</td></tr>
+<tr><td>
+
+[desiredSellPrice](./bitburner.material.desiredsellprice.md)
+
+
+</td><td>
+
+
+</td><td>
+
+string \| number
+
+
+</td><td>
+
+Sell cost, can be "MP+5"
+
+
+</td></tr>
+<tr><td>
+
+[exports](./bitburner.material.exports.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[Export](./bitburner.export.md)<!-- -->\[\]
+
+
+</td><td>
+
+Export orders
+
+
+</td></tr>
+<tr><td>
+
+[importAmount](./bitburner.material.importamount.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Amount of material imported from other divisions last cycle
+
+
+</td></tr>
+<tr><td>
+
+[marketPrice](./bitburner.material.marketprice.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Cost to buy material
+
+
+</td></tr>
+<tr><td>
+
+[name](./bitburner.material.name.md)
+
+
+</td><td>
+
+
+</td><td>
+
+[CorpMaterialName](./bitburner.corpmaterialname.md)
+
+
+</td><td>
+
+Name of the material
+
+
+</td></tr>
+<tr><td>
+
+[productionAmount](./bitburner.material.productionamount.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Amount of material produced last cycle
+
+
+</td></tr>
+<tr><td>
+
+[productionLimit](./bitburner.material.productionlimit.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number \| null
+
+
+</td><td>
+
+A limit on the maximum amount to produce per second
+
+
+</td></tr>
+<tr><td>
+
+[quality](./bitburner.material.quality.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Quality of the material
+
+
+</td></tr>
+<tr><td>
+
+[stored](./bitburner.material.stored.md)
+
+
+</td><td>
+
+
+</td><td>
+
+number
+
+
+</td><td>
+
+Amount of material
+
+
+</td></tr>
+</tbody></table>
 

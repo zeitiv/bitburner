@@ -1,66 +1,36 @@
-import React, { useState, useEffect } from "react";
-import Grid from "@mui/material/Grid";
-import { IMinigameProps } from "./IMinigameProps";
-import { KeyHandler } from "./KeyHandler";
+import { Box, Paper, Typography } from "@mui/material";
+import React from "react";
 import { GameTimer } from "./GameTimer";
-import { interpolate } from "./Difficulty";
-import Typography from "@mui/material/Typography";
+import type { Infiltration } from "../Infiltration";
+import type { SlashModel } from "../model/SlashModel";
 
-interface Difficulty {
-  [key: string]: number;
-  window: number;
+interface IProps {
+  state: Infiltration;
+  stage: SlashModel;
 }
 
-const difficulties: {
-  Trivial: Difficulty;
-  Normal: Difficulty;
-  Hard: Difficulty;
-  Impossible: Difficulty;
-} = {
-  Trivial: { window: 600 },
-  Normal: { window: 325 },
-  Hard: { window: 250 },
-  Impossible: { window: 150 },
-};
-
-export function SlashGame(props: IMinigameProps): React.ReactElement {
-  const difficulty: Difficulty = { window: 0 };
-  interpolate(difficulties, props.difficulty, difficulty);
-  const [phase, setPhase] = useState(0);
-
-  function press(this: Document, event: KeyboardEvent): void {
-    event.preventDefault();
-    if (event.key !== " ") return;
-    if (phase !== 2) {
-      props.onFailure();
-    } else {
-      props.onSuccess();
-    }
-  }
-
-  useEffect(() => {
-    let id = window.setTimeout(() => {
-      setPhase(1);
-      id = window.setTimeout(() => {
-        setPhase(2);
-        id = window.setTimeout(() => setPhase(0), difficulty.window);
-      }, 250);
-    }, Math.random() * 3250 + 1500 - (250 + difficulty.window));
-    return () => {
-      clearInterval(id);
-    };
-  }, []);
-
+export function SlashGame({ stage }: IProps): React.ReactElement {
   return (
-    <Grid container spacing={3}>
-      <GameTimer millis={5000} onExpire={props.onFailure} />
-      <Grid item xs={12}>
-        <Typography variant="h4">Slash when his guard is down!</Typography>
-        {phase === 0 && <Typography variant="h4">Guarding ...</Typography>}
-        {phase === 1 && <Typography variant="h4">Preparing?</Typography>}
-        {phase === 2 && <Typography variant="h4">ATTACKING!</Typography>}
-        <KeyHandler onKeyDown={press} onFailure={props.onFailure} />
-      </Grid>
-    </Grid>
+    <>
+      <Paper sx={{ display: "grid", justifyItems: "center" }}>
+        <Typography variant="h5" textAlign="center">
+          Attack after the sentinel drops his guard and is distracted.
+          <br />
+          Do not alert him!
+        </Typography>
+        <br />
+        {stage.phase === 0 && stage.hasMightOfAres && (
+          <Box sx={{ my: 1 }}>
+            <Typography variant="h5">The sentinel will drop his guard and be distracted in ...</Typography>
+            <GameTimer endTimestamp={stage.guardingEndTime} />
+            <br />
+          </Box>
+        )}
+
+        {stage.phase === 0 && <Typography variant="h4">Guarding ...</Typography>}
+        {stage.phase === 1 && <Typography variant="h4">Distracted!</Typography>}
+        {stage.phase === 2 && <Typography variant="h4">Alerted!</Typography>}
+      </Paper>
+    </>
   );
 }

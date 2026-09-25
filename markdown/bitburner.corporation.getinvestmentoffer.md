@@ -4,16 +4,20 @@
 
 ## Corporation.getInvestmentOffer() method
 
-Get an offer for investment based on you companies current valuation
+Get an offer for investment based on current corporation valuation.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 getInvestmentOffer(): InvestmentOffer;
 ```
-<b>Returns:</b>
+**Returns:**
 
 [InvestmentOffer](./bitburner.investmentoffer.md)
 
 An offer of investment
+
+## Remarks
+
+RAM cost: 10 GB
 

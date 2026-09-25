@@ -1,20 +1,13 @@
-import { IIndustry } from "../IIndustry";
+import { CorpMaterialName } from "@nsdefs";
+import { Division } from "../Division";
+import { boostMaterials } from "../data/Constants";
 
 // Returns a boolean indicating whether the given material is relevant for the
 // current industry.
-export function isRelevantMaterial(matName: string, division: IIndustry): boolean {
-  // Materials that affect Production multiplier
-  const prodMultiplierMats = ["Hardware", "Robots", "AICores", "RealEstate"];
-
-  if (Object.keys(division.reqMats).includes(matName)) {
-    return true;
-  }
-  if (division.prodMats.includes(matName)) {
-    return true;
-  }
-  if (prodMultiplierMats.includes(matName)) {
-    return true;
-  }
+export function isRelevantMaterial(matName: CorpMaterialName, division: Division): boolean {
+  if (Object.keys(division.requiredMaterials).includes(matName)) return true;
+  if (division.producedMaterials.includes(matName)) return true;
+  if (boostMaterials.includes(matName)) return true;
 
   return false;
 }

@@ -4,14 +4,16 @@
 
 ## NS.getSharePower() method
 
-Calculate your share power. Based on all the active share calls.
+Share power has a multiplicative effect on rep/second while doing hacking work for a faction. If you do non-hacking work, share power still increases the reputation gain rate, but the effect is non-linear.
 
-<b>Signature:</b>
+Share power increases incrementally for every thread of share running on your server network, but at a sharply decreasing rate.
+
+**Signature:**
 
 ```typescript
 getSharePower(): number;
 ```
-<b>Returns:</b>
+**Returns:**
 
 number
 

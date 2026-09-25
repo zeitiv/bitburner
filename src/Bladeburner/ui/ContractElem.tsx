@@ -1,90 +1,49 @@
-import React, { useState } from "react";
-import { ActionTypes } from "../data/ActionTypes";
-import { createProgressBarText } from "../../utils/helpers/createProgressBarText";
-import { formatNumber, convertTimeMsToTimeElapsedString } from "../../utils/StringHelperFunctions";
-import { Contracts } from "../data/Contracts";
-import { IBladeburner } from "../IBladeburner";
-import { IAction } from "../IAction";
-import { IPlayer } from "../../PersonObjects/IPlayer";
+import type { Bladeburner } from "../Bladeburner";
+import type { Contract } from "../Actions/Contract";
+
+import React from "react";
+import { convertTimeMsToTimeElapsedString } from "../../utils/StringHelperFunctions";
+import { Player } from "@player";
 import { SuccessChance } from "./SuccessChance";
-import { CopyableText } from "../../ui/React/CopyableText";
 import { ActionLevel } from "./ActionLevel";
 import { Autolevel } from "./Autolevel";
-import { StartButton } from "./StartButton";
+import { formatBigNumber } from "../../ui/formatNumber";
+import { Paper, Typography } from "@mui/material";
+import { useRerender } from "../../ui/React/hooks";
+import { ActionHeader } from "./ActionHeader";
 
-import Typography from "@mui/material/Typography";
-import Paper from "@mui/material/Paper";
-
-interface IProps {
-  bladeburner: IBladeburner;
-  player: IPlayer;
-  action: IAction;
+interface ContractElemProps {
+  bladeburner: Bladeburner;
+  action: Contract;
 }
 
-export function ContractElem(props: IProps): React.ReactElement {
-  const setRerender = useState(false)[1];
-  function rerender(): void {
-    setRerender((old) => !old);
-  }
-  const isActive =
-    props.bladeburner.action.type === ActionTypes["Contract"] && props.action.name === props.bladeburner.action.name;
-  const computedActionTimeCurrent = Math.min(
-    props.bladeburner.actionTimeCurrent + props.bladeburner.actionTimeOverflow,
-    props.bladeburner.actionTimeToComplete,
-  );
-  const actionTime = props.action.getActionTime(props.bladeburner);
-
-  const actionData = Contracts[props.action.name];
-  if (actionData === undefined) {
-    throw new Error(`Cannot find data for ${props.action.name}`);
-  }
+export function ContractElem({ bladeburner, action }: ContractElemProps): React.ReactElement {
+  const rerender = useRerender();
+  const isActive = action.name === bladeburner.action?.name;
+  const actionTime = action.getActionTime(bladeburner, Player);
 
   return (
     <Paper sx={{ my: 1, p: 1 }}>
-      {isActive ? (
-        <>
-          <Typography>
-            <CopyableText value={props.action.name} /> (IN PROGRESS - {formatNumber(computedActionTimeCurrent, 0)} /{" "}
-            {formatNumber(props.bladeburner.actionTimeToComplete, 0)})
-          </Typography>
-          <Typography>
-            {createProgressBarText({
-              progress: computedActionTimeCurrent / props.bladeburner.actionTimeToComplete,
-            })}
-          </Typography>
-        </>
-      ) : (
-        <>
-          <CopyableText value={props.action.name} />
-          <StartButton
-            bladeburner={props.bladeburner}
-            type={ActionTypes.Contract}
-            name={props.action.name}
-            rerender={rerender}
-          />
-        </>
-      )}
+      <ActionHeader bladeburner={bladeburner} action={action} rerender={rerender}></ActionHeader>
       <br />
+      <ActionLevel action={action} bladeburner={bladeburner} isActive={isActive} rerender={rerender} />
       <br />
-      <ActionLevel action={props.action} bladeburner={props.bladeburner} isActive={isActive} rerender={rerender} />
-      <br />
-      <br />
-      <Typography>
-        {actionData.desc}
+      <Typography whiteSpace={"pre-wrap"}>
+        {action.desc}
         <br />
         <br />
-        <SuccessChance action={props.action} bladeburner={props.bladeburner} />
+        <SuccessChance action={action} bladeburner={bladeburner} />
         <br />
         Time Required: {convertTimeMsToTimeElapsedString(actionTime * 1000)}
         <br />
-        Contracts remaining: {Math.floor(props.action.count)}
+        Contracts remaining: {formatBigNumber(Math.floor(action.count))}
         <br />
-        Successes: {props.action.successes}
+        Successes: {formatBigNumber(action.successes)}
         <br />
-        Failures: {props.action.failures}
+        Failures: {formatBigNumber(action.failures)}
       </Typography>
       <br />
-      <Autolevel rerender={rerender} action={props.action} />
+      <Autolevel rerender={rerender} action={action} />
     </Paper>
   );
 }

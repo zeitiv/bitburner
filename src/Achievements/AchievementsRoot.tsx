@@ -1,30 +1,21 @@
 import React from "react";
 
-import makeStyles from "@mui/styles/makeStyles";
-import createStyles from "@mui/styles/createStyles";
-import { Theme } from "@mui/material/styles";
-
 import { AchievementList } from "./AchievementList";
 import { achievements } from "./Achievements";
-import { Typography } from "@mui/material";
-import { Player } from "../Player";
-
-const useStyles = makeStyles((theme: Theme) =>
-  createStyles({
-    root: {
-      width: 50,
-      padding: theme.spacing(2),
-      userSelect: "none",
-    },
-  }),
-);
+import { Box, Typography } from "@mui/material";
+import { Player } from "@player";
 
 export function AchievementsRoot(): JSX.Element {
-  const classes = useStyles();
   return (
-    <div className={classes.root} style={{ width: "90%" }}>
+    <div style={{ width: "100%" }}>
       <Typography variant="h4">Achievements</Typography>
-      <AchievementList achievements={Object.values(achievements)} playerAchievements={Player.achievements} />
+      <Box mx={2}>
+        <Typography>
+          Achievements are persistent rewards for various actions and challenges. A limited number of Bitburner
+          achievements have corresponding achievements in Steam.
+        </Typography>
+        <AchievementList achievements={Object.values(achievements)} playerAchievements={Player.achievements} />
+      </Box>
     </div>
   );
 }

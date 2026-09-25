@@ -6,25 +6,85 @@
 
 Workout at the gym.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
-gymWorkout(gymName: string, stat: string, focus?: boolean): boolean;
+gymWorkout(gymName: GymLocationName, stat: GymType, focus?: boolean): boolean;
 ```
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  gymName | string | Name of gym. You must be in the correct city for whatever gym you specify. |
-|  stat | string | The stat you want to train. |
-|  focus | boolean | Acquire player focus on this gym workout. Optional. Defaults to true. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+gymName
+
+
+</td><td>
+
+[GymLocationName](./bitburner.gymlocationname.md)
+
+
+</td><td>
+
+Name of gym. You must be in the correct city for whatever gym you specify.
+
+
+</td></tr>
+<tr><td>
+
+stat
+
+
+</td><td>
+
+[GymType](./bitburner.gymtype.md)
+
+
+</td><td>
+
+The stat you want to train.
+
+
+</td></tr>
+<tr><td>
+
+focus
+
+
+</td><td>
 
 boolean
 
-True if actions is successfully started, false otherwise.
+
+</td><td>
+
+_(Optional)_ Acquire player focus on this gym workout. Optional. Defaults to true.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
+
+boolean
+
+True if action is successfully started, false otherwise.
 
 ## Remarks
 

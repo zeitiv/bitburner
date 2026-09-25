@@ -1,88 +1,85 @@
-const CyclesPerMarketCycle = 50;
-const AllCorporationStates = ["START", "PURCHASE", "PRODUCTION", "SALE", "EXPORT"];
-export const CorporationConstants: {
-  INITIALSHARES: number;
-  SHARESPERPRICEUPDATE: number;
-  IssueNewSharesCooldown: number;
-  SellSharesCooldown: number;
-  CyclesPerMarketCycle: number;
-  CyclesPerIndustryStateCycle: number;
-  SecsPerMarketCycle: number;
-  Cities: string[];
-  WarehouseInitialCost: number;
-  WarehouseInitialSize: number;
-  WarehouseUpgradeBaseCost: number;
-  OfficeInitialCost: number;
-  OfficeInitialSize: number;
-  OfficeUpgradeBaseCost: number;
-  BribeThreshold: number;
-  BribeToRepRatio: number;
-  ProductProductionCostRatio: number;
-  DividendMaxPercentage: number;
-  EmployeeSalaryMultiplier: number;
-  CyclesPerEmployeeRaise: number;
-  EmployeeRaiseAmount: number;
-  BaseMaxProducts: number;
-  AllCorporationStates: string[];
-  AllMaterials: string[];
-  FundingRoundShares: number[];
-  FundingRoundMultiplier: number[];
-} = {
-  INITIALSHARES: 1e9, //Total number of shares you have at your company
-  SHARESPERPRICEUPDATE: 1e6, //When selling large number of shares, price is dynamically updated for every batch of this amount
-  IssueNewSharesCooldown: 216e3, // 12 Hour in terms of game cycles
-  SellSharesCooldown: 18e3, // 1 Hour in terms of game cycles
+import type {
+  CorpEmployeePosition,
+  CorpIndustryName,
+  CorpMaterialName as APIMaterialName,
+  CorpResearchName,
+  CorpSmartSupplyOption,
+  CorpStateName,
+  CorpUnlockName as APIUnlockName,
+  CorpUpgradeName as APIUpgradeName,
+} from "@nsdefs";
+import { CONSTANTS } from "../../Constants";
+import {
+  IndustryType,
+  CorpEmployeeJob,
+  CorpMaterialName,
+  CorpUnlockName,
+  CorpUpgradeName,
+  SmartSupplyOption,
+  CorpBaseResearchName,
+  CorpProductResearchName,
+} from "@enums";
+import type { PositiveInteger } from "../../types";
 
-  CyclesPerMarketCycle: CyclesPerMarketCycle,
-  CyclesPerIndustryStateCycle: CyclesPerMarketCycle / AllCorporationStates.length,
-  SecsPerMarketCycle: CyclesPerMarketCycle / 5,
-
-  Cities: ["Aevum", "Chongqing", "Sector-12", "New Tokyo", "Ishima", "Volhaven"],
-
-  WarehouseInitialCost: 5e9, //Initial purchase cost of warehouse
-  WarehouseInitialSize: 100,
-  WarehouseUpgradeBaseCost: 1e9,
-
-  OfficeInitialCost: 4e9,
-  OfficeInitialSize: 3,
-  OfficeUpgradeBaseCost: 1e9,
-
-  BribeThreshold: 100e12, //Money needed to be able to bribe for faction rep
-  BribeToRepRatio: 1e9, //Bribe Value divided by this = rep gain
-
-  ProductProductionCostRatio: 5, //Ratio of material cost of a product to its production cost
-
-  DividendMaxPercentage: 1,
-
-  EmployeeSalaryMultiplier: 3, // Employee stats multiplied by this to determine initial salary
-  CyclesPerEmployeeRaise: 400, // All employees get a raise every X market cycles
-  EmployeeRaiseAmount: 50, // Employee salary increases by this (additive)
-
-  BaseMaxProducts: 3, // Initial value for maximum number of products allowed
-  AllCorporationStates: AllCorporationStates,
-  AllMaterials: [
-    "Water",
-    "Energy",
-    "Food",
-    "Plants",
-    "Metal",
-    "Hardware",
-    "Chemicals",
-    "Drugs",
-    "Robots",
-    "AI Cores",
-    "Real Estate",
-  ],
-  FundingRoundShares: [
-    0.1,
-    0.35,
-    0.25,
-    0.2
-  ],
-  FundingRoundMultiplier: [
-    4,
-    3,
-    3,
-    2.5
-  ],
-};
+/** Names of all corporation game states */
+export const stateNames: CorpStateName[] = ["START", "PURCHASE", "PRODUCTION", "EXPORT", "SALE"],
+  // TODO: remove IndustryType and EmployeePositions enums and just use the typed strings.
+  /** Names of all corporation employee positions */
+  employeePositions: CorpEmployeePosition[] = Object.values(CorpEmployeeJob),
+  /** Names of all industries. */
+  industryNames: CorpIndustryName[] = Object.values(IndustryType),
+  /** Names of all materials */
+  materialNames: APIMaterialName[] = Object.values(CorpMaterialName),
+  /** Names of all boost materials */
+  boostMaterials: CorpMaterialName[] = ["Hardware", "Robots", "AI Cores", "Real Estate"],
+  /** Names of all one-time corporation-wide unlocks */
+  unlockNames: APIUnlockName[] = Object.values(CorpUnlockName),
+  upgradeNames: APIUpgradeName[] = Object.values(CorpUpgradeName),
+  /** Names of all researches common to all industries */
+  researchNamesBase: CorpResearchName[] = Object.values(CorpBaseResearchName),
+  /** Names of all researches only available to product industries */
+  researchNamesProductOnly: CorpResearchName[] = Object.values(CorpProductResearchName),
+  /** Names of all researches */
+  researchNames: CorpResearchName[] = [...researchNamesBase, ...researchNamesProductOnly],
+  initialShares = 1e9,
+  /** When selling large number of shares, price is dynamically updated for every batch of this amount */
+  sharesPerPriceUpdate = 1e6,
+  /** Cooldown for issue new shares cooldown in game cycles. Initially 4 hours. */
+  issueNewSharesCooldown = 72e3,
+  /** Cooldown for selling shares in game cycles. 1 hour. */
+  sellSharesCooldown = 18e3,
+  teaCostPerEmployee = 500e3,
+  gameCyclesPerMarketCycle = 50,
+  gameCyclesPerCorpStateCycle = gameCyclesPerMarketCycle / stateNames.length,
+  secondsPerMarketCycle = (gameCyclesPerMarketCycle * CONSTANTS.MilliPerCycle) / 1000,
+  warehouseInitialCost = 5e9,
+  warehouseInitialSize = 100,
+  warehouseSizeUpgradeCostBase = 1e9,
+  officeInitialCost = 4e9,
+  officeInitialSize = 3,
+  officeSizeUpgradeCostBase = 1e9,
+  bribeThreshold = 100e12,
+  bribeAmountPerReputation = 1e9,
+  baseProductProfitMult = 5,
+  dividendMaxRate = 1,
+  /** Conversion factor for employee stats to initial salary */
+  employeeSalaryMultiplier = 3,
+  marketCyclesPerEmployeeRaise = 400,
+  employeeRaiseAmount = 50,
+  /** Max products for a division without upgrades */
+  maxProductsBase = 3,
+  fundingRoundShares = [0.1, 0.35, 0.25, 0.2],
+  fundingRoundMultiplier = [3, 2, 2, 1.5],
+  valuationLength = 10,
+  /** Minimum decay value for employee morale/energy */
+  minEmployeeDecay = 10,
+  /** smart supply options */
+  smartSupplyOptions: CorpSmartSupplyOption[] = Object.values(SmartSupplyOption),
+  PurchaseMultipliers = {
+    x1: 1 as PositiveInteger,
+    x5: 5 as PositiveInteger,
+    x10: 10 as PositiveInteger,
+    x50: 50 as PositiveInteger,
+    x100: 100 as PositiveInteger,
+    MAX: "MAX" as const,
+  };

@@ -1,31 +1,34 @@
-import { ITerminal } from "../ITerminal";
-import { IRouter } from "../../ui/Router";
-import { IPlayer } from "../../PersonObjects/IPlayer";
+import { Terminal } from "../../Terminal";
 import { BaseServer } from "../../Server/BaseServer";
-import { isScriptFilename } from "../../Script/isScriptFilename";
 import { runScript } from "./runScript";
 import { runProgram } from "./runProgram";
+import { hasScriptExtension } from "../../Paths/ScriptFilePath";
+import { hasContractExtension } from "../../Paths/ContractFilePath";
+import { hasProgramExtension } from "../../Paths/ProgramFilePath";
+import { hasCacheExtension } from "../../Paths/CacheFilePath";
 
-export function run(
-  terminal: ITerminal,
-  router: IRouter,
-  player: IPlayer,
-  server: BaseServer,
-  args: (string | number | boolean)[],
-): void {
+export function run(args: (string | number | boolean)[], server: BaseServer): void {
   // Run a program or a script
-  if (args.length < 1) {
-    terminal.error("Incorrect number of arguments. Usage: run [program/script] [-t] [num threads] [arg1] [arg2]...");
-  } else {
-    const executableName = args[0] + "";
+  const arg = args.shift();
+  if (!arg)
+    return Terminal.error(
+      "Usage: run [program/script] [-t num_threads] [--tail] [--ram-override ram_in_GBs] [--temporary] [args...]",
+    );
 
-    // Check if its a script or just a program/executable
-    if (isScriptFilename(executableName)) {
-      runScript(terminal, router, player, server, args);
-    } else if (executableName.endsWith(".cct")) {
-      terminal.runContract(player, executableName);
-    } else {
-      runProgram(terminal, router, player, server, args);
-    }
+  const path = Terminal.getFilepath(String(arg));
+  if (!path) return Terminal.error(`${arg} is not a valid filepath.`);
+  if (hasScriptExtension(path)) {
+    return runScript(path, args, server);
+  } else if (hasContractExtension(path)) {
+    Terminal.runContract(path).catch((error) => {
+      console.error(error);
+      Terminal.error(`Cannot run contract ${path} on ${server.hostname}. Error: ${error}.`);
+    });
+    return;
+  } else if (hasProgramExtension(path)) {
+    return runProgram(path, args, server);
+  } else if (hasCacheExtension(path)) {
+    return Terminal.startAction(4, "c", server);
   }
+  Terminal.error(`Invalid file extension. Only .js, .jsx, .ts, .tsx, .cct, and .exe files can be run.`);
 }

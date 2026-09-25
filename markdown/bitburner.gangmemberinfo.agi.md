@@ -4,7 +4,9 @@
 
 ## GangMemberInfo.agi property
 
-<b>Signature:</b>
+Agility skill level
+
+**Signature:**
 
 ```typescript
 agi: number;

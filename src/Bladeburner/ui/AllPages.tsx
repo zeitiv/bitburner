@@ -1,22 +1,19 @@
+import type { Bladeburner } from "../Bladeburner";
+
 import React from "react";
+import { Box, Tab, Tabs } from "@mui/material";
+
 import { GeneralActionPage } from "./GeneralActionPage";
 import { ContractPage } from "./ContractPage";
 import { OperationPage } from "./OperationPage";
 import { BlackOpPage } from "./BlackOpPage";
 import { SkillPage } from "./SkillPage";
-import { IBladeburner } from "../IBladeburner";
-import { IPlayer } from "../../PersonObjects/IPlayer";
-
-import Tabs from "@mui/material/Tabs";
-import Tab from "@mui/material/Tab";
-import Box from "@mui/material/Box";
 
 interface IProps {
-  bladeburner: IBladeburner;
-  player: IPlayer;
+  bladeburner: Bladeburner;
 }
 
-export function AllPages(props: IProps): React.ReactElement {
+export function AllPages({ bladeburner }: IProps): React.ReactElement {
   const [value, setValue] = React.useState(0);
 
   function handleChange(event: React.SyntheticEvent, tab: number): void {
@@ -33,11 +30,11 @@ export function AllPages(props: IProps): React.ReactElement {
         <Tab label="Skills" />
       </Tabs>
       <Box sx={{ p: 1 }}>
-        {value === 0 && <GeneralActionPage bladeburner={props.bladeburner} player={props.player} />}
-        {value === 1 && <ContractPage bladeburner={props.bladeburner} player={props.player} />}
-        {value === 2 && <OperationPage bladeburner={props.bladeburner} player={props.player} />}
-        {value === 3 && <BlackOpPage bladeburner={props.bladeburner} player={props.player} />}
-        {value === 4 && <SkillPage bladeburner={props.bladeburner} />}
+        {value === 0 && <GeneralActionPage bladeburner={bladeburner} />}
+        {value === 1 && <ContractPage bladeburner={bladeburner} />}
+        {value === 2 && <OperationPage bladeburner={bladeburner} />}
+        {value === 3 && <BlackOpPage bladeburner={bladeburner} />}
+        {value === 4 && <SkillPage bladeburner={bladeburner} />}
       </Box>
     </>
   );

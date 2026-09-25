@@ -1,300 +1,342 @@
-import { INetscriptHelper } from "./INetscriptHelper";
-import { IPlayer } from "../PersonObjects/IPlayer";
-import { getRamCost } from "../Netscript/RamCostGenerator";
-import { FactionWorkType } from "../Faction/FactionWorkTypeEnum";
-import { SourceFileFlags } from "../SourceFile/SourceFileFlags";
-import { SleeveTaskType } from "../PersonObjects/Sleeve/SleeveTaskTypesEnum";
-import { WorkerScript } from "../Netscript/WorkerScript";
-import { findSleevePurchasableAugs } from "../PersonObjects/Sleeve/SleeveHelpers";
+import type { Augmentation } from "../Augmentation/Augmentation";
+import type { Sleeve as NetscriptSleeve } from "@nsdefs";
+import type { ActionIdentifier } from "../Bladeburner/Types";
+
+import { Player } from "@player";
+import { BladeburnerActionType, SpecialBladeburnerActionTypeForSleeve, type BladeburnerContractName } from "@enums";
 import { Augmentations } from "../Augmentation/Augmentations";
-import { CityName } from "../Locations/data/CityNames";
-import { findCrime } from "../Crime/CrimeHelpers";
+import { getEnumHelper } from "../utils/EnumHelper";
+import { InternalAPI, NetscriptContext, setRemovedFunctions } from "../Netscript/APIWrapper";
+import { isSleeveFactionWork } from "../PersonObjects/Sleeve/Work/SleeveFactionWork";
+import { isSleeveCompanyWork } from "../PersonObjects/Sleeve/Work/SleeveCompanyWork";
+import { helpers } from "../Netscript/NetscriptHelpers";
+import { getAugCost } from "../Augmentation/AugmentationHelpers";
+import { Factions } from "../Faction/Factions";
+import { SleeveWorkType } from "../PersonObjects/Sleeve/Work/Work";
+import { canAccessBitNodeFeature } from "../BitNode/BitNodeUtils";
+import { Crimes } from "../Crime/Crimes";
+import {
+  getSleeveCost,
+  purchaseSleeve,
+  purchaseSleeveMemoryUpgrade,
+} from "../PersonObjects/Sleeve/SleeveCovenantPurchases";
 
-import { Sleeve as ISleeve } from "../ScriptEditor/NetscriptDefinitions";
+export const checkBitNodeRequirement = function (ctx: NetscriptContext) {
+  if (Player.bitNodeN !== 10) {
+    throw helpers.errorMessage(ctx, "You must be in BitNode 10 to use this API.");
+  }
+};
 
-export function NetscriptSleeve(player: IPlayer, workerScript: WorkerScript, helper: INetscriptHelper): ISleeve {
-  const checkSleeveAPIAccess = function (func: any): void {
-    if (player.bitNodeN !== 10 && !SourceFileFlags[10]) {
-      throw helper.makeRuntimeErrorMsg(
-        `sleeve.${func}`,
-        "You do not currently have access to the Sleeve API. This is either because you are not in BitNode-10 or because you do not have Source-File 10",
+export const checkSleeveAPIAccess = function (ctx: NetscriptContext) {
+  /**
+   * Don't change sourceFileLvl to activeSourceFileLvl. The ability to control Sleeves (via both UI and APIs) is a
+   * permanent benefit.
+   */
+  if (Player.bitNodeN !== 10 && Player.sourceFileLvl(10) <= 0) {
+    throw helpers.errorMessage(
+      ctx,
+      "You do not currently have access to the Sleeve API. This is either because you are not in BitNode-10 or because you do not have Source-File 10",
+    );
+  }
+};
+
+export const checkSleeveNumber = function (ctx: NetscriptContext, sleeveNumber: number) {
+  if (sleeveNumber >= Player.sleeves.length || sleeveNumber < 0) {
+    const msg = `Invalid sleeve number: ${sleeveNumber}`;
+    throw helpers.errorMessage(ctx, msg);
+  }
+};
+
+export function NetscriptSleeve(): InternalAPI<NetscriptSleeve> {
+  const checkSleeveAPIAccess = function (ctx: NetscriptContext) {
+    if (!canAccessBitNodeFeature(10)) {
+      throw helpers.errorMessage(
+        ctx,
+        "You do not have access to the Sleeve API. This is either because you are not in BitNode-10 or because you do not have Source-File 10.",
       );
     }
   };
 
-  const checkSleeveNumber = function (func: any, sleeveNumber: any): void {
-    if (sleeveNumber >= player.sleeves.length || sleeveNumber < 0) {
+  const checkSleeveNumber = function (ctx: NetscriptContext, sleeveNumber: number) {
+    if (sleeveNumber >= Player.sleeves.length || sleeveNumber < 0) {
       const msg = `Invalid sleeve number: ${sleeveNumber}`;
-      workerScript.log(func, () => msg);
-      throw helper.makeRuntimeErrorMsg(`sleeve.${func}`, msg);
+      helpers.log(ctx, () => msg);
+      throw helpers.errorMessage(ctx, msg);
     }
   };
 
-  return {
-    getNumSleeves: function (): number {
-      helper.updateDynamicRam("getNumSleeves", getRamCost(player, "sleeve", "getNumSleeves"));
-      checkSleeveAPIAccess("getNumSleeves");
-      return player.sleeves.length;
+  const sleeveFunctions: InternalAPI<NetscriptSleeve> = {
+    getNumSleeves: (ctx) => () => {
+      checkSleeveAPIAccess(ctx);
+      return Player.sleeves.length;
     },
-    setToShockRecovery: function (asleeveNumber: any = 0): boolean {
-      const sleeveNumber = helper.number("setToShockRecovery", "sleeveNumber", asleeveNumber);
-      helper.updateDynamicRam("setToShockRecovery", getRamCost(player, "sleeve", "setToShockRecovery"));
-      checkSleeveAPIAccess("setToShockRecovery");
-      checkSleeveNumber("setToShockRecovery", sleeveNumber);
-      return player.sleeves[sleeveNumber].shockRecovery(player);
+    setToIdle: (ctx) => (_sleeveNumber) => {
+      const sleeveNumber = helpers.integer(ctx, "sleeveNumber", _sleeveNumber);
+      checkSleeveAPIAccess(ctx);
+      checkSleeveNumber(ctx, sleeveNumber);
+      Player.sleeves[sleeveNumber].stopWork();
     },
-    setToSynchronize: function (asleeveNumber: any = 0): boolean {
-      const sleeveNumber = helper.number("setToSynchronize", "sleeveNumber", asleeveNumber);
-      helper.updateDynamicRam("setToSynchronize", getRamCost(player, "sleeve", "setToSynchronize"));
-      checkSleeveAPIAccess("setToSynchronize");
-      checkSleeveNumber("setToSynchronize", sleeveNumber);
-      return player.sleeves[sleeveNumber].synchronize(player);
+    setToShockRecovery: (ctx) => (_sleeveNumber) => {
+      const sleeveNumber = helpers.integer(ctx, "sleeveNumber", _sleeveNumber);
+      checkSleeveAPIAccess(ctx);
+      checkSleeveNumber(ctx, sleeveNumber);
+      return Player.sleeves[sleeveNumber].shockRecovery();
     },
-    setToCommitCrime: function (asleeveNumber: any = 0, aCrimeRoughName: any = ""): boolean {
-      const sleeveNumber = helper.number("setToCommitCrime", "sleeveNumber", asleeveNumber);
-      const crimeRoughName = helper.string("setToCommitCrime", "crimeName", aCrimeRoughName);
-      helper.updateDynamicRam("setToCommitCrime", getRamCost(player, "sleeve", "setToCommitCrime"));
-      checkSleeveAPIAccess("setToCommitCrime");
-      checkSleeveNumber("setToCommitCrime", sleeveNumber);
-      const crime = findCrime(crimeRoughName);
-      if (crime === null) {
+    setToSynchronize: (ctx) => (_sleeveNumber) => {
+      const sleeveNumber = helpers.integer(ctx, "sleeveNumber", _sleeveNumber);
+      checkSleeveAPIAccess(ctx);
+      checkSleeveNumber(ctx, sleeveNumber);
+      return Player.sleeves[sleeveNumber].synchronize();
+    },
+    setToCommitCrime: (ctx) => (_sleeveNumber, _crimeType) => {
+      const sleeveNumber = helpers.integer(ctx, "sleeveNumber", _sleeveNumber);
+      const crimeType = getEnumHelper("CrimeType").nsGetMember(ctx, _crimeType);
+      checkSleeveAPIAccess(ctx);
+      checkSleeveNumber(ctx, sleeveNumber);
+      const crime = Crimes[crimeType];
+      if (crime == null) return false;
+      return Player.sleeves[sleeveNumber].commitCrime(crime.type);
+    },
+    setToUniversityCourse: (ctx) => (_sleeveNumber, _universityName, _className) => {
+      const sleeveNumber = helpers.integer(ctx, "sleeveNumber", _sleeveNumber);
+      const universityName = helpers.string(ctx, "universityName", _universityName);
+      const className = getEnumHelper("UniversityClassType").nsGetMember(ctx, _className);
+      checkSleeveAPIAccess(ctx);
+      checkSleeveNumber(ctx, sleeveNumber);
+      return Player.sleeves[sleeveNumber].takeUniversityCourse(universityName, className);
+    },
+    travel: (ctx) => (_sleeveNumber, _cityName) => {
+      const sleeveNumber = helpers.integer(ctx, "sleeveNumber", _sleeveNumber);
+      const cityName = getEnumHelper("CityName").nsGetMember(ctx, _cityName);
+      checkSleeveAPIAccess(ctx);
+      checkSleeveNumber(ctx, sleeveNumber);
+      if (!Player.sleeves[sleeveNumber].travel(cityName)) {
+        helpers.log(ctx, () => "Not enough money to travel.");
         return false;
       }
-      return player.sleeves[sleeveNumber].commitCrime(player, crime.name);
+      return true;
     },
-    setToUniversityCourse: function (asleeveNumber: any = 0, auniversityName: any = "", aclassName: any = ""): boolean {
-      const sleeveNumber = helper.number("setToUniversityCourse", "sleeveNumber", asleeveNumber);
-      const universityName = helper.string("setToUniversityCourse", "universityName", auniversityName);
-      const className = helper.string("setToUniversityCourse", "className", aclassName);
-      helper.updateDynamicRam("setToUniversityCourse", getRamCost(player, "sleeve", "setToUniversityCourse"));
-      checkSleeveAPIAccess("setToUniversityCourse");
-      checkSleeveNumber("setToUniversityCourse", sleeveNumber);
-      return player.sleeves[sleeveNumber].takeUniversityCourse(player, universityName, className);
-    },
-    travel: function (asleeveNumber: any = 0, acityName: any = ""): boolean {
-      const sleeveNumber = helper.number("travel", "sleeveNumber", asleeveNumber);
-      const cityName = helper.string("setToUniversityCourse", "cityName", acityName);
-      helper.updateDynamicRam("travel", getRamCost(player, "sleeve", "travel"));
-      checkSleeveAPIAccess("travel");
-      checkSleeveNumber("travel", sleeveNumber);
-      return player.sleeves[sleeveNumber].travel(player, cityName as CityName);
-    },
-    setToCompanyWork: function (asleeveNumber: any = 0, acompanyName: any = ""): boolean {
-      const sleeveNumber = helper.number("setToCompanyWork", "sleeveNumber", asleeveNumber);
-      const companyName = helper.string("setToUniversityCourse", "companyName", acompanyName);
-      helper.updateDynamicRam("setToCompanyWork", getRamCost(player, "sleeve", "setToCompanyWork"));
-      checkSleeveAPIAccess("setToCompanyWork");
-      checkSleeveNumber("setToCompanyWork", sleeveNumber);
+    setToCompanyWork: (ctx) => (_sleeveNumber, _companyName) => {
+      const sleeveNumber = helpers.integer(ctx, "sleeveNumber", _sleeveNumber);
+      const companyName = getEnumHelper("CompanyName").nsGetMember(ctx, _companyName);
+      checkSleeveAPIAccess(ctx);
+      checkSleeveNumber(ctx, sleeveNumber);
 
       // Cannot work at the same company that another sleeve is working at
-      for (let i = 0; i < player.sleeves.length; ++i) {
+      for (let i = 0; i < Player.sleeves.length; ++i) {
         if (i === sleeveNumber) {
           continue;
         }
-        const other = player.sleeves[i];
-        if (other.currentTask === SleeveTaskType.Company && other.currentTaskLocation === companyName) {
-          throw helper.makeRuntimeErrorMsg(
-            "sleeve.setToFactionWork",
+        const other = Player.sleeves[i];
+        if (isSleeveCompanyWork(other.currentWork) && other.currentWork.companyName === companyName) {
+          throw helpers.errorMessage(
+            ctx,
             `Sleeve ${sleeveNumber} cannot work for company ${companyName} because Sleeve ${i} is already working for them.`,
           );
         }
       }
 
-      return player.sleeves[sleeveNumber].workForCompany(player, companyName);
+      return Player.sleeves[sleeveNumber].workForCompany(companyName);
     },
-    setToFactionWork: function (asleeveNumber: any = 0, afactionName: any = "", aworkType: any = ""): boolean {
-      const sleeveNumber = helper.number("setToFactionWork", "sleeveNumber", asleeveNumber);
-      const factionName = helper.string("setToUniversityCourse", "factionName", afactionName);
-      const workType = helper.string("setToUniversityCourse", "workType", aworkType);
-      helper.updateDynamicRam("setToFactionWork", getRamCost(player, "sleeve", "setToFactionWork"));
-      checkSleeveAPIAccess("setToFactionWork");
-      checkSleeveNumber("setToFactionWork", sleeveNumber);
+    setToFactionWork: (ctx) => (_sleeveNumber, _factionName, _workType) => {
+      const sleeveNumber = helpers.integer(ctx, "sleeveNumber", _sleeveNumber);
+      const factionName = getEnumHelper("FactionName").nsGetMember(ctx, _factionName);
+      const workType = getEnumHelper("FactionWorkType").nsGetMember(ctx, _workType);
+      checkSleeveAPIAccess(ctx);
+      checkSleeveNumber(ctx, sleeveNumber);
+
+      if (!Factions[factionName].isMember) {
+        throw helpers.errorMessage(ctx, `Cannot work for faction ${factionName} without being a member.`);
+      }
 
       // Cannot work at the same faction that another sleeve is working at
-      for (let i = 0; i < player.sleeves.length; ++i) {
+      for (let i = 0; i < Player.sleeves.length; ++i) {
         if (i === sleeveNumber) {
           continue;
         }
-        const other = player.sleeves[i];
-        if (other.currentTask === SleeveTaskType.Faction && other.currentTaskLocation === factionName) {
-          throw helper.makeRuntimeErrorMsg(
-            "sleeve.setToFactionWork",
+        const other = Player.sleeves[i];
+        if (isSleeveFactionWork(other.currentWork) && other.currentWork.factionName === factionName) {
+          throw helpers.errorMessage(
+            ctx,
             `Sleeve ${sleeveNumber} cannot work for faction ${factionName} because Sleeve ${i} is already working for them.`,
           );
         }
       }
 
-      return player.sleeves[sleeveNumber].workForFaction(player, factionName, workType);
-    },
-    setToGymWorkout: function (asleeveNumber: any = 0, agymName: any = "", astat: any = ""): boolean {
-      const sleeveNumber = helper.number("setToGymWorkout", "sleeveNumber", asleeveNumber);
-      const gymName = helper.string("setToUniversityCourse", "gymName", agymName);
-      const stat = helper.string("setToUniversityCourse", "stat", astat);
-      helper.updateDynamicRam("setToGymWorkout", getRamCost(player, "sleeve", "setToGymWorkout"));
-      checkSleeveAPIAccess("setToGymWorkout");
-      checkSleeveNumber("setToGymWorkout", sleeveNumber);
+      if (Player.gang && Player.gang.facName == factionName) {
+        throw helpers.errorMessage(
+          ctx,
+          `Sleeve ${sleeveNumber} cannot work for faction ${factionName} because you have started a gang with them.`,
+        );
+      }
 
-      return player.sleeves[sleeveNumber].workoutAtGym(player, gymName, stat);
+      return Player.sleeves[sleeveNumber].workForFaction(factionName, workType);
     },
-    getSleeveStats: function (asleeveNumber: any = 0): {
-      shock: number;
-      sync: number;
-      hacking: number;
-      strength: number;
-      defense: number;
-      dexterity: number;
-      agility: number;
-      charisma: number;
-    } {
-      const sleeveNumber = helper.number("getSleeveStats", "sleeveNumber", asleeveNumber);
-      helper.updateDynamicRam("getSleeveStats", getRamCost(player, "sleeve", "getSleeveStats"));
-      checkSleeveAPIAccess("getSleeveStats");
-      checkSleeveNumber("getSleeveStats", sleeveNumber);
+    setToGymWorkout: (ctx) => (_sleeveNumber, _gymName, _stat) => {
+      const sleeveNumber = helpers.integer(ctx, "sleeveNumber", _sleeveNumber);
+      const gymName = helpers.string(ctx, "gymName", _gymName);
+      const stat = getEnumHelper("GymType").nsGetMember(ctx, _stat);
+      checkSleeveAPIAccess(ctx);
+      checkSleeveNumber(ctx, sleeveNumber);
 
-      const sl = player.sleeves[sleeveNumber];
-      return {
-        shock: 100 - sl.shock,
-        sync: sl.sync,
-        hacking: sl.hacking,
-        strength: sl.strength,
-        defense: sl.defense,
-        dexterity: sl.dexterity,
-        agility: sl.agility,
-        charisma: sl.charisma,
-      };
+      return Player.sleeves[sleeveNumber].workoutAtGym(gymName, stat);
     },
-    getTask: function (asleeveNumber: any = 0): {
-      task: string;
-      crime: string;
-      location: string;
-      gymStatType: string;
-      factionWorkType: string;
-    } {
-      const sleeveNumber = helper.number("getTask", "sleeveNumber", asleeveNumber);
-      helper.updateDynamicRam("getTask", getRamCost(player, "sleeve", "getTask"));
-      checkSleeveAPIAccess("getTask");
-      checkSleeveNumber("getTask", sleeveNumber);
+    getTask: (ctx) => (_sleeveNumber) => {
+      const sleeveNumber = helpers.integer(ctx, "sleeveNumber", _sleeveNumber);
+      checkSleeveAPIAccess(ctx);
+      checkSleeveNumber(ctx, sleeveNumber);
 
-      const sl = player.sleeves[sleeveNumber];
-      return {
-        task: SleeveTaskType[sl.currentTask],
-        crime: sl.crimeType,
-        location: sl.currentTaskLocation,
-        gymStatType: sl.gymStatType,
-        factionWorkType: FactionWorkType[sl.factionWorkType],
-      };
+      const sl = Player.sleeves[sleeveNumber];
+      if (sl.currentWork === null) return null;
+      return sl.currentWork.APICopy(sl);
     },
-    getInformation: function (asleeveNumber: any = 0): any {
-      const sleeveNumber = helper.number("getInformation", "sleeveNumber", asleeveNumber);
-      helper.updateDynamicRam("getInformation", getRamCost(player, "sleeve", "getInformation"));
-      checkSleeveAPIAccess("getInformation");
-      checkSleeveNumber("getInformation", sleeveNumber);
+    getSleeve: (ctx) => (_sleeveNumber) => {
+      const sleeveNumber = helpers.integer(ctx, "sleeveNumber", _sleeveNumber);
+      checkSleeveAPIAccess(ctx);
+      checkSleeveNumber(ctx, sleeveNumber);
 
-      const sl = player.sleeves[sleeveNumber];
-      return {
+      const sl = Player.sleeves[sleeveNumber];
+
+      const data = {
+        hp: structuredClone(sl.hp),
+        skills: structuredClone(sl.skills),
+        exp: structuredClone(sl.exp),
+        mults: structuredClone(sl.mults),
         city: sl.city,
-        hp: sl.hp,
-        jobs: Object.keys(player.jobs), // technically sleeves have the same jobs as the player.
-        jobTitle: Object.values(player.jobs),
-        maxHp: sl.max_hp,
-
-        mult: {
-          agility: sl.agility_mult,
-          agilityExp: sl.agility_exp_mult,
-          charisma: sl.charisma_mult,
-          charismaExp: sl.charisma_exp_mult,
-          companyRep: sl.company_rep_mult,
-          crimeMoney: sl.crime_money_mult,
-          crimeSuccess: sl.crime_success_mult,
-          defense: sl.defense_mult,
-          defenseExp: sl.defense_exp_mult,
-          dexterity: sl.dexterity_mult,
-          dexterityExp: sl.dexterity_exp_mult,
-          factionRep: sl.faction_rep_mult,
-          hacking: sl.hacking_mult,
-          hackingExp: sl.hacking_exp_mult,
-          strength: sl.strength_mult,
-          strengthExp: sl.strength_exp_mult,
-          workMoney: sl.work_money_mult,
-        },
-
-        timeWorked: sl.currentTaskTime,
-        earningsForSleeves: {
-          workHackExpGain: sl.earningsForSleeves.hack,
-          workStrExpGain: sl.earningsForSleeves.str,
-          workDefExpGain: sl.earningsForSleeves.def,
-          workDexExpGain: sl.earningsForSleeves.dex,
-          workAgiExpGain: sl.earningsForSleeves.agi,
-          workChaExpGain: sl.earningsForSleeves.cha,
-          workMoneyGain: sl.earningsForSleeves.money,
-        },
-        earningsForPlayer: {
-          workHackExpGain: sl.earningsForPlayer.hack,
-          workStrExpGain: sl.earningsForPlayer.str,
-          workDefExpGain: sl.earningsForPlayer.def,
-          workDexExpGain: sl.earningsForPlayer.dex,
-          workAgiExpGain: sl.earningsForPlayer.agi,
-          workChaExpGain: sl.earningsForPlayer.cha,
-          workMoneyGain: sl.earningsForPlayer.money,
-        },
-        earningsForTask: {
-          workHackExpGain: sl.earningsForTask.hack,
-          workStrExpGain: sl.earningsForTask.str,
-          workDefExpGain: sl.earningsForTask.def,
-          workDexExpGain: sl.earningsForTask.dex,
-          workAgiExpGain: sl.earningsForTask.agi,
-          workChaExpGain: sl.earningsForTask.cha,
-          workMoneyGain: sl.earningsForTask.money,
-        },
-        workRepGain: sl.getRepGain(player),
+        shock: sl.shock,
+        sync: sl.sync,
+        memory: sl.memory,
+        storedCycles: sl.storedCycles,
       };
+
+      return data;
     },
-    getSleeveAugmentations: function (asleeveNumber: any = 0): string[] {
-      const sleeveNumber = helper.number("getSleeveAugmentations", "sleeveNumber", asleeveNumber);
-      helper.updateDynamicRam("getSleeveAugmentations", getRamCost(player, "sleeve", "getSleeveAugmentations"));
-      checkSleeveAPIAccess("getSleeveAugmentations");
-      checkSleeveNumber("getSleeveAugmentations", sleeveNumber);
+    getSleeveAugmentations: (ctx) => (_sleeveNumber) => {
+      const sleeveNumber = helpers.integer(ctx, "sleeveNumber", _sleeveNumber);
+      checkSleeveAPIAccess(ctx);
+      checkSleeveNumber(ctx, sleeveNumber);
 
       const augs = [];
-      for (let i = 0; i < player.sleeves[sleeveNumber].augmentations.length; i++) {
-        augs.push(player.sleeves[sleeveNumber].augmentations[i].name);
+      for (let i = 0; i < Player.sleeves[sleeveNumber].augmentations.length; i++) {
+        augs.push(Player.sleeves[sleeveNumber].augmentations[i].name);
       }
       return augs;
     },
-    getSleevePurchasableAugs: function (asleeveNumber: any = 0): {
-      name: string;
-      cost: number;
-    }[] {
-      const sleeveNumber = helper.number("getSleevePurchasableAugs", "sleeveNumber", asleeveNumber);
-      helper.updateDynamicRam("getSleevePurchasableAugs", getRamCost(player, "sleeve", "getSleevePurchasableAugs"));
-      checkSleeveAPIAccess("getSleevePurchasableAugs");
-      checkSleeveNumber("getSleevePurchasableAugs", sleeveNumber);
+    getSleevePurchasableAugs: (ctx) => (_sleeveNumber) => {
+      const sleeveNumber = helpers.integer(ctx, "sleeveNumber", _sleeveNumber);
+      checkSleeveAPIAccess(ctx);
+      checkSleeveNumber(ctx, sleeveNumber);
 
-      const purchasableAugs = findSleevePurchasableAugs(player.sleeves[sleeveNumber], player);
+      const purchasableAugs = Player.sleeves[sleeveNumber].findPurchasableAugs();
       const augs = [];
       for (let i = 0; i < purchasableAugs.length; i++) {
         const aug = purchasableAugs[i];
         augs.push({
           name: aug.name,
-          cost: aug.startingCost,
+          cost: aug.baseCost,
         });
       }
 
       return augs;
     },
-    purchaseSleeveAug: function (asleeveNumber: any = 0, aaugName: any = ""): boolean {
-      const sleeveNumber = helper.number("purchaseSleeveAug", "sleeveNumber", asleeveNumber);
-      const augName = helper.string("setToUniversityCourse", "augName", aaugName);
-      helper.updateDynamicRam("purchaseSleeveAug", getRamCost(player, "sleeve", "purchaseSleeveAug"));
-      checkSleeveAPIAccess("purchaseSleeveAug");
-      checkSleeveNumber("purchaseSleeveAug", sleeveNumber);
+    purchaseSleeveAug: (ctx) => (_sleeveNumber, _augName) => {
+      const sleeveNumber = helpers.integer(ctx, "sleeveNumber", _sleeveNumber);
+      const augName = getEnumHelper("AugmentationName").nsGetMember(ctx, _augName);
+      checkSleeveAPIAccess(ctx);
+      checkSleeveNumber(ctx, sleeveNumber);
 
       const aug = Augmentations[augName];
       if (!aug) {
-        throw helper.makeRuntimeErrorMsg("sleeve.purchaseSleeveAug", `Invalid aug: ${augName}`);
+        throw helpers.errorMessage(ctx, `Invalid aug: ${augName}`);
       }
 
-      return player.sleeves[sleeveNumber].tryBuyAugmentation(player, aug);
+      const result = Player.sleeves[sleeveNumber].purchaseAugmentation(aug);
+      if (!result.success) {
+        helpers.log(ctx, () => result.message);
+      }
+      return result.success;
+    },
+    getSleeveAugmentationPrice: (ctx) => (_augName) => {
+      checkSleeveAPIAccess(ctx);
+      const augName = getEnumHelper("AugmentationName").nsGetMember(ctx, _augName);
+      const aug: Augmentation = Augmentations[augName];
+      return aug.baseCost;
+    },
+    getSleeveAugmentationRepReq: (ctx) => (_augName) => {
+      checkSleeveAPIAccess(ctx);
+      const augName = getEnumHelper("AugmentationName").nsGetMember(ctx, _augName);
+      const aug: Augmentation = Augmentations[augName];
+      return getAugCost(aug).repCost;
+    },
+    setToBladeburnerAction: (ctx) => (_sleeveNumber, _action, _contract?) => {
+      const sleeveNumber = helpers.integer(ctx, "sleeveNumber", _sleeveNumber);
+      const action = helpers.string(ctx, "action", _action);
+      checkSleeveAPIAccess(ctx);
+      checkSleeveNumber(ctx, sleeveNumber);
+      if (!Player.bladeburner) {
+        helpers.log(ctx, () => "You must be a member of the Bladeburner division to use this API.");
+        return false;
+      }
+      let contract: BladeburnerContractName | undefined = undefined;
+      if (action === SpecialBladeburnerActionTypeForSleeve.TakeOnContracts) {
+        contract = getEnumHelper("BladeburnerContractName").nsGetMember(ctx, _contract);
+        for (let i = 0; i < Player.sleeves.length; ++i) {
+          if (i === sleeveNumber) {
+            continue;
+          }
+          const otherWork = Player.sleeves[i].currentWork;
+          if (otherWork?.type === SleeveWorkType.BLADEBURNER && otherWork.actionId.name === contract) {
+            throw helpers.errorMessage(
+              ctx,
+              `Sleeve ${sleeveNumber} cannot take on contracts because Sleeve ${i} is already performing that action.`,
+            );
+          }
+        }
+        const actionId: ActionIdentifier = { type: BladeburnerActionType.Contract, name: contract };
+        const availability = Player.bladeburner.getActionObject(actionId).getAvailability(Player.bladeburner);
+        if (!availability.available) {
+          helpers.log(ctx, () => `Could not start action ${contract}: ${availability.error}`);
+          return false;
+        }
+      }
+      return Player.sleeves[sleeveNumber].bladeburner(action, contract);
+    },
+    purchaseSleeve: (ctx) => () => {
+      checkBitNodeRequirement(ctx);
+      const result = purchaseSleeve();
+      if (!result.success) {
+        helpers.log(ctx, () => result.message);
+      }
+      return result;
+    },
+    upgradeMemory: (ctx) => (_sleeveNumber, _amount) => {
+      checkBitNodeRequirement(ctx);
+      const amount = helpers.positiveInteger(ctx, "amount", _amount);
+      const sleeveNumber = helpers.integer(ctx, "sleeveNumber", _sleeveNumber);
+      checkSleeveNumber(ctx, sleeveNumber);
+      const result = purchaseSleeveMemoryUpgrade(Player.sleeves[sleeveNumber], amount);
+      if (!result.success) {
+        helpers.log(ctx, () => result.message);
+      }
+      return result;
+    },
+    getSleeveCost: (ctx) => () => {
+      checkSleeveAPIAccess(ctx);
+      return getSleeveCost(Player.sleevesFromCovenant);
+    },
+    getMemoryUpgradeCost: (ctx) => (_sleeveNumber, _amount) => {
+      checkSleeveAPIAccess(ctx);
+      const amount = helpers.positiveInteger(ctx, "amount", _amount);
+      const sleeveNumber = helpers.integer(ctx, "sleeveNumber", _sleeveNumber);
+      checkSleeveNumber(ctx, sleeveNumber);
+      return Player.sleeves[sleeveNumber].getMemoryUpgradeCost(amount);
     },
   };
+
+  // Removed functions
+  setRemovedFunctions(sleeveFunctions, {
+    getSleeveStats: { version: "2.2.0", replacement: "sleeve.getSleeve" },
+    getInformation: { version: "2.2.0", replacement: "sleeve.getSleeve" },
+  });
+  return sleeveFunctions;
 }

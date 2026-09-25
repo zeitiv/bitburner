@@ -4,7 +4,9 @@
 
 ## GangMemberInfo.wantedLevelGain property
 
-<b>Signature:</b>
+Per Cycle Rate by which this member is affecting your gang's Wanted Level
+
+**Signature:**
 
 ```typescript
 wantedLevelGain: number;

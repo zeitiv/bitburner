@@ -1,83 +1,56 @@
-import { ITerminal } from "../ITerminal";
-import { IRouter } from "../../ui/Router";
-import { IPlayer } from "../../PersonObjects/IPlayer";
+import { Terminal } from "../../Terminal";
 import { BaseServer } from "../../Server/BaseServer";
-import { isScriptFilename } from "../../Script/isScriptFilename";
-import FileSaver from "file-saver";
 import JSZip from "jszip";
+import { root } from "../../Paths/Directory";
+import { hasScriptExtension } from "../../Paths/ScriptFilePath";
+import { hasTextExtension } from "../../Paths/TextFilePath";
+import { getGlobbedFileMap } from "../../Paths/GlobbedFiles";
+import { downloadContentAsFile } from "../../utils/FileUtils";
 
-export function exportScripts(pattern: string, server: BaseServer): void {
-  const matchEnding = pattern.length == 1 || pattern === "*.*" ? null : pattern.slice(1); // Treat *.* the same as *
+// Basic globbing implementation only supporting * and ?. Can be broken out somewhere else later.
+export function exportScripts(pattern: string, server: BaseServer, currDir = root): void {
   const zip = new JSZip();
-  // Helper function to zip any file contents whose name matches the pattern
-  const zipFiles = (fileNames: string[], fileContents: string[]): void => {
-    for (let i = 0; i < fileContents.length; ++i) {
-      let name = fileNames[i];
-      if (name.startsWith("/")) name = name.slice(1);
-      if (!matchEnding || name.endsWith(matchEnding))
-        zip.file(name, new Blob([fileContents[i]], { type: "text/plain" }));
-    }
-  };
-  // In the case of script files, we pull from the server.scripts array
-  if (!matchEnding || isScriptFilename(matchEnding))
-    zipFiles(
-      server.scripts.map((s) => s.filename),
-      server.scripts.map((s) => s.code),
-    );
-  // In the case of text files, we pull from the server.scripts array
-  if (!matchEnding || matchEnding.endsWith(".txt"))
-    zipFiles(
-      server.textFiles.map((s) => s.fn),
-      server.textFiles.map((s) => s.text),
-    );
+
+  for (const [name, file] of getGlobbedFileMap(pattern, server, currDir)) {
+    zip.file(name, new Blob([file.content], { type: "text/plain" }));
+  }
 
   // Return an error if no files matched, rather than an empty zip folder
   if (Object.keys(zip.files).length == 0) throw new Error(`No files match the pattern ${pattern}`);
-  const zipFn = `bitburner${isScriptFilename(pattern) ? "Scripts" : pattern === "*.txt" ? "Texts" : "Files"}.zip`;
-  zip.generateAsync({ type: "blob" }).then((content: any) => FileSaver.saveAs(content, zipFn));
+  const filename = `bitburner${
+    hasScriptExtension(pattern) ? "Scripts" : hasTextExtension(pattern) ? "Texts" : "Files"
+  }.zip`;
+  zip
+    .generateAsync({ type: "blob" })
+    .then((content: Blob) => downloadContentAsFile(content, filename))
+    .catch((error) => {
+      console.error(error);
+      Terminal.error(`Cannot compress scripts with pattern ${pattern} on ${server.hostname}. Error: ${error}`);
+    });
 }
 
-export function download(
-  terminal: ITerminal,
-  router: IRouter,
-  player: IPlayer,
-  server: BaseServer,
-  args: (string | number | boolean)[],
-): void {
-  try {
-    if (args.length !== 1) {
-      terminal.error("Incorrect usage of download command. Usage: download [script/text file]");
-      return;
-    }
-    const fn = args[0] + "";
-    // If the parameter starts with *, download all files that match the wildcard pattern
-    if (fn.startsWith("*")) {
-      try {
-        exportScripts(fn, server);
-        return;
-      } catch (error: any) {
-        return terminal.error(error.message);
-      }
-    } else if (isScriptFilename(fn)) {
-      // Download a single script
-      const script = terminal.getScript(player, fn);
-      if (script != null) {
-        return script.download();
-      }
-    } else if (fn.endsWith(".txt")) {
-      // Download a single text file
-      const txt = terminal.getTextFile(player, fn);
-      if (txt != null) {
-        return txt.download();
-      }
-    } else {
-      terminal.error(`Cannot download this filetype`);
-      return;
-    }
-    terminal.error(`${fn} does not exist`);
-    return;
-  } catch (e) {
-    terminal.error(e + "");
-    return;
+export function download(args: (string | number | boolean)[], server: BaseServer): void {
+  if (args.length !== 1) {
+    return Terminal.error("Incorrect usage of download command. Usage: download [script/text file]");
   }
+  const pattern = String(args[0]);
+  // If the path contains a * or ?, treat as glob
+  if (pattern.includes("*") || pattern.includes("?")) {
+    try {
+      exportScripts(pattern, server, Terminal.currDir);
+      return;
+    } catch (error) {
+      console.error(error);
+      Terminal.error(`Cannot export scripts with pattern ${pattern} on ${server.hostname}. Error: ${error}`);
+      return;
+    }
+  }
+  const path = Terminal.getFilepath(pattern);
+  if (!path) return Terminal.error(`Could not resolve path ${pattern}`);
+  if (!hasScriptExtension(path) && !hasTextExtension(path)) {
+    return Terminal.error("Can only download script and text files");
+  }
+  const file = server.getContentFile(path);
+  if (!file) return Terminal.error(`File not found: ${path}`);
+  return downloadContentAsFile(file.content, file.filename);
 }

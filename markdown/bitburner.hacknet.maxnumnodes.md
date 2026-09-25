@@ -6,18 +6,18 @@
 
 Get the maximum number of hacknet nodes.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 maxNumNodes(): number;
 ```
-<b>Returns:</b>
+**Returns:**
 
 number
 
-maximum number of hacknet nodes.
+Maximum number of hacknet nodes.
 
 ## Remarks
 
-RAM cost: 0 GB
+RAM cost: 0.5 GB
 

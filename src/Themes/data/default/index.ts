@@ -2,9 +2,9 @@ import { IPredefinedTheme } from "../../Themes";
 import img1 from "./screenshot.png";
 
 export const Theme: IPredefinedTheme = {
-  name: 'Default',
-  description: 'Default game theme, most supported',
-  credit: 'hydroflame',
+  name: "Default",
+  description: "Default game theme, most supported",
+  credit: "hydroflame",
   screenshot: img1,
   colors: {
     primarylight: "#0f0",
@@ -40,5 +40,10 @@ export const Theme: IPredefinedTheme = {
     backgroundprimary: "#000",
     backgroundsecondary: "#000",
     button: "#333",
+    maplocation: "#ffffff",
+    bnlvl0: "#ffff00",
+    bnlvl1: "#ff0000",
+    bnlvl2: "#48d1cc",
+    bnlvl3: "#0000ff",
   },
 };

@@ -6,7 +6,7 @@
 
 List running scripts on a server.
 
-<b>Signature:</b>
+**Signature:**
 
 ```typescript
 ps(host?: string): ProcessInfo[];
@@ -14,11 +14,41 @@ ps(host?: string): ProcessInfo[];
 
 ## Parameters
 
-|  Parameter | Type | Description |
-|  --- | --- | --- |
-|  host | string | Host address of the target server. If not specified, it will be the current server’s IP by default. |
+<table><thead><tr><th>
 
-<b>Returns:</b>
+Parameter
+
+
+</th><th>
+
+Type
+
+
+</th><th>
+
+Description
+
+
+</th></tr></thead>
+<tbody><tr><td>
+
+host
+
+
+</td><td>
+
+string
+
+
+</td><td>
+
+_(Optional)_ Hostname/IP of the target server. If not specified, it will be the current server’s IP by default.
+
+
+</td></tr>
+</tbody></table>
+
+**Returns:**
 
 [ProcessInfo](./bitburner.processinfo.md)<!-- -->\[\]
 
@@ -30,27 +60,14 @@ RAM cost: 0.2 GB
 
 Returns an array with general information about all scripts running on the specified target server.
 
-## Example 1
+## Example
 
 
-```ts
-// NS1:
-const scripts = ps("home");
-for (let i = 0; i < scripts.length; ++i) {
-    tprint(scripts[i].filename + ' ' + scripts[i].threads);
-    tprint(scripts[i].args);
-}
-```
-
-## Example 2
-
-
-```ts
-// NS2:
+```js
 const ps = ns.ps("home");
-for (let script of ps) {
-    ns.tprint(`${script.filename} ${ps[i].threads}`);
-    ns.tprint(script.args);
+for (const script of ps) {
+  ns.tprint(`${script.filename} ${script.threads}`);
+  ns.tprint(script.args);
 }
 ```
 

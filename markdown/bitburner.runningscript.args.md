@@ -4,8 +4,10 @@
 
 ## RunningScript.args property
 
-<b>Signature:</b>
+Arguments the script was called with
+
+**Signature:**
 
 ```typescript
-args: string[];
+args: ScriptArg[];
 ```
