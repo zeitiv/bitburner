@@ -20,7 +20,7 @@ const useStyles = makeStyles()((theme: Theme) => ({
   container: {
     display: "flex",
     flexDirection: "column",
-    height: "calc(100vh - 16px)",
+    height: "calc(100vh - 16px - var(--bb-appbar-offset, 0px))",
   },
   entries: {
     padding: 0,

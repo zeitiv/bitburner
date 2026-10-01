@@ -20,7 +20,7 @@ export interface ICreateProps {
 export interface SidebarItemProps extends ICreateProps {
   clickFn: () => void;
   flash: boolean;
-  classes: Record<"listitem" | "active", string>;
+  classes: Record<"listitem" | "active" | "navButton", string>;
   sidebarOpen: boolean;
 }
 
@@ -33,18 +33,20 @@ export const SidebarItem = memo(function SidebarItem(props: SidebarItemProps): R
       className={props.active ? props.classes.active : ""}
       disablePadding
     >
-      <ListItemButton onClick={props.clickFn}>
-        <ListItemIcon>
-          <Badge badgeContent={(props.count ?? 0) > 0 ? props.count : undefined} color="error">
-            <Tooltip title={!props.sidebarOpen ? props.key_ : ""}>
-              <props.icon color={color} />
-            </Tooltip>
-          </Badge>
-        </ListItemIcon>
-        <ListItemText>
-          <Typography color={color}>{props.key_}</Typography>
-        </ListItemText>
-      </ListItemButton>
+      <Tooltip title={!props.sidebarOpen ? props.key_ : ""} placement="right">
+        <ListItemButton onClick={props.clickFn} className={props.classes.navButton} selected={props.active}>
+          <ListItemIcon>
+            <Badge badgeContent={(props.count ?? 0) > 0 ? props.count : undefined} color="error">
+              <props.icon color={color} fontSize="small" />
+            </Badge>
+          </ListItemIcon>
+          <ListItemText>
+            <Typography color={color} fontWeight={props.active ? 600 : 400}>
+              {props.key_}
+            </Typography>
+          </ListItemText>
+        </ListItemButton>
+      </Tooltip>
     </ListItem>
   );
 });

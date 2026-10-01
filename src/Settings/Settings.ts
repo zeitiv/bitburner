@@ -83,6 +83,11 @@ export const Settings = {
   TailRenderInterval: 1000,
   /** Theme colors. */
   theme: { ...defaultTheme },
+  /**
+   * Whether the one-time switch from the classic green palette to the Modern palette has run. Saves still on the
+   * untouched classic palette are moved over once; picking Classic again afterwards sticks.
+   */
+  ModernThemeApplied: true,
   /** Interface styles. */
   styles: { ...defaultStyles },
   /** Character overview settings. */

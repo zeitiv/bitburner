@@ -88,10 +88,21 @@ const useStyles = makeStyles()((theme: Theme) => ({
     scrollbarWidth: "none" /* for Firefox */,
     margin: theme.spacing(0),
     flexGrow: 1,
-    padding: "8px",
+    // Full-height pages size themselves as calc(100vh - 16px - var(--bb-appbar-offset)), so keep the 8px vertical padding.
+    padding: "8px 20px",
     minHeight: "100vh",
     boxSizing: "border-box",
     width: "1px",
+    [theme.breakpoints.down("sm")]: {
+      padding: "8px 10px",
+    },
+  },
+  // On mobile the sidebar collapses into a fixed top app bar, which the page must clear.
+  withAppBar: {
+    [theme.breakpoints.down("sm")]: {
+      "--bb-appbar-offset": "calc(56px + env(safe-area-inset-top))",
+      paddingTop: "calc(8px + var(--bb-appbar-offset))",
+    },
   },
 }));
 
@@ -550,7 +561,7 @@ export function GameRoot(): React.ReactElement {
               {withSidebar ? (
                 <Box display="flex" flexDirection="row" width="100%">
                   <SidebarRoot page={pageWithContext.page} />
-                  <Box className={classes.root}>{mainPage}</Box>
+                  <Box className={`${classes.root} ${classes.withAppBar}`}>{mainPage}</Box>
                 </Box>
               ) : (
                 <Box className={classes.root}>{mainPage}</Box>

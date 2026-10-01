@@ -3,7 +3,7 @@ import Draggable, { DraggableEventHandler } from "react-draggable";
 import { makeStyles } from "tss-react/mui";
 import Collapse from "@mui/material/Collapse";
 import Paper from "@mui/material/Paper";
-import { useTheme } from "@mui/material/styles";
+import { alpha, useTheme, type Theme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import KeyboardArrowUpIcon from "@mui/icons-material/KeyboardArrowUp";
@@ -15,17 +15,25 @@ import { Settings } from "../../Settings/Settings";
 import { Box, Button, Typography } from "@mui/material";
 import { debounce } from "lodash";
 
-const useStyles = makeStyles()({
+const useStyles = makeStyles()((theme: Theme) => ({
   overviewContainer: {
     position: "fixed",
-    top: 0,
-    right: 0,
+    top: 8,
+    right: 8,
     zIndex: 1500,
     display: "flex",
     justifyContent: "flex-end",
     flexDirection: "column",
-    maxWidth: "100vw",
+    maxWidth: "calc(100vw - 16px)",
     boxSizing: "border-box",
+    backgroundColor: alpha(theme.palette.background.default, 0.8),
+    backdropFilter: "blur(16px) saturate(140%)",
+    WebkitBackdropFilter: "blur(16px) saturate(140%)",
+    boxShadow: `0 24px 60px -20px ${alpha(theme.colors.black ?? "#000", 0.9)}`,
+    // Sit just below the mobile top app bar.
+    [theme.breakpoints.down("sm")]: {
+      top: "calc(64px + env(safe-area-inset-top))",
+    },
   },
 
   header: {
@@ -34,27 +42,32 @@ const useStyles = makeStyles()({
     display: "flex",
     flexDirection: "row",
     alignItems: "center",
+    gap: 6,
+    padding: "4px 6px 4px 10px",
+    "&:active": { cursor: "grabbing" },
   },
 
   visibilityToggle: {
     padding: "2px",
     minWidth: "inherit",
     backgroundColor: "transparent",
+    backgroundImage: "none",
     border: "none",
     "&:hover": {
-      backgroundColor: "rgba(255, 255, 255, 0.1)",
+      backgroundColor: alpha(theme.palette.primary.main, 0.1),
+      boxShadow: "none",
     },
   },
 
   collapse: {
-    borderTop: `1px solid ${Settings.theme.welllight}`,
+    borderTop: `1px solid ${theme.palette.divider}`,
     margin: "0 auto",
   },
 
   icon: {
-    fontSize: "24px",
+    fontSize: "20px",
   },
-});
+}));
 
 interface IProps {
   children: (parentOpen: boolean) => JSX.Element[] | JSX.Element | React.ReactElement[] | React.ReactElement;
@@ -136,11 +149,17 @@ export function Overview({ children, mode }: IProps): React.ReactElement {
     return <></>;
   return (
     <Draggable handle=".drag" bounds="body" onStop={handleStop} defaultPosition={{ x, y }}>
-      <Paper className={classes.overviewContainer} square style={{ maxHeight: "100vh", overflowY: "auto" }}>
+      <Paper className={classes.overviewContainer} style={{ maxHeight: "100vh", overflowY: "auto" }}>
         <Box className="drag" onDoubleClick={() => setOpen((old) => !old)} ref={draggableRef}>
           <Box className={classes.header}>
             <LeftIcon color="secondary" className={classes.icon} sx={{ padding: "2px" }} />
-            <Typography flexGrow={1} color="secondary">
+            <Typography
+              flexGrow={1}
+              color="secondary"
+              variant="caption"
+              textAlign="left"
+              sx={{ textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: 600 }}
+            >
               {header}
             </Typography>
             <Button

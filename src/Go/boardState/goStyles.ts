@@ -587,7 +587,7 @@ export const boardStyles = makeStyles<unknown, Size | "background">({ uniqId: "b
       },
     },
     instructionScroller: {
-      height: "calc(100vh - 80px)",
+      height: "calc(100vh - 80px - var(--bb-appbar-offset, 0px))",
       overflowY: "scroll",
       marginTop: "10px",
     },

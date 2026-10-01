@@ -10,6 +10,7 @@ import { mergePlayerDefinedKeyBindings } from "../utils/KeyBindingUtils";
 import { assertObject } from "../utils/TypeAssertion";
 import { Settings } from "./Settings";
 import { Reviver } from "../utils/GenericReviver";
+import { Classic, Modern } from "../Themes/data";
 
 /**
  * This function won't be able to catch **all** invalid hostnames. In order to validate a hostname properly, we need to
@@ -139,6 +140,18 @@ export function loadSettings(saveString: string) {
   }
   if (!isValidRFAConnectionPortSetting(Settings.RemoteFileApiPort).success) {
     Settings.RemoteFileApiPort = 0;
+  }
+
+  // Saves from before the Modern theme carry no flag. If they still use the untouched classic palette, they never
+  // chose it on purpose, so give them the new default look once.
+  if (save.ModernThemeApplied !== true) {
+    const savedTheme: Record<string, unknown> = Settings.theme;
+    const usesClassic = Object.entries(Classic.colors).every(([key, value]) => {
+      const current = savedTheme[key];
+      return typeof current === "string" && current.toLowerCase() === String(value).toLowerCase();
+    });
+    if (usesClassic) Object.assign(Settings.theme, Modern.colors);
+    Settings.ModernThemeApplied = true;
   }
 
   // Merge Settings.KeyBindings with DefaultKeyBindings.

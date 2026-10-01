@@ -54,7 +54,7 @@ export interface IPredefinedTheme {
 }
 
 export const defaultTheme: ITheme = {
-  ...predefined.Default.colors,
+  ...predefined.Modern.colors,
 };
 
 export const getPredefinedThemes = (): Record<string, IPredefinedTheme> => ({

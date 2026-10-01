@@ -483,7 +483,12 @@ export function WorkInProgressRoot(): React.ReactElement {
   return (
     <Container
       maxWidth="md"
-      sx={{ display: "flex", flexDirection: "column", justifyContent: "center", height: "calc(100vh - 16px)" }}
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        height: "calc(100vh - 16px - var(--bb-appbar-offset, 0px))",
+      }}
     >
       <Paper sx={{ p: 1, mb: 1 }}>
         <Typography variant="h6">{workInfo.title}</Typography>

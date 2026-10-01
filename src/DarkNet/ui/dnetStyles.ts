@@ -19,7 +19,7 @@ export const dnetStyles = makeStyles<unknown, dwColors>({ uniqId: "dnetStyles" }
   },
   NetWrapper: {
     width: "100%",
-    height: "calc(100vh - 80px)",
+    height: "calc(100vh - 80px - var(--bb-appbar-offset, 0px))",
     overflow: "scroll",
     position: "relative",
     border: "solid 1px " + theme.colors.secondary,

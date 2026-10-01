@@ -21,7 +21,7 @@ type SidebarAccordionProps = {
   items: (IItemProps | boolean)[];
   icon: React.ReactElement["type"];
   sidebarOpen: boolean;
-  classes: Record<"listitem" | "active", string>;
+  classes: Record<"listitem" | "active" | "navButton" | "sectionButton", string>;
 };
 
 type ClickFnCacheKeyType = (page: Page) => void;
@@ -68,18 +68,32 @@ export function SidebarAccordion({
       {useMemo(
         () => (
           <ListItem classes={li_classes} disablePadding>
-            <ListItemButton onClick={() => setOpen((open) => !open)}>
-              <ListItemIcon>
-                <Tooltip title={!sidebarOpen ? key_ : ""}>
-                  <Icon color={"primary"} />
-                </Tooltip>
-              </ListItemIcon>
-              <ListItemText primary={<Typography>{key_}</Typography>} />
-              {open ? <ExpandLessIcon color="primary" /> : <ExpandMoreIcon color="primary" />}
-            </ListItemButton>
+            <Tooltip title={!sidebarOpen ? key_ : ""} placement="right">
+              <ListItemButton onClick={() => setOpen((open) => !open)} className={classes.sectionButton}>
+                <ListItemIcon>
+                  <Icon color={"secondary"} fontSize="small" />
+                </ListItemIcon>
+                <ListItemText
+                  primary={
+                    <Typography
+                      variant="caption"
+                      color="secondary"
+                      sx={{ textTransform: "uppercase", letterSpacing: "0.12em", fontWeight: 600 }}
+                    >
+                      {key_}
+                    </Typography>
+                  }
+                />
+                {open ? (
+                  <ExpandLessIcon color="secondary" fontSize="small" />
+                ) : (
+                  <ExpandMoreIcon color="secondary" fontSize="small" />
+                )}
+              </ListItemButton>
+            </Tooltip>
           </ListItem>
         ),
-        [li_classes, sidebarOpen, key_, open, Icon],
+        [li_classes, classes.sectionButton, sidebarOpen, key_, open, Icon],
       )}
       <Collapse in={open} timeout="auto" unmountOnExit>
         {items.map((x) => {

@@ -1,4 +1,5 @@
-export { Theme as Default } from "./default";
+export { Theme as Modern } from "./modern";
+export { Theme as Classic } from "./default";
 export { Theme as DefaultLite } from "./default-lite";
 export { Theme as Monokai } from "./monokai-ish";
 export { Theme as Warmer } from "./warmer";

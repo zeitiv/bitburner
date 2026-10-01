@@ -1,5 +1,5 @@
 import React, { useMemo, useCallback, useState, useEffect, useRef } from "react";
-import { styled, Theme, CSSObject, useTheme } from "@mui/material/styles";
+import { alpha, styled, Theme, CSSObject, useTheme } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
 import { makeStyles } from "tss-react/mui";
 import MuiDrawer from "@mui/material/Drawer";
@@ -15,6 +15,7 @@ import ListItemButton from "@mui/material/ListItemButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import Typography from "@mui/material/Typography";
+import Box from "@mui/material/Box";
 
 import ComputerIcon from "@mui/icons-material/Computer"; // Hacking
 import LastPageIcon from "@mui/icons-material/LastPage"; // Terminal
@@ -122,10 +123,75 @@ const Drawer = styled(MuiDrawer)(({ theme, open }) => ({
 }));
 
 const useStyles = makeStyles()((theme: Theme) => ({
-  active: {
-    borderLeft: "3px solid " + theme.palette.primary.main,
-  },
+  active: {},
   listitem: {},
+  navButton: {
+    position: "relative",
+    margin: "1px 8px",
+    padding: "6px 8px",
+    minHeight: 38,
+    borderRadius: theme.shape.borderRadius,
+    transition: "background-color 150ms ease",
+    "& .MuiListItemIcon-root": { minWidth: 36 },
+    "&:hover": { backgroundColor: alpha(theme.palette.primary.main, 0.08) },
+    "&.Mui-selected, &.Mui-selected:hover": { backgroundColor: alpha(theme.palette.primary.main, 0.14) },
+    // Accent bar on the active page.
+    "&.Mui-selected::before": {
+      content: '""',
+      position: "absolute",
+      left: -8,
+      top: 8,
+      bottom: 8,
+      width: 3,
+      borderRadius: "0 3px 3px 0",
+      backgroundColor: theme.palette.primary.main,
+      boxShadow: `0 0 12px ${alpha(theme.palette.primary.main, 0.6)}`,
+    },
+  },
+  sectionButton: {
+    margin: "10px 8px 2px",
+    padding: "2px 8px",
+    minHeight: 30,
+    borderRadius: theme.shape.borderRadius,
+    "& .MuiListItemIcon-root": { minWidth: 36 },
+    "&:hover": { backgroundColor: "transparent", "& .MuiTypography-root": { color: theme.palette.secondary.light } },
+  },
+  brand: {
+    margin: "8px",
+    padding: "8px",
+    borderRadius: theme.shape.borderRadius,
+    "& .MuiListItemIcon-root": { minWidth: 40 },
+  },
+  logo: {
+    width: 26,
+    height: 26,
+    borderRadius: 8,
+    display: "grid",
+    placeItems: "center",
+    flexShrink: 0,
+    fontWeight: 800,
+    fontSize: 12,
+    color: theme.palette.background.default,
+    background: `linear-gradient(135deg, ${theme.palette.primary.light}, ${theme.palette.info.main})`,
+    boxShadow: `0 4px 14px -4px ${alpha(theme.palette.primary.main, 0.7)}`,
+  },
+  appBar: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 56,
+    zIndex: 1550,
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    padding: "0 8px",
+    paddingTop: "env(safe-area-inset-top)",
+    backgroundColor: alpha(theme.palette.background.default, 0.78),
+    backdropFilter: "blur(14px) saturate(140%)",
+    WebkitBackdropFilter: "blur(14px) saturate(140%)",
+    borderBottom: `1px solid ${theme.palette.divider}`,
+  },
 }));
 
 export function SidebarRoot(props: { page: Page }): React.ReactElement {
@@ -326,12 +392,15 @@ export function SidebarRoot(props: { page: Page }): React.ReactElement {
 
   const { classes } = useStyles();
   const [open, setOpen] = useState(() => (isMobile ? false : Settings.IsSidebarOpened));
-  const toggleDrawer = (): void =>
-    setOpen((old) => {
-      // The open/closed rail is a desktop preference; don't let mobile's overlay open/close persist it.
-      if (!isMobile) Settings.IsSidebarOpened = !old;
-      return !old;
-    });
+  const toggleDrawer = useCallback(
+    (): void =>
+      setOpen((old) => {
+        // The open/closed rail is a desktop preference; don't let mobile's overlay open/close persist it.
+        if (!isMobile) Settings.IsSidebarOpened = !old;
+        return !old;
+      }),
+    [isMobile],
+  );
   const li_classes = useMemo(() => ({ root: classes.listitem }), [classes.listitem]);
   const ChevronOpenClose = open ? ChevronLeftIcon : ChevronRightIcon;
 
@@ -340,21 +409,16 @@ export function SidebarRoot(props: { page: Page }): React.ReactElement {
   // props.children array will be a different object every time.
   return (
     <>
-      {isMobile && !open && (
-        <IconButton
-          aria-label="open sidebar"
-          onClick={toggleDrawer}
-          sx={{
-            position: "fixed",
-            top: 4,
-            left: 4,
-            zIndex: 1600,
-            backgroundColor: (t) => t.colors.backgroundprimary,
-            border: (t) => `1px solid ${t.palette.primary.main}`,
-          }}
-        >
-          <MenuIcon color="primary" />
-        </IconButton>
+      {isMobile && (
+        <Box className={classes.appBar}>
+          <IconButton aria-label="open sidebar" onClick={toggleDrawer}>
+            <MenuIcon color="primary" />
+          </IconButton>
+          <Box className={classes.logo}>&gt;_</Box>
+          <Typography noWrap fontWeight={600} sx={{ ml: 0.5 }}>
+            {props.page}
+          </Typography>
+        </Box>
       )}
       <Drawer
         open={open}
@@ -363,122 +427,127 @@ export function SidebarRoot(props: { page: Page }): React.ReactElement {
         onClose={toggleDrawer}
         sx={isMobile ? { zIndex: 1600 } : undefined}
       >
-      {useMemo(
-        () => (
-          <ListItem classes={li_classes} disablePadding>
-            <ListItemButton onClick={toggleDrawer}>
-              <ListItemIcon>
-                <ChevronOpenClose color={"primary"} />
-              </ListItemIcon>
-              <ListItemText
-                primary={
-                  <Tooltip title={commitHash()}>
-                    <Typography>Bitburner v{CONSTANTS.VersionString}</Typography>
-                  </Tooltip>
-                }
-              />
-            </ListItemButton>
-          </ListItem>
-        ),
-        [ChevronOpenClose, li_classes],
-      )}
-      <Divider />
-      <List>
-        <SidebarAccordion
-          key_="Hacking"
-          page={props.page}
-          clickPage={clickPage}
-          flash={flash}
-          icon={ComputerIcon}
-          sidebarOpen={open}
-          classes={classes}
-          items={[
-            { key_: Page.Terminal, icon: LastPageIcon },
-            { key_: Page.ScriptEditor, icon: CreateIcon },
-            {
-              key_: Page.ActiveScripts,
-              icon: StorageIcon,
-              count: errorCount,
-              alternateKeys: [Page.RecentErrors, Page.RecentlyKilledScripts],
-            },
-            { key_: Page.CreateProgram, icon: BugReportIcon, count: programCount },
-            canStaneksGift && { key_: Page.StaneksGift, icon: DeveloperBoardIcon },
-          ]}
-        />
-        <Typography component="div" id="sidebar-extra-hook-0"></Typography>
-        <Divider />
-        <SidebarAccordion
-          key_="Character"
-          page={props.page}
-          clickPage={clickPage}
-          flash={flash}
-          icon={AccountBoxIcon}
-          sidebarOpen={open}
-          classes={classes}
-          items={[
-            { key_: Page.Stats, icon: EqualizerIcon },
-            canOpenFactions && {
-              key_: Page.Factions,
-              icon: ContactsIcon,
-              active: [Page.Factions, Page.Faction].includes(props.page),
-              count: invitationsCount,
-            },
-            canOpenAugmentations && {
-              key_: Page.Augmentations,
-              icon: RotatedDoubleArrowIcon,
-              count: augmentationCount,
-            },
-            { key_: Page.Hacknet, icon: AccountTreeIcon },
-            canOpenSleeves && { key_: Page.Sleeves, icon: PeopleAltIcon },
-            canOpenGrafting && { key_: Page.Grafting, icon: BiotechIcon },
-          ]}
-        />
-        <Typography component="div" id="sidebar-extra-hook-1"></Typography>
-        <Divider />
-        <SidebarAccordion
-          key_="World"
-          page={props.page}
-          clickPage={clickPage}
-          flash={flash}
-          icon={PublicIcon}
-          sidebarOpen={open}
-          classes={classes}
-          items={[
-            {
-              key_: Page.City,
-              icon: LocationCityIcon,
-              active: [Page.City, Page.Location].includes(props.page),
-            },
-            { key_: Page.Travel, icon: AirplanemodeActiveIcon },
-            canJob && { key_: Page.Job, icon: WorkIcon },
-            canStockMarket && { key_: Page.StockMarket, icon: TrendingUpIcon },
-            canBladeburner && { key_: Page.Bladeburner, icon: FormatBoldIcon },
-            canCorporation && { key_: Page.Corporation, icon: BusinessIcon },
-            canGang && { key_: Page.Gang, icon: SportsMmaIcon },
-            canIPvGO && { key_: Page.Go, icon: BorderInnerSharpIcon },
-            canDarkNet && { key_: Page.DarkNet, icon: ShareIcon },
-          ]}
-        />
-        <Typography component="div" id="sidebar-extra-hook-2"></Typography>
-        <Divider />
-        <SidebarAccordion
-          key_="Help"
-          page={props.page}
-          clickPage={clickPage}
-          flash={flash}
-          icon={LiveHelpIcon}
-          sidebarOpen={open}
-          classes={classes}
-          items={[
-            { key_: Page.Milestones, icon: CheckIcon },
-            { key_: Page.Documentation, icon: HelpIcon },
-            { key_: Page.Achievements, icon: EmojiEventsIcon },
-            { key_: Page.Options, icon: SettingsIcon },
-            process.env.NODE_ENV === "development" && { key_: Page.DevMenu, icon: DeveloperBoardIcon },
-          ]}
-        />
-        <Typography component="div" id="sidebar-extra-hook-3"></Typography>
-      </List>
+        {useMemo(
+          () => (
+            <ListItem classes={li_classes} disablePadding>
+              <ListItemButton onClick={toggleDrawer} className={classes.brand} aria-label="toggle sidebar">
+                <ListItemIcon>
+                  <Box className={classes.logo}>&gt;_</Box>
+                </ListItemIcon>
+                <ListItemText
+                  primary={
+                    <Tooltip title={commitHash()}>
+                      <Box>
+                        <Typography fontWeight={700} lineHeight={1.2}>
+                          Bitburner
+                        </Typography>
+                        <Typography variant="caption" color="secondary" lineHeight={1.2}>
+                          v{CONSTANTS.VersionString}
+                        </Typography>
+                      </Box>
+                    </Tooltip>
+                  }
+                />
+                <ChevronOpenClose color="secondary" fontSize="small" />
+              </ListItemButton>
+            </ListItem>
+          ),
+          [ChevronOpenClose, li_classes, classes.brand, classes.logo, toggleDrawer],
+        )}
+        <Divider sx={{ mx: 1.5 }} />
+        <List sx={{ pt: 0 }}>
+          <SidebarAccordion
+            key_="Hacking"
+            page={props.page}
+            clickPage={clickPage}
+            flash={flash}
+            icon={ComputerIcon}
+            sidebarOpen={open}
+            classes={classes}
+            items={[
+              { key_: Page.Terminal, icon: LastPageIcon },
+              { key_: Page.ScriptEditor, icon: CreateIcon },
+              {
+                key_: Page.ActiveScripts,
+                icon: StorageIcon,
+                count: errorCount,
+                alternateKeys: [Page.RecentErrors, Page.RecentlyKilledScripts],
+              },
+              { key_: Page.CreateProgram, icon: BugReportIcon, count: programCount },
+              canStaneksGift && { key_: Page.StaneksGift, icon: DeveloperBoardIcon },
+            ]}
+          />
+          <Typography component="div" id="sidebar-extra-hook-0"></Typography>
+          <SidebarAccordion
+            key_="Character"
+            page={props.page}
+            clickPage={clickPage}
+            flash={flash}
+            icon={AccountBoxIcon}
+            sidebarOpen={open}
+            classes={classes}
+            items={[
+              { key_: Page.Stats, icon: EqualizerIcon },
+              canOpenFactions && {
+                key_: Page.Factions,
+                icon: ContactsIcon,
+                active: [Page.Factions, Page.Faction].includes(props.page),
+                count: invitationsCount,
+              },
+              canOpenAugmentations && {
+                key_: Page.Augmentations,
+                icon: RotatedDoubleArrowIcon,
+                count: augmentationCount,
+              },
+              { key_: Page.Hacknet, icon: AccountTreeIcon },
+              canOpenSleeves && { key_: Page.Sleeves, icon: PeopleAltIcon },
+              canOpenGrafting && { key_: Page.Grafting, icon: BiotechIcon },
+            ]}
+          />
+          <Typography component="div" id="sidebar-extra-hook-1"></Typography>
+          <SidebarAccordion
+            key_="World"
+            page={props.page}
+            clickPage={clickPage}
+            flash={flash}
+            icon={PublicIcon}
+            sidebarOpen={open}
+            classes={classes}
+            items={[
+              {
+                key_: Page.City,
+                icon: LocationCityIcon,
+                active: [Page.City, Page.Location].includes(props.page),
+              },
+              { key_: Page.Travel, icon: AirplanemodeActiveIcon },
+              canJob && { key_: Page.Job, icon: WorkIcon },
+              canStockMarket && { key_: Page.StockMarket, icon: TrendingUpIcon },
+              canBladeburner && { key_: Page.Bladeburner, icon: FormatBoldIcon },
+              canCorporation && { key_: Page.Corporation, icon: BusinessIcon },
+              canGang && { key_: Page.Gang, icon: SportsMmaIcon },
+              canIPvGO && { key_: Page.Go, icon: BorderInnerSharpIcon },
+              canDarkNet && { key_: Page.DarkNet, icon: ShareIcon },
+            ]}
+          />
+          <Typography component="div" id="sidebar-extra-hook-2"></Typography>
+          <SidebarAccordion
+            key_="Help"
+            page={props.page}
+            clickPage={clickPage}
+            flash={flash}
+            icon={LiveHelpIcon}
+            sidebarOpen={open}
+            classes={classes}
+            items={[
+              { key_: Page.Milestones, icon: CheckIcon },
+              { key_: Page.Documentation, icon: HelpIcon },
+              { key_: Page.Achievements, icon: EmojiEventsIcon },
+              { key_: Page.Options, icon: SettingsIcon },
+              process.env.NODE_ENV === "development" && { key_: Page.DevMenu, icon: DeveloperBoardIcon },
+            ]}
+          />
+          <Typography component="div" id="sidebar-extra-hook-3"></Typography>
+        </List>
       </Drawer>
     </>
   );

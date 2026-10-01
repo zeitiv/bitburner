@@ -95,7 +95,14 @@ export function InfiltrationRoot(): React.ReactElement {
     // this. Because the current page is not saved, reloading should always
     // fix this state.
     return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "calc(100vh - 16px)" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          height: "calc(100vh - 16px - var(--bb-appbar-offset, 0px))",
+        }}
+      >
         <Typography variant="h2">Not currently infiltrating!</Typography>
       </div>
     );
@@ -105,7 +112,7 @@ export function InfiltrationRoot(): React.ReactElement {
     throw new Error("Internal error: Unknown stage " + state.stage.constructor.name);
   }
   return (
-    <div style={{ display: "flex", alignItems: "center", height: "calc(100vh - 16px)" }}>
+    <div style={{ display: "flex", alignItems: "center", height: "calc(100vh - 16px - var(--bb-appbar-offset, 0px))" }}>
       {state.stage instanceof IntroModel ? (
         <Intro state={state} />
       ) : (

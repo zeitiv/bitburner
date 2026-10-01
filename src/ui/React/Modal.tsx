@@ -1,5 +1,5 @@
 import React, { type CSSProperties, useEffect, useState } from "react";
-import { Theme } from "@mui/material";
+import { Theme, alpha } from "@mui/material";
 import Box from "@mui/material/Box";
 import IconButton from "@mui/material/IconButton";
 import Fade from "@mui/material/Fade";
@@ -16,12 +16,21 @@ const useStyles = makeStyles()((theme: Theme) => ({
   },
   paper: {
     position: "relative",
-    backgroundColor: theme.palette.background.default,
-    border: "2px solid " + theme.palette.primary.main,
-    boxShadow: `0px 3px 5px -1px ${theme.palette.primary.dark},0px 5px 8px 0px ${theme.palette.primary.dark},0px 1px 14px 0px ${theme.palette.primary.dark}`,
+    backgroundColor: theme.colors.backgroundsecondary,
+    backgroundImage: `linear-gradient(180deg, ${alpha(theme.palette.primary.main, 0.05)}, transparent 120px)`,
+    border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`,
+    borderRadius: theme.shape.borderRadius * 1.6,
+    boxShadow: `0 0 0 1px ${alpha(theme.colors.black ?? "#000", 0.4)}, 0 30px 80px -20px ${alpha(
+      theme.colors.black ?? "#000",
+      0.9,
+    )}, 0 0 60px -30px ${alpha(theme.palette.primary.main, 0.5)}`,
     padding: 2,
     maxWidth: "80%",
     maxHeight: "80%",
+    [theme.breakpoints.down("sm")]: {
+      maxWidth: "calc(100% - 16px)",
+      maxHeight: "calc(100% - 32px)",
+    },
     overflow: "auto",
     "&::-webkit-scrollbar": {
       // webkit
@@ -31,10 +40,12 @@ const useStyles = makeStyles()((theme: Theme) => ({
   },
   closeButton: {
     position: "absolute",
-    right: 3,
-    top: 3,
-    width: 20,
-    height: 20,
+    right: 8,
+    top: 8,
+    width: 28,
+    height: 28,
+    zIndex: 1,
+    color: theme.palette.secondary.main,
   },
 }));
 
@@ -93,9 +104,9 @@ export const Modal = ({
           inert={open ? null : ""}
         >
           <IconButton className={classes.closeButton} onClick={onClose}>
-            <CloseIcon />
+            <CloseIcon fontSize="small" />
           </IconButton>
-          <Box sx={{ m: 2 }}>{content}</Box>
+          <Box sx={{ m: { xs: 2, sm: 3 } }}>{content}</Box>
         </div>
       </Fade>
     </M>
