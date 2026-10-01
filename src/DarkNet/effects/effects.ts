@@ -40,7 +40,7 @@ export const handleSuccessfulAuth = (server: DarknetServer, threads: number, pid
   addClue(server);
 
   const chance = 0.1 * 1.05 ** server?.difficulty;
-  if (Math.random() < chance && !isLabyrinthServer(server.hostname)) {
+  if (Math.random() < chance && !isLabyrinthServer(server.hostname) && server.maxRam) {
     addCacheToServer(server, false);
   }
 };
@@ -77,16 +77,24 @@ export const calculateAuthenticationTime = (
   const applyUnderleveledFactor = person.skills.charisma <= chaRequired && darknetServerData.depth > 1;
   const underleveledFactor = applyUnderleveledFactor ? 1.5 + (chaRequired + 50) / (person.skills.charisma + 50) : 1;
   const hasBootsFactor = Player.hasAugmentation(AugmentationName.TheBoots) ? 0.8 : 1;
-  const hasSf15_2Factor = Player.activeSourceFileLvl(15) > 2 ? 0.8 : 1;
+  const hasSf15_2Factor = Player.activeSourceFileLvl(15) >= 2 ? 0.8 : 1;
+  const intelligenceFactor = 1 / calculateIntelligenceBonus(person.skills.intelligence, 0.25);
 
   const time =
-    baseTime * skillFactor * backdoorFactor * underleveledFactor * hasBootsFactor * hasSf15_2Factor * threadsFactor;
+    baseTime *
+    skillFactor *
+    backdoorFactor *
+    underleveledFactor *
+    hasBootsFactor *
+    hasSf15_2Factor *
+    threadsFactor *
+    intelligenceFactor;
 
   // Add extra time for timing attack server, per correct character
   const sharedChars = darknetServerData.modelId === ModelIds.TimingAttack ? correctCharsInPassword : 0;
   const sharedCharsExtraTime = sharedChars * 50 * threadsFactor;
 
-  return time * calculateIntelligenceBonus(person.skills.intelligence, 0.25) + sharedCharsExtraTime;
+  return time + sharedCharsExtraTime;
 };
 
 export const getBackdoorAuthTimeDebuff = () => {
@@ -111,8 +119,11 @@ export const getMultiplierFromCharisma = (scalar = 1) => {
 };
 
 export const calculatePasswordAttemptChaGain = (server: DarknetServerData, threads: number = 1, success = false) => {
-  const baseXpGain = 3;
-  const difficultyBase = 1.1;
+  if (!server.maxRam) {
+    return 0;
+  }
+  const baseXpGain = 2.5;
+  const difficultyBase = 1.07;
   const xpGain = baseXpGain + difficultyBase ** server.difficulty;
   const alreadyHackedMult = server.hasAdminRights ? 0.2 : 1;
   const successMult = success && !server.hasAdminRights ? 10 : 1;
@@ -120,13 +131,17 @@ export const calculatePasswordAttemptChaGain = (server: DarknetServerData, threa
   return xpGain * alreadyHackedMult * successMult * bonusTimeMult * threads * Player.mults.charisma_exp;
 };
 
-// TODO: balance password clue spawn rate
-export const addClue = (server: DarknetServer) => {
+export const addClue = (server: DarknetServer): string[] => {
+  if (!server.maxRam) {
+    return [];
+  }
+  const files = [];
   // Basic mechanics hints
   if ((Math.random() < 0.7 && server.difficulty <= 3) || Math.random() < 0.1) {
     const hint: LiteratureName = hintLiterature[Math.floor(Math.random() * hintLiterature.length)];
     if (hint && !server.messages.includes(hint)) {
       server.messages.push(hint);
+      files.push(hint);
     }
   }
 
@@ -137,7 +152,8 @@ export const addClue = (server: DarknetServer) => {
     const start = Math.floor(Math.random() * (commonPasswordDictionary.length - length));
     const commonPasswords = commonPasswordDictionary.slice(start, start + length).join(", ");
     server.writeToTextFile(hintFileName, `Some common passwords include ${commonPasswords}`);
-    return;
+    files.push(hintFileName);
+    return files;
   }
 
   // connected neighboring server's password (does not include server name)
@@ -150,7 +166,8 @@ export const addClue = (server: DarknetServer) => {
     const neighboringServer = neighboringServerName ? getDarknetServer(neighboringServerName) : null;
     if (neighboringServer) {
       server.writeToTextFile(passwordHintName, `Remember this password: ${neighboringServer.password}`);
-      return;
+      files.push(passwordHintName);
+      return files;
     }
   }
 
@@ -161,7 +178,8 @@ export const addClue = (server: DarknetServer) => {
     if (targetServer) {
       const contents = `Server: ${targetServer.hostname} Password: "${targetServer.password}"`;
       server.writeToTextFile(hintFileName, contents);
-      return;
+      files.push(hintFileName);
+      return files;
     }
   }
 
@@ -169,7 +187,8 @@ export const addClue = (server: DarknetServer) => {
     const hintFileName = getClueFileName(notebookFileNames);
     const loreNote = packetSniffPhrases[Math.floor(Math.random() * packetSniffPhrases.length)];
     server.writeToTextFile(hintFileName, loreNote);
-    return;
+    files.push(hintFileName);
+    return files;
   }
 
   if (Math.random() < 0.7) {
@@ -179,9 +198,11 @@ export const addClue = (server: DarknetServer) => {
       const [containedChar1, containedChar2] = getTwoCharsInPassword(targetServer.password);
       const hint = `The password for ${targetServer.hostname} contains ${containedChar1} and ${containedChar2}`;
       server.writeToTextFile(hintFileName, hint);
-      return;
+      files.push(hintFileName);
+      return files;
     }
   }
+  return files;
 };
 
 export const getClueFileName = (fileNameList: readonly string[]): TextFilePath => {

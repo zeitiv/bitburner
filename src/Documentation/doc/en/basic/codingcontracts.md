@@ -9,7 +9,8 @@ Each contract has a limited number of attempts.
 If you provide the wrong answer too many times and exceed the number of attempts, the contract will self-destruct (delete itself).
 
 Coding Contracts are randomly generated and spawn over time. Initially, you'll only see a small range of the easier contracts, but as you progress further through the game more challenging ones will unlock.
-They can appear on any [server](servers.md) (including your home computer), except for your purchased [servers](servers.md).
+
+They can appear on non-darknet [servers](servers.md) that are not owned by the player (`Server.purchasedByPlayer` is false).
 
 ## Contract generation
 
@@ -33,7 +34,9 @@ lower rewards. Contracts generated this way grant 50% lower rewards than those g
 
 To run a Coding Contract in the [Terminal](terminal.md), simply use the `run` command:
 
-    $ run some-contract.cct
+```text
+$ run some-contract.cct
+```
 
 Doing this will bring up a popup.
 The popup will display the contract's problem, the number of attempts remaining, and an area to provide an answer.
