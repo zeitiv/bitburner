@@ -82,8 +82,12 @@ export function DocumentationRoot({ docPage }: { docPage?: string }): React.Reac
         bgcolor={Settings.theme.backgroundprimary}
         alignItems="center"
       >
-        <Button onClick={() => history.pop()}>Back</Button>
-        <Button onClick={() => history.home()}>Home</Button>
+        <Button onClick={() => history.pop()} disabled={history.pages.length === 0}>
+          Back
+        </Button>
+        <Button onClick={() => history.home()} disabled={history.pages.length === 0}>
+          Home
+        </Button>
         <DocumentationAutocomplete
           sx={{ marginLeft: "10px" }}
           onChange={(path, external) => {
@@ -91,7 +95,7 @@ export function DocumentationRoot({ docPage }: { docPage?: string }): React.Reac
           }}
         />
       </Box>
-      <Box paddingTop="50px">
+      <Box sx={{ paddingTop: "50px", maxWidth: "lg" }}>
         <Navigator.Provider value={navigator}>
           <MD pageFilePath={deepLink ? asFilePath(deepLink) : history.page} />
         </Navigator.Provider>

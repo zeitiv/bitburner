@@ -79,11 +79,7 @@ export function generateRandomContract(): void {
   const reward = getRandomReward();
 
   // Finally select a random problem type.
-  // Difficulty is capped to not overwhelm a new player.
-  const totalSFs = [...Player.sourceFiles].reduce<number>((total, [__bn, lvl]) => (total += lvl), 0);
-  const maxDif = 2 * totalSFs + 1;
-
-  const problemType = getRandomProblemType(maxDif);
+  const problemType = getRandomProblemType();
 
   const contractFn = getRandomFilename(randServer);
   if (contractFn == null) {
@@ -101,7 +97,6 @@ export function generateRandomContractOnHome(): void {
   // Then select a random reward type. 'Money' will always be the last reward type
   const reward = getRandomReward();
 
-  // Choose random server
   const serv = Player.getHomeComputer();
 
   const contractFn = getRandomFilename(serv);
@@ -129,12 +124,11 @@ export const generateDummyContract = (problemType: CodingContractName, server: B
 interface IGenerateContractParams {
   problemType?: CodingContractName;
   server?: string;
-  filename?: ContractFilePath;
   reward?: ICodingContractReward;
   rewardScaling?: number;
 }
 
-export function generateContract(params: IGenerateContractParams): void {
+export function generateContract(params: IGenerateContractParams): ContractFilePath | null {
   // Problem Type
   let problemType;
   const problemTypes = Object.keys(CodingContractTypes);
@@ -158,18 +152,25 @@ export function generateContract(params: IGenerateContractParams): void {
     server = getRandomServer();
   }
   if (server === null) {
-    return;
+    return null;
   }
 
-  const filename = params.filename ? params.filename : getRandomFilename(server);
+  const filename = getRandomFilename(server);
   if (filename == null) {
-    return;
+    return null;
   }
   const contract = new CodingContract(filename, problemType, reward, params.rewardScaling);
   server.addContract(contract);
+  return contract.fn;
 }
 
-function getRandomProblemType(maxDif = 10): CodingContractName {
+function calculateDefaultMaxDifficulty(): number {
+  // Difficulty is capped to not overwhelm a new player.
+  const totalSFs = [...Player.sourceFiles].reduce((total, [__bn, lvl]) => (total += lvl), 0);
+  return 2 * totalSFs + 1;
+}
+
+function getRandomProblemType(maxDif = calculateDefaultMaxDifficulty()): CodingContractName {
   const problemTypes = Object.values(CodingContractName).filter((x) => CodingContractTypes[x].difficulty <= maxDif);
   const randIndex = getRandomIntInclusive(0, problemTypes.length - 1);
 
@@ -189,29 +190,18 @@ export function getRandomReward(): ICodingContractReward {
   return { type: getRandomIntInclusive(0, validRewardTypes.length - 1) };
 }
 
-function getRandomServer(): BaseServer | null {
-  const servers = GetAllServers().filter((server: BaseServer) => server.serversOnNetwork.length !== 0);
+export function getRandomServer(): BaseServer | null {
+  const servers = GetAllServers().filter(
+    (server: BaseServer) =>
+      server instanceof Server &&
+      !server.purchasedByPlayer &&
+      server.hostname !== SpecialServers.WorldDaemon &&
+      server.serversOnNetwork.length !== 0,
+  );
   if (servers.length === 0) {
     return null;
   }
-  let randIndex = getRandomIntInclusive(0, servers.length - 1);
-  let randServer = servers[randIndex];
-
-  // An infinite loop shouldn't ever happen, but to be safe we'll use
-  // a for loop with a limited number of tries
-  for (let i = 0; i < 200; ++i) {
-    if (
-      randServer instanceof Server &&
-      !randServer.purchasedByPlayer &&
-      randServer.hostname !== SpecialServers.WorldDaemon
-    ) {
-      break;
-    }
-    randIndex = getRandomIntInclusive(0, servers.length - 1);
-    randServer = servers[randIndex];
-  }
-
-  return randServer;
+  return servers[getRandomIntInclusive(0, servers.length - 1)];
 }
 
 /**

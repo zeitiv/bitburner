@@ -9,7 +9,8 @@ You only need to do 2 things:
 
 ## Community tools
 
-All these tools support synchronizing scripts to Bitburner and transpiling TypeScript/JSX to JavaScript. Note that Bitburner has native support for TypeScript/JSX.
+All these tools support synchronizing scripts to Bitburner. Some tools support transpiling TypeScript/JSX to JavaScript.
+Note that Bitburner has native support for TypeScript/JSX.
 
 Links:
 
@@ -17,9 +18,10 @@ Links:
 - [viteburner](https://github.com/Tanimodori/viteburner): Daemon tools of bitburner using vite for script transform, file syncing, RAM monitoring and more!
 - [bb-external-editor](https://github.com/shyguy1412/bb-external-editor): This tool uses esbuild to transpile and bundle your scripts. It supports JS, TS and React as well as importing from any browser-compatible npm library out of the box.
 - [BitburnerGoFilesync](https://github.com/CTNOriginals/BitburnerGoFilesync): A standalone binary cli tool that doesn't require any setup or third party libraries. It is designed to be very minimal and easy to use out of the box.
+- [VS Code Extension: Bitburner File Sync Plugin](https://github.com/ficocelliguy/bitburner-file-sync-plugin): A VS Code extension that syncs your local script files to Bitburner.
 
 `typescript-template` and `BitburnerGoFilesync` both have a small set of options and features, their simplicity is by design.  
-`viteburner` and `bb-external-editor` have more fancy features and may offer more control for specific use cases.
+`viteburner`, `bb-external-editor`, and `VS Code Extension: Bitburner File Sync Plugin` have more fancy features and may offer more control for specific use cases.
 
 ## Troubleshooting tips
 
@@ -35,293 +37,360 @@ Links:
 
 ## API specification
 
-All APIs use an input/output format similar to the JSON RPC 2.0 protocol.
+### Overview
 
-Input:
+All APIs use a request/response format similar to the JSON RPC 2.0 protocol.
 
-        {
-            "jsonrpc": "2.0",
-            "id": number,
-            "method": string,
-            "params": any
-        }
+Unknown parameters in requests are ignored.
 
-Output:
+Pagination is not supported.
 
-        {
-            "jsonrpc": "2.0",
-            "id": number,
-            "result": any,
-            "error": any
-        }
+Request:
 
-### pushFile
+```text
+{
+  "jsonrpc": "2.0",
+  "id": number,
+  "method": string,
+  "params": any
+}
+```
+
+Success Response:
+
+```text
+{
+  "jsonrpc": "2.0",
+  "id": number,
+  "result": any
+}
+```
+
+Error Response:
+
+```text
+{
+  "jsonrpc": "2.0",
+  "id": number,
+  "error": string
+}
+```
+
+### API list
+
+#### pushFile
 
 Create or update a file.
 
-Input:
+Request:
 
-        {
-            "jsonrpc": "2.0",
-            "id": number,
-            "method": "pushFile",
-            "params": {
-                "filename": string,
-                "content": string,
-                "server": string
-            }
-        }
+```text
+{
+  "jsonrpc": "2.0",
+  "id": number,
+  "method": "pushFile",
+  "params": {
+    "filename": string,
+    "content": string,
+    "server": string
+  }
+}
+```
 
-Output:
+Response:
 
-        {
-            "jsonrpc": "2.0",
-            "id": number,
-            "result": "OK"
-        }
+```text
+{
+  "jsonrpc": "2.0",
+  "id": number,
+  "result": "OK"
+}
+```
 
-### getFile
+#### getFile
 
 Read a file and its content.
 
-Input:
+Request:
 
-        {
-            "jsonrpc": "2.0",
-            "id": number,
-            "method": "getFile",
-            "params": {
-                "filename": string,
-                "server": string
-            }
-        }
+```text
+{
+  "jsonrpc": "2.0",
+  "id": number,
+  "method": "getFile",
+  "params": {
+    "filename": string,
+    "server": string
+  }
+}
+```
 
-Output:
+Response:
 
-        {
-            "jsonrpc": "2.0",
-            "id": number,
-            "result": string
-        }
+```text
+{
+  "jsonrpc": "2.0",
+  "id": number,
+  "result": string
+}
+```
 
-### getFileMetadata
+#### getFileMetadata
 
 Read metadata of a file.
 
-Input:
+Request:
 
-        {
-            "jsonrpc": "2.0",
-            "id": number,
-            "method": "getFileMetadata",
-            "params": {
-                "filename": string,
-                "server": string
-            }
-        }
+```text
+{
+  "jsonrpc": "2.0",
+  "id": number,
+  "method": "getFileMetadata",
+  "params": {
+    "filename": string,
+    "server": string
+  }
+}
+```
 
-Output:
+Response:
 
-        {
-            "jsonrpc": "2.0",
-            "id": number,
-            "result": {
-                "filename": string,
-                "atime": string,
-                "btime": string,
-                "mtime": string
-            }
-        }
+```text
+{
+  "jsonrpc": "2.0",
+  "id": number,
+  "result": {
+    "filename": string,
+    "size": number,
+    "atime": number,
+    "btime": number,
+    "mtime": number
+  }
+}
+```
 
-### deleteFile
+#### deleteFile
 
 Delete a file.
 
-Input:
+Request:
 
-        {
-            "jsonrpc": "2.0",
-            "id": number,
-            "method": "deleteFile",
-            "params": {
-                "filename": string,
-                "server": string
-            }
-        }
+```text
+{
+  "jsonrpc": "2.0",
+  "id": number,
+  "method": "deleteFile",
+  "params": {
+    "filename": string,
+    "server": string
+  }
+}
+```
 
-Output:
+Response:
 
-        {
-            "jsonrpc": "2.0",
-            "id": number,
-            "result": "OK"
-        }
+```text
+{
+  "jsonrpc": "2.0",
+  "id": number,
+  "result": "OK"
+}
+```
 
-### getFileNames
+#### getFileNames
 
 List all file names on a server.
 
-Input:
+Request:
 
-        {
-            "jsonrpc": "2.0",
-            "id": number,
-            "method": "getFileNames",
-            "params": {
-                "server": string
-            }
-        }
+```text
+{
+  "jsonrpc": "2.0",
+  "id": number,
+  "method": "getFileNames",
+  "params": {
+    "server": string
+  }
+}
+```
 
-Output:
+Response:
 
-        {
-            "jsonrpc": "2.0",
-            "id": number,
-            "result": string[]
-        }
+```text
+{
+  "jsonrpc": "2.0",
+  "id": number,
+  "result": string[]
+}
+```
 
-### getAllFiles
-
-Get the content of all files on a server.
-
-Input:
-
-        {
-            "jsonrpc": "2.0",
-            "id": number,
-            "method": "getAllFiles",
-            "params": {
-                "server": string
-            }
-        }
-
-Output:
-
-        {
-            "jsonrpc": "2.0",
-            "id": number,
-            "result": {
-                "filename": string,
-                "content": string
-            }[]
-        }
-
-### getAllFileMetadata
-
-Input:
+#### getAllFiles
 
 Get the content of all files on a server.
 
-        {
-            "jsonrpc": "2.0",
-            "id": number,
-            "method": "getAllFileMetadata",
-            "params": {
-                "server": string
-            }
-        }
+Request:
 
-Output:
+```text
+{
+  "jsonrpc": "2.0",
+  "id": number,
+  "method": "getAllFiles",
+  "params": {
+    "server": string
+  }
+}
+```
 
-        {
-            "jsonrpc": "2.0",
-            "id": number,
-            "result": {
-                "filename": string,
-                "atime": string
-                "btime": string,
-                "mtime": string,
-            }[]
-        }
+Response:
 
-### calculateRam
+```text
+{
+  "jsonrpc": "2.0",
+  "id": number,
+  "result": {
+    "filename": string,
+    "content": string
+  }[]
+}
+```
+
+#### getAllFileMetadata
+
+Get the content of all files on a server.
+
+Request:
+
+```text
+{
+  "jsonrpc": "2.0",
+  "id": number,
+  "method": "getAllFileMetadata",
+  "params": {
+    "server": string
+  }
+}
+```
+
+Response:
+
+```text
+{
+  "jsonrpc": "2.0",
+  "id": number,
+  "result": {
+    "filename": string,
+    "size": number,
+    "atime": number,
+    "btime": number,
+    "mtime": number
+  }[]
+}
+```
+
+#### calculateRam
 
 Calculate the in-game ram cost of a script.
 
-Input:
+Request:
 
-        {
-            "jsonrpc": "2.0",
-            "id": number,
-            "method": "calculateRam",
-            "params": {
-                "filename": string,
-                "server": string
-            }
-        }
+```text
+{
+  "jsonrpc": "2.0",
+  "id": number,
+  "method": "calculateRam",
+  "params": {
+    "filename": string,
+    "server": string
+  }
+}
+```
 
-Output:
+Response:
 
-        {
-            "jsonrpc": "2.0",
-            "id": number,
-            "result": number
-        }
+```text
+{
+  "jsonrpc": "2.0",
+  "id": number,
+  "result": number
+}
+```
 
-### getDefinitionFile
+#### getDefinitionFile
 
 Get the definition file of NS APIs.
 
-Input:
+Request:
 
-        {
-            "jsonrpc": "2.0",
-            "id": number,
-            "method": "getDefinitionFile"
-        }
+```text
+{
+  "jsonrpc": "2.0",
+  "id": number,
+  "method": "getDefinitionFile"
+}
+```
 
-Output:
+Response:
 
-        {
-            "jsonrpc": "2.0",
-            "id": number,
-            "result": string
-        }
+```text
+{
+  "jsonrpc": "2.0",
+  "id": number,
+  "result": string
+}
+```
 
-### getSaveFile
+#### getSaveFile
 
 Get save data.
 
-Input:
+Request:
 
-        {
-            "jsonrpc": "2.0",
-            "id": number,
-            "method": "getSaveFile"
-        }
+```text
+{
+  "jsonrpc": "2.0",
+  "id": number,
+  "method": "getSaveFile"
+}
+```
 
-Output:
+Response:
 
-        {
-            "jsonrpc": "2.0",
-            "id": number,
-            "result": {
-                "identifier": string,
-                "binary": boolean,
-                "save": string
-            }
-        }
+```text
+{
+  "jsonrpc": "2.0",
+  "id": number,
+  "result": {
+    "identifier": string,
+    "binary": boolean,
+    "save": string
+  }
+}
+```
 
-### getAllServers
+#### getAllServers
 
 Get all servers.
 
-Input:
+Request:
 
-        {
-            "jsonrpc": "2.0",
-            "id": number,
-            "method": "getAllServers"
-        }
+```text
+{
+  "jsonrpc": "2.0",
+  "id": number,
+  "method": "getAllServers"
+}
+```
 
-Output:
+Response:
 
-        {
-            "jsonrpc": "2.0",
-            "id": number,
-            "result": {
-                "hostname": string,
-                "hasAdminRights": boolean,
-                "purchasedByPlayer": boolean
-            }[]
-        }
+```text
+{
+  "jsonrpc": "2.0",
+  "id": number,
+  "result": {
+    "hostname": string,
+    "hasAdminRights": boolean,
+    "purchasedByPlayer": boolean
+  }[]
+}
+```

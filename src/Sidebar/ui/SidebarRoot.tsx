@@ -11,6 +11,7 @@ import ChevronLeftIcon from "@mui/icons-material/ChevronLeft";
 import ChevronRightIcon from "@mui/icons-material/ChevronRight";
 import MenuIcon from "@mui/icons-material/Menu";
 import ListItem from "@mui/material/ListItem";
+import ListItemButton from "@mui/material/ListItemButton";
 import ListItemIcon from "@mui/material/ListItemIcon";
 import ListItemText from "@mui/material/ListItemText";
 import Typography from "@mui/material/Typography";
@@ -53,7 +54,7 @@ import { CONSTANTS } from "../../Constants";
 import { iTutorialSteps, iTutorialNextStep, ITutorial } from "../../InteractiveTutorial";
 import { getAvailableCreatePrograms } from "../../Programs/ProgramHelpers";
 import { Settings } from "../../Settings/Settings";
-import { AugmentationName, CityName } from "@enums";
+import { AugmentationName } from "@enums";
 
 import { ProgramsSeen } from "../../Programs/ui/ProgramsRoot";
 import { InvitationsSeen } from "../../Faction/ui/FactionsRoot";
@@ -138,10 +139,10 @@ export function SidebarRoot(props: { page: Page }): React.ReactElement {
   let flash: Page | null = null;
   switch (ITutorial.currStep) {
     case iTutorialSteps.CharacterGoToTerminalPage:
-    case iTutorialSteps.ActiveScriptsPage:
+    case iTutorialSteps.ActiveScriptsDescription:
       flash = Page.Terminal;
       break;
-    case iTutorialSteps.GoToCharacterPage:
+    case iTutorialSteps.GoToCharacterStatsPage:
       flash = Page.Stats;
       break;
     case iTutorialSteps.TerminalGoToActiveScriptsPage:
@@ -178,7 +179,7 @@ export function SidebarRoot(props: { page: Page }): React.ReactElement {
     Player.exploits.length > 0;
 
   const canOpenSleeves = Player.sleeves.length > 0;
-  const canOpenGrafting = Player.canAccessGrafting() && Player.city === CityName.NewTokyo;
+  const canOpenGrafting = Player.canAccessGrafting();
 
   const canCorporation = !!Player.corporation;
   const canGang = !!Player.gang;
@@ -191,7 +192,12 @@ export function SidebarRoot(props: { page: Page }): React.ReactElement {
 
   const clickPage = useCallback(
     (page: Page) => {
-      if (page == Page.ScriptEditor || page == Page.Documentation || page == Page.Options) {
+      if (page == Page.ScriptEditor) {
+        Router.toPage(page, {
+          files: new Map(),
+          options: { vim: Settings.MonacoDefaultToVim, hostname: Player.currentServer },
+        });
+      } else if (page === Page.Documentation || page === Page.Options || page === Page.ActiveScripts) {
         Router.toPage(page, {});
       } else if (isSimplePage(page)) {
         Router.toPage(page);
@@ -218,7 +224,7 @@ export function SidebarRoot(props: { page: Page }): React.ReactElement {
       switch (keyBindingType) {
         case SimplePage.Terminal:
         case ComplexPage.ScriptEditor:
-        case SimplePage.ActiveScripts:
+        case ComplexPage.ActiveScripts:
         case SimplePage.CreateProgram:
         case SimplePage.Stats:
         case SimplePage.Hacknet:
@@ -359,17 +365,19 @@ export function SidebarRoot(props: { page: Page }): React.ReactElement {
       >
       {useMemo(
         () => (
-          <ListItem classes={li_classes} button onClick={toggleDrawer}>
-            <ListItemIcon>
-              <ChevronOpenClose color={"primary"} />
-            </ListItemIcon>
-            <ListItemText
-              primary={
-                <Tooltip title={commitHash()}>
-                  <Typography>Bitburner v{CONSTANTS.VersionString}</Typography>
-                </Tooltip>
-              }
-            />
+          <ListItem classes={li_classes} disablePadding>
+            <ListItemButton onClick={toggleDrawer}>
+              <ListItemIcon>
+                <ChevronOpenClose color={"primary"} />
+              </ListItemIcon>
+              <ListItemText
+                primary={
+                  <Tooltip title={commitHash()}>
+                    <Typography>Bitburner v{CONSTANTS.VersionString}</Typography>
+                  </Tooltip>
+                }
+              />
+            </ListItemButton>
           </ListItem>
         ),
         [ChevronOpenClose, li_classes],
@@ -397,7 +405,7 @@ export function SidebarRoot(props: { page: Page }): React.ReactElement {
             canStaneksGift && { key_: Page.StaneksGift, icon: DeveloperBoardIcon },
           ]}
         />
-        <Typography id="sidebar-extra-hook-0"></Typography>
+        <Typography component="div" id="sidebar-extra-hook-0"></Typography>
         <Divider />
         <SidebarAccordion
           key_="Character"
@@ -425,7 +433,7 @@ export function SidebarRoot(props: { page: Page }): React.ReactElement {
             canOpenGrafting && { key_: Page.Grafting, icon: BiotechIcon },
           ]}
         />
-        <Typography id="sidebar-extra-hook-1"></Typography>
+        <Typography component="div" id="sidebar-extra-hook-1"></Typography>
         <Divider />
         <SidebarAccordion
           key_="World"
@@ -451,7 +459,7 @@ export function SidebarRoot(props: { page: Page }): React.ReactElement {
             canDarkNet && { key_: Page.DarkNet, icon: ShareIcon },
           ]}
         />
-        <Typography id="sidebar-extra-hook-2"></Typography>
+        <Typography component="div" id="sidebar-extra-hook-2"></Typography>
         <Divider />
         <SidebarAccordion
           key_="Help"
@@ -469,7 +477,7 @@ export function SidebarRoot(props: { page: Page }): React.ReactElement {
             process.env.NODE_ENV === "development" && { key_: Page.DevMenu, icon: DeveloperBoardIcon },
           ]}
         />
-        <Typography id="sidebar-extra-hook-3"></Typography>
+        <Typography component="div" id="sidebar-extra-hook-3"></Typography>
       </List>
       </Drawer>
     </>
